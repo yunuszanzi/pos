@@ -19,6 +19,12 @@ const ProductsPage = lazy(() => import("../features/products/ProductsPage").then
 const ProductFormPage = lazy(() => import("../features/products/ProductFormPage").then(({ ProductFormPage: Page }) => ({ default: Page })));
 const ImportPage = lazy(() => import("../features/products/ImportPage").then(({ ImportPage: Page }) => ({ default: Page })));
 const CatalogueSetupPage = lazy(() => import("../features/products/CatalogueSetupPage").then(({ CatalogueSetupPage: Page }) => ({ default: Page })));
+const StockPage = lazy(() => import("../features/stock/StockPage").then(({ StockPage: Page }) => ({ default: Page })));
+const LedgerPage = lazy(() => import("../features/stock/LedgerPage").then(({ LedgerPage: Page }) => ({ default: Page })));
+const AdjustmentsPage = lazy(() => import("../features/stock/AdjustmentsPage").then(({ AdjustmentsPage: Page }) => ({ default: Page })));
+const NewAdjustmentPage = lazy(() => import("../features/stock/NewAdjustmentPage").then(({ NewAdjustmentPage: Page }) => ({ default: Page })));
+const OpeningStockPage = lazy(() => import("../features/stock/OpeningStockPage").then(({ OpeningStockPage: Page }) => ({ default: Page })));
+const ValuationPage = lazy(() => import("../features/stock/ValuationPage").then(({ ValuationPage: Page }) => ({ default: Page })));
 
 type AppRoute = {
   path: string;
@@ -37,6 +43,12 @@ const appRoutes: AppRoute[] = [
   { path: "/products/import", label: "Import products", permission: "products.import", element: <ImportPage />, nav: false },
   { path: "/products/:id", label: "Edit product", permission: "catalog.manage", element: <ProductFormPage />, nav: false },
   { path: "/catalogue", label: "Categories & tax", permission: "catalog.view", element: <CatalogueSetupPage /> },
+  { path: "/stock", label: "Stock", permission: "inventory.view", element: <StockPage /> },
+  { path: "/stock/ledger", label: "Stock movements", permission: "inventory.view", element: <LedgerPage />, nav: false },
+  { path: "/stock/adjustments", label: "Stock adjustments", permission: "inventory.view", element: <AdjustmentsPage />, nav: false },
+  { path: "/stock/adjustments/new", label: "New stock adjustment", permission: "inventory.adjust", element: <NewAdjustmentPage />, nav: false },
+  { path: "/stock/opening", label: "Opening stock", permission: "inventory.opening_stock", element: <OpeningStockPage />, nav: false },
+  { path: "/stock/valuation", label: "Stock valuation", permission: "products.cost.view", element: <ValuationPage />, nav: false },
   { path: "/users", label: "Users", permission: "users.view", element: <UsersPage /> },
   { path: "/roles", label: "Roles & permissions", permission: "roles.view", element: <RolesPage /> },
   { path: "/settings", label: "Settings", permission: "settings.view", element: <SettingsPage /> },

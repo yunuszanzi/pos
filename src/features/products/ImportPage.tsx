@@ -1,69 +1,20 @@
-import { useRef, useState, type ChangeEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { toCsv } from "../../../shared/csv";
 import { importColumns, importTemplateCsvRows } from "../../../shared/productImport";
-import { ApiRequestError, saveTextFile } from "../../api/client";
-import { importProducts, previewProductImport, type ImportIssue, type ImportPreview, type ImportResult } from "../../api/productsApi";
+import { saveTextFile } from "../../api/client";
+import { importProducts, previewProductImport } from "../../api/productsApi";
 import { ErrorMessage, PageTitle, SuccessMessage } from "../../app/FormElements";
-
-const visibleIssueLimit = 200;
+import { IssuesTable } from "./IssuesTable";
+import { useCsvImport } from "./useCsvImport";
 
 export function ImportPage() {
   const queryClient = useQueryClient();
-  const [fileName, setFileName] = useState("");
-  const [csv, setCsv] = useState("");
-  const [preview, setPreview] = useState<ImportPreview | null>(null);
-  const [issues, setIssues] = useState<ImportIssue[]>([]);
-  const [result, setResult] = useState<ImportResult | null>(null);
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-  // One key per chosen file: clicking Import twice, or retrying after a dropped connection, cannot import twice.
-  const idempotencyKey = useRef(crypto.randomUUID());
-
-  async function chooseFile(event: ChangeEvent<HTMLInputElement>) {
-    const input = event.currentTarget;
-    const file = input.files?.[0];
-    input.value = ""; // lets the same file name be chosen again after fixing it
-    if (!file) return;
-    setError("");
-    setResult(null);
-    setPreview(null);
-    setIssues([]);
-    setFileName(file.name);
-    idempotencyKey.current = crypto.randomUUID();
-    setBusy(true);
-    try {
-      const text = await file.text();
-      setCsv(text);
-      const checked = await previewProductImport(text);
-      setPreview(checked);
-      setIssues(checked.issues);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "The file could not be checked");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function runImport() {
-    setError("");
-    setBusy(true);
-    try {
-      const done = await importProducts(csv, idempotencyKey.current);
-      setResult(done);
-      setPreview(null);
-      await Promise.all(["products", "categories", "brands"].map((key) => queryClient.invalidateQueries({ queryKey: [key] })));
-    } catch (caught) {
-      if (caught instanceof ApiRequestError && caught.code === "IMPORT_HAS_ERRORS") {
-        setIssues(caught.details as ImportIssue[]);
-        setPreview((current) => current && { ...current, canImport: false, issues: caught.details as ImportIssue[] });
-      }
-      setError(caught instanceof Error ? caught.message : "The import failed");
-    } finally {
-      setBusy(false);
-    }
-  }
+  const { fileName, preview, issues, result, error, busy, chooseFile, runImport } = useCsvImport({
+    preview: previewProductImport,
+    run: importProducts,
+    onImported: () => Promise.all(["products", "categories", "brands"].map((key) => queryClient.invalidateQueries({ queryKey: [key] }))),
+  });
 
   return <div className="content">
     <PageTitle title="Import products" description="Add or update many products from a CSV file. The file is checked first; nothing is saved until every row is valid." />
@@ -100,15 +51,6 @@ export function ImportPage() {
         {!preview && !result && !busy && <p className="muted">Choose a file to see what would change.</p>}
       </section>
     </div>
-    {issues.length > 0 && <section className="panel">
-      <h2>Problems</h2>
-      <div className="table-scroll"><table>
-        <thead><tr><th>Row</th><th>Column</th><th>Problem</th></tr></thead>
-        <tbody>{issues.slice(0, visibleIssueLimit).map((issue, index) => <tr key={`${issue.row}-${issue.field}-${index}`}>
-          <td>{issue.row}</td><td className="mono">{issue.field}</td><td>{issue.message}</td>
-        </tr>)}</tbody>
-      </table></div>
-      {issues.length > visibleIssueLimit && <p className="muted">Showing the first {visibleIssueLimit} of {issues.length} problems.</p>}
-    </section>}
+    <IssuesTable issues={issues} />
   </div>;
 }
