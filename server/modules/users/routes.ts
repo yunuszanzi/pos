@@ -6,7 +6,7 @@ import { roleSchema, userCreateSchema, userUpdateSchema } from "./schema";
 import { auditPrincipal } from "../../lib/audit";
 import { db } from "../../lib/db";
 import { apiError, roleAboveActor } from "../../lib/http";
-import { canManageRole, getPrincipal, holdsAllPermissions, requirePermission } from "../../lib/permissions";
+import { canManageRole, createdByActor, getPrincipal, holdsAllPermissions, requirePermission, updatedByActor } from "../../lib/permissions";
 import { hashPin } from "../auth/pin";
 import { supabaseAdmin } from "../../lib/supabaseAdmin";
 
@@ -63,6 +63,7 @@ usersRoutes.post("/users", requirePermission("users.manage"), validateJson(userC
         email: input.email,
         displayName: input.displayName,
         pinHash: input.pin ? await hashPin(input.pin) : null,
+        ...createdByActor(principal),
       }).returning();
       await tx.insert(userBranches).values(input.branchIds.map((branchId) => ({ userId: created.id, branchId })));
       return [created];
@@ -121,7 +122,7 @@ usersRoutes.put("/users/:id", requirePermission("users.manage"), validateJson(us
     const [updated] = await tx.update(appUsers).set({
       ...profileChanges,
       ...(pin ? { pinHash: await hashPin(pin) } : {}),
-      updatedAt: new Date(),
+      ...updatedByActor(principal),
     }).where(eq(appUsers.id, id)).returning();
     if (branchIds) {
       await tx.delete(userBranches).where(eq(userBranches.userId, id));
@@ -187,7 +188,7 @@ usersRoutes.post("/roles", requirePermission("roles.manage"), validateJson(roleS
     .where(inArray(permissions.key, input.permissionKeys));
   if (valid.length !== new Set(input.permissionKeys).size) return apiError(context, 400, "INVALID_PERMISSION", "One or more permission keys are invalid");
   const [role] = await db.transaction(async (tx) => {
-    const [created] = await tx.insert(roles).values({ businessId: principal.businessId!, name: input.name }).returning();
+    const [created] = await tx.insert(roles).values({ businessId: principal.businessId!, name: input.name, ...createdByActor(principal) }).returning();
     if (input.permissionKeys.length) {
       await tx.insert(rolePermissions).values(input.permissionKeys.map((permissionKey) => ({ roleId: created.id, permissionKey })));
     }
@@ -210,7 +211,7 @@ usersRoutes.put("/roles/:id", requirePermission("roles.manage"), validateJson(ro
     .where(inArray(permissions.key, input.permissionKeys));
   if (valid.length !== new Set(input.permissionKeys).size) return apiError(context, 400, "INVALID_PERMISSION", "One or more permission keys are invalid");
   await db.transaction(async (tx) => {
-    await tx.update(roles).set({ name: input.name, updatedAt: new Date() }).where(eq(roles.id, id));
+    await tx.update(roles).set({ name: input.name, ...updatedByActor(principal) }).where(eq(roles.id, id));
     await tx.delete(rolePermissions).where(eq(rolePermissions.roleId, id));
     if (input.permissionKeys.length) {
       await tx.insert(rolePermissions).values(input.permissionKeys.map((permissionKey) => ({ roleId: id, permissionKey })));

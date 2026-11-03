@@ -6,7 +6,7 @@ import { settingsSchema } from "./schema";
 import { auditPrincipal } from "../../lib/audit";
 import { db } from "../../lib/db";
 import { apiError } from "../../lib/http";
-import { getPrincipal, requirePermission } from "../../lib/permissions";
+import { getPrincipal, requirePermission, updatedByActor } from "../../lib/permissions";
 
 export const settingsRoutes = new Hono();
 
@@ -24,7 +24,7 @@ settingsRoutes.put("/settings", requirePermission("settings.manage"), validateJs
     .where(eq(businessSettings.businessId, principal.businessId!)).limit(1);
   if (!before) return apiError(context, 404, "NOT_FOUND", "Settings not found");
   const [after] = await db.update(businessSettings)
-    .set({ ...context.req.valid("json"), updatedAt: new Date() })
+    .set({ ...context.req.valid("json"), ...updatedByActor(principal) })
     .where(eq(businessSettings.businessId, principal.businessId!))
     .returning();
   await auditPrincipal(context, principal, "settings", principal.businessId!, "update", before, after);

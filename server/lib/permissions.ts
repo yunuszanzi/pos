@@ -26,6 +26,14 @@ export function getPrincipal(context: Context): Principal {
   return principal;
 }
 
+/** The person acting: the PIN-switched user on a terminal, otherwise the signed-in account. */
+export function getActorId(principal: Principal): string {
+  return principal.activeUserId ?? principal.authUserId;
+}
+
+export const createdByActor = (principal: Principal) => ({ createdBy: getActorId(principal), updatedBy: getActorId(principal) });
+export const updatedByActor = (principal: Principal) => ({ updatedBy: getActorId(principal), updatedAt: new Date() });
+
 export async function getRolePermissions(roleId: string): Promise<Set<string>> {
   const rows = await db.select({ key: rolePermissions.permissionKey })
     .from(rolePermissions)

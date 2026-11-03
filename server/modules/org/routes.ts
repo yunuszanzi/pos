@@ -7,7 +7,7 @@ import { branchSchema, businessUpdateSchema, documentSeriesSchema, locationSchem
 import { auditPrincipal } from "../../lib/audit";
 import { db } from "../../lib/db";
 import { apiError } from "../../lib/http";
-import { getPrincipal, requirePermission } from "../../lib/permissions";
+import { createdByActor, getPrincipal, requirePermission, updatedByActor } from "../../lib/permissions";
 import { hashPin } from "../auth/pin";
 
 export const orgRoutes = new Hono();
@@ -20,6 +20,7 @@ orgRoutes.post("/org/setup", validateJson(setupBusinessSchema), async (context) 
   if (existing) return apiError(context, 409, "BUSINESS_ALREADY_CONFIGURED", "This account already belongs to a business");
 
   const input = context.req.valid("json");
+  const authorship = createdByActor(principal);
   const result = await db.transaction(async (tx) => {
     const [business] = await tx.insert(businesses).values({
       legalName: input.legalName,
@@ -31,38 +32,45 @@ orgRoutes.post("/org/setup", validateJson(setupBusinessSchema), async (context) 
       province: input.province,
       logoUrl: input.logoUrl,
       receiptFooter: input.receiptFooter,
+      ...authorship,
     }).returning();
     const [branch] = await tx.insert(branches).values({
       businessId: business.id,
       name: input.branchName,
       code: input.branchCode,
+      ...authorship,
     }).returning();
     const [location] = await tx.insert(locations).values({
       businessId: business.id,
       branchId: branch.id,
       name: input.locationName,
       type: "store",
+      ...authorship,
     }).returning();
     const [terminal] = await tx.insert(terminals).values({
       businessId: business.id,
       branchId: branch.id,
       name: input.terminalName,
+      ...authorship,
     }).returning();
     await tx.insert(permissions).values(permissionDefinitions.map(([key, description]) => ({ key, description }))).onConflictDoNothing();
     const [ownerRole] = await tx.insert(roles).values({
       businessId: business.id,
       name: "Owner",
       isSystem: true,
+      ...authorship,
     }).returning();
     const [managerRole] = await tx.insert(roles).values({
       businessId: business.id,
       name: "Manager",
       isSystem: true,
+      ...authorship,
     }).returning();
     const [cashierRole] = await tx.insert(roles).values({
       businessId: business.id,
       name: "Cashier",
       isSystem: true,
+      ...authorship,
     }).returning();
     const permissionRows = await tx.select({ key: permissions.key }).from(permissions);
     await tx.insert(rolePermissions).values(permissionRows.map(({ key }) => ({ roleId: ownerRole.id, permissionKey: key })));
@@ -83,20 +91,23 @@ orgRoutes.post("/org/setup", validateJson(setupBusinessSchema), async (context) 
       email: ownerEmail,
       displayName: ownerEmail.split("@")[0],
       pinHash: await hashPin(input.ownerPin),
+      ...authorship,
     }).returning({ id: appUsers.id });
     await tx.insert(userBranches).values({ userId: owner.id, branchId: branch.id });
-    await tx.insert(businessSettings).values({ businessId: business.id });
+    await tx.insert(businessSettings).values({ businessId: business.id, ...authorship });
     await tx.insert(documentSeries).values({
       businessId: business.id,
       branchId: branch.id,
       docType: "invoice",
       prefix: input.documentPrefix,
+      ...authorship,
     });
     await tx.insert(documentSeries).values({
       businessId: business.id,
       branchId: branch.id,
       docType: "return",
       prefix: `${input.documentPrefix}-R`,
+      ...authorship,
     });
     await tx.insert(auditLog).values({
       businessId: business.id,
@@ -124,7 +135,7 @@ orgRoutes.put("/business", requirePermission("business.update"), validateJson(bu
   const values = context.req.valid("json");
   const [before] = await db.select().from(businesses).where(eq(businesses.id, principal.businessId!)).limit(1);
   if (!before) return apiError(context, 404, "NOT_FOUND", "Business profile not found");
-  const [after] = await db.update(businesses).set({ ...values, updatedAt: new Date() })
+  const [after] = await db.update(businesses).set({ ...values, ...updatedByActor(principal) })
     .where(eq(businesses.id, principal.businessId!)).returning();
   await auditPrincipal(context, principal, "business", after.id, "update", before, after);
   return context.json(after);
@@ -137,7 +148,7 @@ orgRoutes.get("/branches", requirePermission("branches.view"), async (context) =
 
 orgRoutes.post("/branches", requirePermission("branches.manage"), validateJson(branchSchema), async (context) => {
   const principal = getPrincipal(context);
-  const [branch] = await db.insert(branches).values({ ...context.req.valid("json"), businessId: principal.businessId! }).returning();
+  const [branch] = await db.insert(branches).values({ ...context.req.valid("json"), businessId: principal.businessId!, ...createdByActor(principal) }).returning();
   await auditPrincipal(context, principal, "branch", branch.id, "create", null, branch);
   return context.json(branch, 201);
 });
@@ -147,7 +158,7 @@ orgRoutes.put("/branches/:id", requirePermission("branches.manage"), validateJso
   const id = context.req.param("id");
   const [before] = await db.select().from(branches).where(and(eq(branches.id, id), eq(branches.businessId, principal.businessId!))).limit(1);
   if (!before) return apiError(context, 404, "NOT_FOUND", "Branch not found");
-  const [after] = await db.update(branches).set({ ...context.req.valid("json"), updatedAt: new Date() })
+  const [after] = await db.update(branches).set({ ...context.req.valid("json"), ...updatedByActor(principal) })
     .where(eq(branches.id, id)).returning();
   await auditPrincipal(context, principal, "branch", id, "update", before, after);
   return context.json(after);
@@ -164,7 +175,7 @@ orgRoutes.post("/locations", requirePermission("locations.manage"), validateJson
   const [branch] = await db.select({ id: branches.id }).from(branches)
     .where(and(eq(branches.id, input.branchId), eq(branches.businessId, principal.businessId!))).limit(1);
   if (!branch) return apiError(context, 400, "INVALID_BRANCH", "Select a branch in this business");
-  const [location] = await db.insert(locations).values({ ...input, businessId: principal.businessId! }).returning();
+  const [location] = await db.insert(locations).values({ ...input, businessId: principal.businessId!, ...createdByActor(principal) }).returning();
   await auditPrincipal(context, principal, "location", location.id, "create", null, location);
   return context.json(location, 201);
 });
@@ -180,7 +191,7 @@ orgRoutes.put("/locations/:id", requirePermission("locations.manage"), validateJ
       .where(and(eq(branches.id, input.branchId), eq(branches.businessId, principal.businessId!))).limit(1);
     if (!branch) return apiError(context, 400, "INVALID_BRANCH", "Select a branch in this business");
   }
-  const [after] = await db.update(locations).set({ ...input, updatedAt: new Date() })
+  const [after] = await db.update(locations).set({ ...input, ...updatedByActor(principal) })
     .where(eq(locations.id, id)).returning();
   await auditPrincipal(context, principal, "location", id, "update", before, after);
   return context.json(after);
@@ -197,7 +208,7 @@ orgRoutes.post("/terminals", requirePermission("terminals.manage"), validateJson
   const [branch] = await db.select({ id: branches.id }).from(branches)
     .where(and(eq(branches.id, input.branchId), eq(branches.businessId, principal.businessId!))).limit(1);
   if (!branch) return apiError(context, 400, "INVALID_BRANCH", "Select a branch in this business");
-  const [terminal] = await db.insert(terminals).values({ ...input, businessId: principal.businessId! }).returning();
+  const [terminal] = await db.insert(terminals).values({ ...input, businessId: principal.businessId!, ...createdByActor(principal) }).returning();
   await auditPrincipal(context, principal, "terminal", terminal.id, "create", null, terminal);
   return context.json(terminal, 201);
 });
@@ -213,7 +224,7 @@ orgRoutes.put("/terminals/:id", requirePermission("terminals.manage"), validateJ
       .where(and(eq(branches.id, input.branchId), eq(branches.businessId, principal.businessId!))).limit(1);
     if (!branch) return apiError(context, 400, "INVALID_BRANCH", "Select a branch in this business");
   }
-  const [after] = await db.update(terminals).set({ ...input, updatedAt: new Date() })
+  const [after] = await db.update(terminals).set({ ...input, ...updatedByActor(principal) })
     .where(eq(terminals.id, id)).returning();
   await auditPrincipal(context, principal, "terminal", id, "update", before, after);
   return context.json(after);
@@ -230,7 +241,7 @@ orgRoutes.post("/document-series", requirePermission("document_series.manage"), 
   const [branch] = await db.select({ id: branches.id }).from(branches)
     .where(and(eq(branches.id, input.branchId), eq(branches.businessId, principal.businessId!))).limit(1);
   if (!branch) return apiError(context, 400, "INVALID_BRANCH", "Select a branch in this business");
-  const [series] = await db.insert(documentSeries).values({ ...input, businessId: principal.businessId! }).returning();
+  const [series] = await db.insert(documentSeries).values({ ...input, businessId: principal.businessId!, ...createdByActor(principal) }).returning();
   await auditPrincipal(context, principal, "document_series", series.id, "create", null, series);
   return context.json(series, 201);
 });
@@ -247,7 +258,7 @@ orgRoutes.put("/document-series/:id", requirePermission("document_series.manage"
       .where(and(eq(branches.id, input.branchId), eq(branches.businessId, principal.businessId!))).limit(1);
     if (!branch) return apiError(context, 400, "INVALID_BRANCH", "Select a branch in this business");
   }
-  const [after] = await db.update(documentSeries).set({ ...input, updatedAt: new Date() })
+  const [after] = await db.update(documentSeries).set({ ...input, ...updatedByActor(principal) })
     .where(eq(documentSeries.id, id)).returning();
   await auditPrincipal(context, principal, "document_series", id, "update", before, after);
   return context.json(after);

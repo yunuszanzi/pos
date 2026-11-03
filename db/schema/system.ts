@@ -11,9 +11,12 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
+// created_by / updated_by reference auth.users (see migration 0001); Drizzle only needs the columns.
 const timestamps = {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  createdBy: uuid("created_by"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedBy: uuid("updated_by"),
 };
 
 export const businesses = pgTable("businesses", {
