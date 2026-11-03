@@ -1,0 +1,10 @@
+node_modules
+dist
+.vercel
+.env
+.env.*
+!.env.example
+playwright-report
+test-results
+coverage
+drizzle/meta
