@@ -47,6 +47,10 @@ export function createRole(input: { name: string; permissionKeys: string[] }) {
   return postJson<AppRole>("/roles", input);
 }
 
+export function updateRole(id: string, input: { name: string; permissionKeys: string[] }) {
+  return putJson<AppRole>(`/roles/${id}`, input);
+}
+
 export function getAllPermissions() {
   return requestApi<PermissionDefinition[]>("/permissions");
 }

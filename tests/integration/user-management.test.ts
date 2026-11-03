@@ -55,6 +55,28 @@ integration("user management (FR-USR-03, FR-USR-06)", { timeout: 60_000 }, () =>
     expect(create.status).toBe(403);
   });
 
+  it("applies an edited custom role to its users straight away and audits the change", async () => {
+    const business = await createTestBusiness();
+    const role = await callApi(business.ownerToken, "POST", "/roles", { body: { name: "Stock viewer", permissionKeys: ["branches.view"] } });
+    business.roleIds["Stock viewer"] = role.body.id;
+    const staff = await inviteTestStaff(business, "Stock viewer");
+    expect((await callApi(staff.token, "GET", "/locations")).status).toBe(403);
+
+    const edit = await callApi(business.ownerToken, "PUT", `/roles/${role.body.id}`, {
+      body: { name: "Stock viewer", permissionKeys: ["branches.view", "locations.view"] },
+    });
+    expect(edit.status).toBe(200);
+    expect((await callApi(staff.token, "GET", "/locations")).status).toBe(200);
+
+    const system = await callApi(business.ownerToken, "PUT", `/roles/${business.roleIds.Cashier}`, {
+      body: { name: "Cashier", permissionKeys: ["users.manage"] },
+    });
+    expect(system.status).toBe(404);
+    const audit = await callApi(business.ownerToken, "GET", "/audit-log?pageSize=100");
+    expect(audit.body.data.some((entry: { entity: string; action: string; entityId: string }) =>
+      entry.entity === "role" && entry.action === "update" && entry.entityId === role.body.id)).toBe(true);
+  });
+
   it("lets a manager deactivate a cashier, which blocks sign-in but keeps history", async () => {
     const business = await createTestBusiness();
     const manager = await inviteTestStaff(business, "Manager");

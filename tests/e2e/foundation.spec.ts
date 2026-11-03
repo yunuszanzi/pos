@@ -43,6 +43,20 @@ test("1. owner signs up, creates the business, a branch, a terminal and a cashie
   await expect(page.getByRole("cell", { name: "Cashier One" })).toBeVisible();
 });
 
+test("owner edits a custom role in the permission matrix", async ({ page }) => {
+  const business = await createTestBusiness();
+  await callApi(business.ownerToken, "POST", "/roles", { body: { name: "Floor staff", permissionKeys: ["branches.view"] } });
+  await signInThroughUi(page, business.ownerEmail);
+  await page.getByRole("navigation", { name: "Main navigation" }).getByRole("link", { name: "Roles & permissions" }).click();
+
+  await page.getByRole("button", { name: "Edit Floor staff" }).click();
+  await expect(page.getByRole("heading", { name: "Edit Floor staff" })).toBeVisible();
+  await page.getByRole("checkbox", { name: /^locations\.view/ }).check();
+  await page.getByRole("button", { name: "Save role" }).click();
+  await expect(page.getByRole("status")).toContainText("Role updated");
+  await expect(page.getByText("2 assigned permissions")).toBeVisible();
+});
+
 test("2. cashier cannot open Users or Settings, in the UI or by calling the API", async ({ page }) => {
   const business = await createTestBusiness();
   const cashier = await inviteTestStaff(business, "Cashier");
