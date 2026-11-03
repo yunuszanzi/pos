@@ -42,3 +42,28 @@ export function createUnit(input: { name: string; shortName: string }) {
 export function updateUnit(id: string, input: Partial<{ name: string; shortName: string; active: boolean }>) {
   return putJson<Unit>(`/units/${id}`, input);
 }
+
+export type PriceList = { id: string; name: string; active: boolean };
+export type PriceListItem = {
+  variantId: string;
+  unitId: string;
+  /** Quantity text such as "10"; the price applies from this quantity up. */
+  minQuantity: string;
+  pricePaisa: number;
+};
+export type PriceListDetail = PriceList & {
+  items: Array<PriceListItem & { id: string; sku: string; productName: string; variantName: string; unitIds: string[] }>;
+};
+
+export function getAllPriceLists() {
+  return requestApi<PriceList[]>("/price-lists");
+}
+export function getPriceListById(id: string) {
+  return requestApi<PriceListDetail>(`/price-lists/${id}`);
+}
+export function createPriceList(input: { name: string; active?: boolean; items: PriceListItem[] }) {
+  return postJson<PriceListDetail>("/price-lists", input);
+}
+export function updatePriceList(id: string, input: { name: string; active?: boolean; items: PriceListItem[] }) {
+  return putJson<PriceListDetail>(`/price-lists/${id}`, input);
+}

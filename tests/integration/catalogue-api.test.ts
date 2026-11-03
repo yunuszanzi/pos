@@ -271,7 +271,9 @@ integration("catalogue API", { timeout: 120_000 }, () => {
     const created = await callApi(business.ownerToken, "POST", "/price-lists", { body });
     expect(created.status, JSON.stringify(created.body)).toBe(201);
     const loaded = await callApi(business.ownerToken, "GET", `/price-lists/${created.body.id}`);
-    expect(loaded.body.items.map((item: { minQuantity: string; pricePaisa: number }) => [item.minQuantity, item.pricePaisa])).toEqual(expect.arrayContaining([["1.000", 450000], ["10.000", 420000]]));
+    expect(loaded.body.items.map((item: { minQuantity: string; pricePaisa: number }) => [item.minQuantity, item.pricePaisa])).toEqual([["1", 450000], ["10", 420000]]);
+    expect(loaded.body.items[0]).toMatchObject({ sku: "BAL-12-RED", productName: "Latex Balloon 12 inch", variantId, unitId: ids.carton });
+    expect(loaded.body.items[0].unitIds.sort()).toEqual([ids.carton, ids.piece].sort());
 
     expect((await callApi(business.ownerToken, "POST", "/price-lists", { body: { ...body, name: "wholesale" } })).status).toBe(409);
     expect((await callApi(business.ownerToken, "POST", "/price-lists", { body: { name: "Bad", items: [{ variantId, unitId: ids.pack, minQuantity: "1", pricePaisa: 1 }] } })).body.error.code).toBe("INVALID_PRICE_ITEM");

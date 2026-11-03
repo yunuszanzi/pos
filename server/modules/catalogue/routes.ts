@@ -1,6 +1,6 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { Hono } from "hono";
-import { brands, categories, priceListItems, priceLists, productUnits, taxCategories, units } from "../../../db/schema";
+import { brands, categories, priceListItems, priceLists, productUnits, productVariants, products, taxCategories, units } from "../../../db/schema";
 import { brandSchema, categorySchema, priceListSchema, taxCategorySchema, unitSchema } from "../../../shared/schemas/catalogue";
 import { auditPrincipal } from "../../lib/audit";
 import { db } from "../../lib/db";
@@ -8,6 +8,7 @@ import { conflictOrThrow } from "../../lib/dbErrors";
 import { apiError, paramId } from "../../lib/http";
 import { createdByActor, getPrincipal, requirePermission, updatedByActor } from "../../lib/permissions";
 import { validateJson } from "../../lib/validate";
+import { quantityText } from "../products/service";
 
 export const catalogueRoutes = new Hono();
 
@@ -164,7 +165,24 @@ catalogueRoutes.put("/units/:id", manage, validateJson(unitSchema.partial()), as
 async function loadPriceList(businessId: string, id: string) {
   const [list] = await db.select().from(priceLists).where(and(eq(priceLists.id, id), eq(priceLists.businessId, businessId))).limit(1);
   if (!list) return null;
-  const items = await db.select().from(priceListItems).where(eq(priceListItems.priceListId, id));
+  const rows = await db.select({
+    id: priceListItems.id, variantId: priceListItems.variantId, unitId: priceListItems.unitId, minQuantity: priceListItems.minQuantity,
+    pricePaisa: priceListItems.pricePaisa, sku: productVariants.sku, variantName: productVariants.variantName, productName: products.name,
+  }).from(priceListItems)
+    .innerJoin(productVariants, eq(productVariants.id, priceListItems.variantId))
+    .innerJoin(products, eq(products.id, productVariants.productId))
+    .where(eq(priceListItems.priceListId, id))
+    .orderBy(products.name, productVariants.sku, priceListItems.unitId, priceListItems.minQuantity);
+  // The units each SKU is sold in, so the editor can offer them without another request per row.
+  const unitRows = rows.length
+    ? await db.select({ variantId: productUnits.variantId, unitId: productUnits.unitId }).from(productUnits)
+      .where(inArray(productUnits.variantId, [...new Set(rows.map((row) => row.variantId))]))
+    : [];
+  const items = rows.map((row) => ({
+    ...row,
+    minQuantity: quantityText(row.minQuantity),
+    unitIds: unitRows.filter((unit) => unit.variantId === row.variantId).map((unit) => unit.unitId),
+  }));
   return { ...list, items };
 }
 
