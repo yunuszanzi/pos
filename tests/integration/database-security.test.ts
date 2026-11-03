@@ -10,6 +10,7 @@ const foundationTables = [
   "user_branches", "auth_sessions", "pin_attempts", "document_series", "business_settings", "audit_log",
   "idempotency_keys", "categories", "brands", "tax_categories", "units", "products", "product_variants", "product_units",
   "price_lists", "price_list_items", "stock_ledger", "stock_balances", "stock_adjustments", "stock_adjustment_lines",
+  "payment_methods", "shifts", "cash_movements", "sales_invoices", "sales_invoice_lines", "payments", "held_sales", "data_versions",
 ];
 
 function supabaseAs(accessToken: string) {

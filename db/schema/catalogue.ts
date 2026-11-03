@@ -61,6 +61,8 @@ export const products = pgTable("products", {
   productType: text("product_type", { enum: ["stocked", "non_stock", "service"] }).notNull().default("stocked"),
   baseUnitId: uuid("base_unit_id").notNull(),
   active: boolean("active").notNull().default(true),
+  /** Set by a trigger to the dataset version this product (or its SKUs or units) last changed at. */
+  catalogVersion: bigint("catalog_version", { mode: "number" }).notNull().default(0),
   ...audited,
 }, (table) => [
   index("products_category_idx").on(table.businessId, table.categoryId),

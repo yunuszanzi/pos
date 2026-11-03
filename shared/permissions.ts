@@ -28,6 +28,17 @@ export const permissionDefinitions = [
   ["inventory.adjust", "Request stock adjustments"],
   ["inventory.approve", "Approve or reject stock adjustments above the approval threshold"],
   ["inventory.opening_stock", "Import opening stock"],
+  ["sales.create", "Ring up and post sales"],
+  ["sales.discount", "Give line and bill discounts up to the role's limit"],
+  ["sales.discount.above_limit", "Approve a discount above another user's limit (manager PIN)"],
+  ["sales.price_override", "Change a price at the till"],
+  ["sales.reprint", "Reprint a sales document (marked DUPLICATE and logged)"],
+  ["sales.void", "Void a sale in progress"],
+  ["shifts.open", "Open a cash register shift"],
+  ["shifts.close", "Close a cash register shift with a cash count"],
+  ["shifts.view_all", "See and report on other users' shifts"],
+  ["cash.movement", "Record cash in and cash out during a shift"],
+  ["reports.sales.view", "View sales reports"],
 ] as const;
 
 export type PermissionKey = (typeof permissionDefinitions)[number][0];
@@ -43,9 +54,12 @@ export const managerPermissionKeys: PermissionKey[] = [
   "auth.manager_override",
   "catalog.view", "catalog.manage", "products.cost.view", "products.import", "products.export",
   "inventory.view", "inventory.adjust", "inventory.approve", "inventory.opening_stock",
+  "sales.create", "sales.discount", "sales.discount.above_limit", "sales.price_override", "sales.reprint", "sales.void",
+  "shifts.open", "shifts.close", "shifts.view_all", "cash.movement", "reports.sales.view",
 ];
 
 export const cashierPermissionKeys: PermissionKey[] = [
   "branches.view", "locations.view", "terminals.view", "auth.pin_switch",
   "catalog.view", "inventory.view",
+  "sales.create", "sales.discount", "sales.reprint", "sales.void", "shifts.open", "shifts.close", "cash.movement",
 ];

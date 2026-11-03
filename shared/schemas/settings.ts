@@ -10,4 +10,10 @@ export const settingsSchema = z.object({
   posSessionTimeoutHours: z.number().int().min(1).max(24).default(12),
   // Stock adjustments worth more than this wait for someone with inventory.approve. Paisa; default PKR 10,000.
   adjustmentApprovalThresholdPaisa: z.number().int().min(0).max(100_000_000_000).default(1_000_000),
+  // Selling. Prices include tax unless a wholesale business chooses otherwise.
+  taxMode: z.enum(["inclusive", "exclusive"]).default("inclusive"),
+  // Round a cash total to the nearest 1, 5 or 10 rupees (in paisa); 0 is no rounding.
+  cashRoundingPaisa: z.union([z.literal(0), z.literal(100), z.literal(500), z.literal(1000)]).default(0),
+  allowNegativeStock: z.boolean().default(false),
+  autoPrintReceipt: z.boolean().default(true),
 });

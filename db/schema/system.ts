@@ -66,6 +66,8 @@ export const terminals = pgTable("terminals", {
   name: text("name").notNull(),
   defaultPrintFormat: text("default_print_format", { enum: ["pos80", "pos58", "a4", "a5"] }).notNull().default("pos80"),
   fbrPosId: text("fbr_pos_id"),
+  /** Where this terminal's sales take stock from; empty means the first store location of its branch. */
+  salesLocationId: uuid("sales_location_id"),
   active: boolean("active").notNull().default(true),
   ...timestamps,
 }, (table) => [
@@ -77,6 +79,8 @@ export const roles = pgTable("roles", {
   businessId: uuid("business_id").notNull().references(() => businesses.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   isSystem: boolean("is_system").notNull().default(false),
+  /** Largest discount, in basis points, this role may give without a manager. */
+  maxDiscountBps: integer("max_discount_bps").notNull().default(0),
   ...timestamps,
 }, (table) => [
   uniqueIndex("roles_business_name_uidx").on(table.businessId, table.name),
@@ -165,5 +169,9 @@ export const businessSettings = pgTable("business_settings", {
   sessionTimeoutMinutes: integer("session_timeout_minutes").notNull().default(30),
   posSessionTimeoutHours: integer("pos_session_timeout_hours").notNull().default(12),
   adjustmentApprovalThresholdPaisa: bigint("adjustment_approval_threshold_paisa", { mode: "number" }).notNull().default(1000000),
+  taxMode: text("tax_mode", { enum: ["inclusive", "exclusive"] }).notNull().default("inclusive"),
+  cashRoundingPaisa: integer("cash_rounding_paisa").notNull().default(0),
+  allowNegativeStock: boolean("allow_negative_stock").notNull().default(false),
+  autoPrintReceipt: boolean("auto_print_receipt").notNull().default(true),
   ...timestamps,
 });

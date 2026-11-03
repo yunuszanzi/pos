@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { authenticate } from "./lib/auth";
+import { isTransientConflict } from "./lib/dbErrors";
 import { apiError } from "./lib/http";
 import { auditRoutes } from "./modules/audit/routes";
 import { authRoutes } from "./modules/auth/routes";
@@ -25,6 +26,9 @@ app.route("/api/v1", inventoryRoutes);
 
 app.notFound((context) => apiError(context, 404, "NOT_FOUND", "API route not found"));
 app.onError((error, context) => {
+  if (isTransientConflict(error)) {
+    return context.json({ error: { code: "BUSY", message: "Someone else changed the same thing at the same moment. Nothing was saved; please try again." } }, 409);
+  }
   console.error("Unhandled API error", error);
   return context.json({ error: { code: "INTERNAL_ERROR", message: "The request could not be completed" } }, 500);
 });

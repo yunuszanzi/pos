@@ -6,6 +6,7 @@ import { cashierPermissionKeys, managerPermissionKeys, permissionDefinitions } f
 import { branchSchema, businessUpdateSchema, documentSeriesSchema, locationSchema, setupBusinessSchema, terminalSchema } from "./schema";
 import { auditPrincipal } from "../../lib/audit";
 import { db } from "../../lib/db";
+import { conflictOrThrow } from "../../lib/dbErrors";
 import { apiError, paramId } from "../../lib/http";
 import { createdByActor, getPrincipal, requirePermission, updatedByActor } from "../../lib/permissions";
 import { hashPin } from "../auth/pin";
@@ -58,18 +59,21 @@ orgRoutes.post("/org/setup", validateJson(setupBusinessSchema), async (context) 
       businessId: business.id,
       name: "Owner",
       isSystem: true,
+      maxDiscountBps: 10000,
       ...authorship,
     }).returning();
     const [managerRole] = await tx.insert(roles).values({
       businessId: business.id,
       name: "Manager",
       isSystem: true,
+      maxDiscountBps: 10000,
       ...authorship,
     }).returning();
     const [cashierRole] = await tx.insert(roles).values({
       businessId: business.id,
       name: "Cashier",
       isSystem: true,
+      maxDiscountBps: 500,
       ...authorship,
     }).returning();
     const permissionRows = await tx.select({ key: permissions.key }).from(permissions);
@@ -88,6 +92,7 @@ orgRoutes.post("/org/setup", validateJson(setupBusinessSchema), async (context) 
     await tx.insert(userBranches).values({ userId: owner.id, branchId: branch.id });
     await tx.insert(businessSettings).values({ businessId: business.id, ...authorship });
     await tx.execute(sql`SELECT seed_catalogue_defaults(${business.id}, ${authorship.createdBy})`);
+    await tx.execute(sql`SELECT seed_sales_defaults(${business.id}, ${authorship.createdBy})`);
     await tx.insert(documentSeries).values({
       businessId: business.id,
       branchId: branch.id,
@@ -141,9 +146,21 @@ orgRoutes.get("/branches", requirePermission("branches.view"), async (context) =
 
 orgRoutes.post("/branches", requirePermission("branches.manage"), validateJson(branchSchema), async (context) => {
   const principal = getPrincipal(context);
-  const [branch] = await db.insert(branches).values({ ...context.req.valid("json"), businessId: principal.businessId!, ...createdByActor(principal) }).returning();
-  await auditPrincipal(context, principal, "branch", branch.id, "create", null, branch);
-  return context.json(branch, 201);
+  const input = context.req.valid("json");
+  try {
+    // Every branch needs an invoice series, or nothing could be sold there.
+    const branch = await db.transaction(async (tx) => {
+      const [created] = await tx.insert(branches).values({ ...input, businessId: principal.businessId!, ...createdByActor(principal) }).returning();
+      await tx.insert(documentSeries).values({
+        businessId: principal.businessId!, branchId: created.id, docType: "invoice", prefix: `INV-${input.code.toUpperCase()}`, ...createdByActor(principal),
+      });
+      return created;
+    });
+    await auditPrincipal(context, principal, "branch", branch.id, "create", null, branch);
+    return context.json(branch, 201);
+  } catch (error) {
+    return conflictOrThrow(context, error);
+  }
 });
 
 orgRoutes.put("/branches/:id", requirePermission("branches.manage"), validateJson(branchSchema.partial()), async (context) => {

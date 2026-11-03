@@ -78,6 +78,8 @@ integration("database migrations", { timeout: 120_000 }, () => {
       await sql`INSERT INTO role_permissions (role_id, permission_key) VALUES (${roleIds.Cashier}, 'branches.view'), (${roleIds.Cashier}, 'auth.pin_switch')`;
       const [custom] = await sql<{ id: string }[]>`INSERT INTO roles (business_id, name, is_system) VALUES (${business.id}, 'Custom', false) RETURNING id`;
       await sql`INSERT INTO role_permissions (role_id, permission_key) VALUES (${custom.id}, 'branches.view')`;
+      // v0.1 did not create a numbering series when a branch was added.
+      await sql`INSERT INTO branches (business_id, name, code) VALUES (${business.id}, 'Legacy branch', 'lg')`;
 
       await apply(migrationFiles.slice(lastV01 + 1));
 
@@ -88,11 +90,22 @@ integration("database migrations", { timeout: 120_000 }, () => {
       expect((await sql`SELECT 1 FROM units WHERE business_id = ${business.id}`)).toHaveLength(8);
 
       const granted = async (roleId: string) => (await sql<{ permission_key: string }[]>`SELECT permission_key FROM role_permissions WHERE role_id = ${roleId}`).map((row) => row.permission_key);
-      const catalogueKeys = managerPermissionKeys.filter((key) => /^(catalog|products|inventory)\./.test(key));
-      expect(await granted(roleIds.Owner)).toEqual(expect.arrayContaining(catalogueKeys));
-      expect(await granted(roleIds.Manager)).toEqual(expect.arrayContaining(catalogueKeys));
-      expect((await granted(roleIds.Cashier)).sort()).toEqual(["auth.pin_switch", "branches.view", ...cashierPermissionKeys.filter((key) => /^(catalog|inventory)\./.test(key))].sort());
+      const addedSince = /^(catalog|products|inventory|sales|shifts|cash|reports)\./;
+      expect((await granted(roleIds.Owner)).filter((key) => addedSince.test(key)).sort()).toEqual(allPermissionKeys.filter((key) => addedSince.test(key)).sort());
+      expect((await granted(roleIds.Manager)).filter((key) => addedSince.test(key)).sort()).toEqual(managerPermissionKeys.filter((key) => addedSince.test(key)).sort());
+      expect((await granted(roleIds.Cashier)).sort()).toEqual(["auth.pin_switch", "branches.view", ...cashierPermissionKeys.filter((key) => addedSince.test(key))].sort());
       expect(await granted(custom.id)).toEqual(["branches.view"]);
+
+      // v0.3: payment methods, discount limits and a numbering series for the branch that had none.
+      const methods = await sql<{ code: string; kind: string }[]>`SELECT code, kind FROM payment_methods WHERE business_id = ${business.id} ORDER BY sort_order`;
+      expect(methods.map((method) => method.code)).toEqual(["cash", "card", "bank_transfer", "jazzcash", "easypaisa"]);
+      expect(methods.map((method) => method.kind)).toEqual(["cash", "card", "bank", "wallet", "wallet"]);
+      const limits = await sql<{ name: string; max_discount_bps: number }[]>`SELECT name, max_discount_bps FROM roles WHERE business_id = ${business.id} ORDER BY name`;
+      expect(Object.fromEntries(limits.map((role) => [role.name, role.max_discount_bps]))).toEqual({ Cashier: 500, Custom: 0, Manager: 10000, Owner: 10000 });
+      const [series] = await sql<{ prefix: string; next_number: number }[]>`SELECT s.prefix, s.next_number FROM document_series s JOIN branches b ON b.id = s.branch_id WHERE b.code = 'lg' AND s.doc_type = 'invoice'`;
+      expect(series).toEqual({ prefix: "INV-LG", next_number: 1 });
+      const [selling] = await sql<{ tax_mode: string; cash_rounding_paisa: number; allow_negative_stock: boolean }[]>`SELECT tax_mode, cash_rounding_paisa, allow_negative_stock FROM business_settings WHERE business_id = ${business.id}`;
+      expect(selling).toEqual({ tax_mode: "inclusive", cash_rounding_paisa: 0, allow_negative_stock: false });
 
       const [settings] = await sql<{ adjustment_approval_threshold_paisa: string }[]>`SELECT adjustment_approval_threshold_paisa FROM business_settings WHERE business_id = ${business.id}`;
       expect(Number(settings.adjustment_approval_threshold_paisa)).toBe(1_000_000);
@@ -114,6 +127,36 @@ integration("database migrations", { timeout: 120_000 }, () => {
       expect(Number(balance.avg_cost_paisa)).toBe(250);
       const [entry] = await sql<{ seq: string }[]>`SELECT seq FROM stock_ledger WHERE variant_id = ${variant.id}`;
       expect(Number(entry.seq)).toBeGreaterThan(0);
+    });
+  });
+
+  it("upgrades a v0.2 database, stamping the products that already exist for the POS cache", async () => {
+    await withScratchDatabase(async (sql, apply) => {
+      const lastV02 = migrationFiles.findIndex((name) => name.startsWith("0004"));
+      await apply(migrationFiles.slice(0, lastV02 + 1));
+
+      const [business] = await sql<{ id: string }[]>`INSERT INTO businesses (legal_name, trade_name) VALUES ('Catalogue Traders', 'Catalogue') RETURNING id`;
+      await sql`INSERT INTO business_settings (business_id) VALUES (${business.id})`;
+      await sql`SELECT seed_catalogue_defaults(${business.id}, NULL)`;
+      const [unit] = await sql<{ id: string }[]>`SELECT id FROM units WHERE business_id = ${business.id} AND name = 'Piece'`;
+      const productIds: string[] = [];
+      for (const name of ["Balloon", "Pump", "Ribbon"]) {
+        const [product] = await sql<{ id: string }[]>`INSERT INTO products (business_id, name, base_unit_id) VALUES (${business.id}, ${name}, ${unit.id}) RETURNING id`;
+        const [variant] = await sql<{ id: string }[]>`INSERT INTO product_variants (business_id, product_id, sku) VALUES (${business.id}, ${product.id}, ${name.toUpperCase()}) RETURNING id`;
+        await sql`INSERT INTO product_units (business_id, variant_id, unit_id, factor_to_base, is_base, sale_price_paisa) VALUES (${business.id}, ${variant.id}, ${unit.id}, 1, true, 500)`;
+        productIds.push(product.id);
+      }
+
+      await apply(migrationFiles.slice(lastV02 + 1));
+
+      const stamped = await sql<{ catalog_version: string }[]>`SELECT catalog_version FROM products WHERE business_id = ${business.id}`;
+      expect(stamped).toHaveLength(3);
+      expect(stamped.every((row) => Number(row.catalog_version) > 0)).toBe(true);
+      // The backfill ran as one transaction, so every existing product shares one version, and the counter has reached it.
+      expect(new Set(stamped.map((row) => row.catalog_version)).size).toBe(1);
+      const [counter] = await sql<{ version: string }[]>`SELECT version FROM data_versions WHERE business_id = ${business.id} AND dataset = 'catalogue'`;
+      expect(counter.version).toBe(stamped[0].catalog_version);
+      expect((await sql`SELECT 1 FROM payment_methods WHERE business_id = ${business.id}`)).toHaveLength(5);
     });
   });
 

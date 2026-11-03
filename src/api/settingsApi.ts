@@ -9,6 +9,10 @@ export type BusinessSettings = {
   posSessionTimeoutHours: number;
   /** Paisa. Stock adjustments worth more than this need approval. */
   adjustmentApprovalThresholdPaisa: number;
+  taxMode: "inclusive" | "exclusive";
+  cashRoundingPaisa: 0 | 100 | 500 | 1000;
+  allowNegativeStock: boolean;
+  autoPrintReceipt: boolean;
 };
 
 export function getBusinessSettings() {

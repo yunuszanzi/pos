@@ -12,6 +12,10 @@ const defaults: BusinessSettings = {
   sessionTimeoutMinutes: 30,
   posSessionTimeoutHours: 12,
   adjustmentApprovalThresholdPaisa: 1_000_000,
+  taxMode: "inclusive",
+  cashRoundingPaisa: 0,
+  allowNegativeStock: false,
+  autoPrintReceipt: true,
 };
 
 export function SettingsPage() {
@@ -40,6 +44,10 @@ export function SettingsPage() {
         sessionTimeoutMinutes: Number(data.get("sessionTimeoutMinutes")),
         posSessionTimeoutHours: Number(data.get("posSessionTimeoutHours")),
         adjustmentApprovalThresholdPaisa: threshold,
+        taxMode: settings.taxMode,
+        cashRoundingPaisa: settings.cashRoundingPaisa,
+        allowNegativeStock: settings.allowNegativeStock,
+        autoPrintReceipt: settings.autoPrintReceipt,
       });
       setSettings(updated);
       setSuccess("Settings saved.");
@@ -62,6 +70,18 @@ export function SettingsPage() {
       <Field label="Back-office session expiry (minutes)"><TextInput name="sessionTimeoutMinutes" type="number" min={5} max={240} value={settings.sessionTimeoutMinutes} onChange={(event) => setSettings({ ...settings, sessionTimeoutMinutes: Number(event.target.value) })} /></Field>
       <Field label="POS session expiry (hours)"><TextInput name="posSessionTimeoutHours" type="number" min={1} max={24} value={settings.posSessionTimeoutHours} onChange={(event) => setSettings({ ...settings, posSessionTimeoutHours: Number(event.target.value) })} /></Field>
       <Field label="Stock adjustment approval above (PKR)"><MoneyInput name="adjustmentApprovalThreshold" pattern="[0-9,]+(\.[0-9]{1,2})?" key={settings.adjustmentApprovalThresholdPaisa} defaultValue={toPlainRupees(settings.adjustmentApprovalThresholdPaisa)} required /></Field>
+      <Field label="Prices">
+        <SelectInput value={settings.taxMode} onChange={(event) => setSettings({ ...settings, taxMode: event.target.value as BusinessSettings["taxMode"] })}>
+          <option value="inclusive">Include tax (shelf prices)</option><option value="exclusive">Exclude tax (tax added at the end)</option>
+        </SelectInput>
+      </Field>
+      <Field label="Round cash totals to">
+        <SelectInput value={settings.cashRoundingPaisa} onChange={(event) => setSettings({ ...settings, cashRoundingPaisa: Number(event.target.value) as BusinessSettings["cashRoundingPaisa"] })}>
+          <option value={0}>No rounding</option><option value={100}>Nearest Rs 1</option><option value={500}>Nearest Rs 5</option><option value={1000}>Nearest Rs 10</option>
+        </SelectInput>
+      </Field>
+      <label className="checkbox-row"><input type="checkbox" checked={settings.allowNegativeStock} onChange={(event) => setSettings({ ...settings, allowNegativeStock: event.target.checked })} /><span><strong>Allow selling below zero stock</strong><small>Off: a sale of more than is on hand is refused.</small></span></label>
+      <label className="checkbox-row"><input type="checkbox" checked={settings.autoPrintReceipt} onChange={(event) => setSettings({ ...settings, autoPrintReceipt: event.target.checked })} /><span><strong>Print the receipt after each sale</strong></span></label>
       <button className="button primary" disabled={!loaded}>Save settings</button>
     </form>
   </div>;
