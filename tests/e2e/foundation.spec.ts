@@ -1,15 +1,8 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { callApi, createTestBusiness, inviteTestStaff, testPassword, uniqueEmail } from "../integration/helpers";
+import { signInThroughUi } from "./helpers";
 
 // v0.1 acceptance tests (technical-plan 6) against the real UI, API and local Supabase. No mocks.
-
-async function signInThroughUi(page: Page, email: string) {
-  await page.goto("/login");
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill(testPassword);
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await page.getByRole("heading", { name: /Welcome/ }).waitFor();
-}
 
 test("1. owner signs up, creates the business, a branch, a terminal and a cashier", async ({ page }) => {
   const ownerEmail = uniqueEmail("owner");

@@ -6,6 +6,7 @@ import { switchTerminalUser } from "../api/authApi";
 import { useAuth } from "./useAuth";
 import { useTerminalStore } from "./terminalStore";
 import { ErrorMessage, Field, SelectInput, TextInput } from "./FormElements";
+import { hasPermission } from "./permissions";
 
 const AuditPage = lazy(() => import("../features/audit/AuditPage").then(({ AuditPage: Page }) => ({ default: Page })));
 const LoginPage = lazy(() => import("../features/auth/LoginPage").then(({ LoginPage: Page }) => ({ default: Page })));
@@ -14,17 +15,28 @@ const SetupPage = lazy(() => import("../features/onboarding/SetupPage").then(({ 
 const RolesPage = lazy(() => import("../features/roles/RolesPage").then(({ RolesPage: Page }) => ({ default: Page })));
 const SettingsPage = lazy(() => import("../features/settings/SettingsPage").then(({ SettingsPage: Page }) => ({ default: Page })));
 const UsersPage = lazy(() => import("../features/users/UsersPage").then(({ UsersPage: Page }) => ({ default: Page })));
+const ProductsPage = lazy(() => import("../features/products/ProductsPage").then(({ ProductsPage: Page }) => ({ default: Page })));
+const ProductFormPage = lazy(() => import("../features/products/ProductFormPage").then(({ ProductFormPage: Page }) => ({ default: Page })));
+const ImportPage = lazy(() => import("../features/products/ImportPage").then(({ ImportPage: Page }) => ({ default: Page })));
+const CatalogueSetupPage = lazy(() => import("../features/products/CatalogueSetupPage").then(({ CatalogueSetupPage: Page }) => ({ default: Page })));
 
 type AppRoute = {
   path: string;
   label: string;
   permission?: string;
   element: ReactNode;
+  /** False for pages reached from another page rather than the menu. */
+  nav?: boolean;
 };
 
 const appRoutes: AppRoute[] = [
   { path: "/", label: "Overview", element: <Dashboard /> },
   { path: "/organization", label: "Business & organisation", permission: "business.view", element: <OrganizationPage /> },
+  { path: "/products", label: "Products", permission: "catalog.view", element: <ProductsPage /> },
+  { path: "/products/new", label: "New product", permission: "catalog.manage", element: <ProductFormPage />, nav: false },
+  { path: "/products/import", label: "Import products", permission: "products.import", element: <ImportPage />, nav: false },
+  { path: "/products/:id", label: "Edit product", permission: "catalog.manage", element: <ProductFormPage />, nav: false },
+  { path: "/catalogue", label: "Categories & tax", permission: "catalog.view", element: <CatalogueSetupPage /> },
   { path: "/users", label: "Users", permission: "users.view", element: <UsersPage /> },
   { path: "/roles", label: "Roles & permissions", permission: "roles.view", element: <RolesPage /> },
   { path: "/settings", label: "Settings", permission: "settings.view", element: <SettingsPage /> },
@@ -94,7 +106,7 @@ function Shell({ children }: { children: ReactNode }) {
     }
   }, [terminalQuery.isSuccess, terminalId, terminals, setTerminalId]);
 
-  const visibleRoutes = appRoutes.filter((route) => !route.permission || hasPermission(currentUser?.permissions ?? [], route.permission));
+  const visibleRoutes = appRoutes.filter((route) => route.nav !== false && (!route.permission || hasPermission(currentUser?.permissions ?? [], route.permission)));
 
   async function submitPinSwitch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -156,7 +168,7 @@ function Shell({ children }: { children: ReactNode }) {
 
 function Dashboard() {
   const { currentUser } = useAuth();
-  const cards = appRoutes.filter((route) => route.path !== "/" && (!route.permission || hasPermission(currentUser?.permissions ?? [], route.permission)));
+  const cards = appRoutes.filter((route) => route.path !== "/" && route.nav !== false && (!route.permission || hasPermission(currentUser?.permissions ?? [], route.permission)));
   return <div className="content">
     <div className="welcome-panel">
       <p className="eyebrow">Foundation release · v0.1</p>
@@ -172,8 +184,4 @@ function Dashboard() {
 
 function AccessDenied() {
   return <div className="content narrow"><section className="panel"><h1>Access denied</h1><p className="muted">Your role does not allow access to this page. Contact the business owner if you need access.</p></section></div>;
-}
-
-function hasPermission(permissions: string[], permission: string): boolean {
-  return permissions.includes("*") || permissions.includes(permission);
 }
