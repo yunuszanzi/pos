@@ -49,3 +49,19 @@ export function divideRounded(numerator: bigint, denominator: bigint): bigint {
 export function lineValue(quantityMilli: number, unitCostPaisa: Paisa): Paisa {
   return Number(divideRounded(BigInt(quantityMilli) * BigInt(unitCostPaisa), 1000n));
 }
+
+/** "18" -> 1800, "7.5" -> 750, "0.25" -> 25. Tax rates are stored as integer basis points; at most two decimals of a percent. */
+export function parsePercentToBps(input: string): number {
+  const match = /^(\d{1,3})(?:\.(\d{1,2}))?$/.exec(input.trim());
+  if (!match) throw new RangeError(`"${input}" is not a valid percentage`);
+  const bps = Number(match[1]) * 100 + Number((match[2] ?? "").padEnd(2, "0"));
+  if (bps > 10000) throw new RangeError("A rate cannot exceed 100%");
+  return bps;
+}
+
+/** 1800 -> "18", 750 -> "7.5", 25 -> "0.25". */
+export function formatBps(bps: number): string {
+  assertPaisa(bps, "rate");
+  const fraction = String(bps % 100).padStart(2, "0").replace(/0+$/, "");
+  return `${Math.trunc(bps / 100)}${fraction ? `.${fraction}` : ""}`;
+}
