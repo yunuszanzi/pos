@@ -24,6 +24,13 @@ DB: Supabase Postgres via Drizzle; posting logic in SQL functions. Auth: Supabas
   + IndexedDB; catalogue and customers sync by delta; scans/search/pricing run locally;
   write responses update the cache instead of refetching. See technical-plan 5.7.
 - Print: every document supports POS slip (80/58 mm) and A4/A5, user-selectable.
+- Quantities are exact: numeric(14,3) in the database, strings in the API, integer thousandths in
+  code (shared/units.ts). Never parseFloat/Number them.
+- Stock changes only through SQL functions that write stock_ledger. stock_balances is maintained by
+  a trigger; never write it. Hide costs (lists, ledger, valuation, exports, imports) from roles
+  without products.cost.view.
+- Path ids go through paramId() so a malformed id is a 404, not a 500. Every list is paginated;
+  searches are debounced and abort stale requests.
 
 ## Commands
 npm run dev | npm test | npm run e2e | npm run db:migrate | npm run db:seed

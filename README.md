@@ -18,10 +18,20 @@ The browser uses Supabase Auth only for email/password sign-in and calls the Hon
 
 - `npm run typecheck` and `npm run lint`
 - `npm test` runs unit tests, plus integration tests against the real API and local Supabase when `.env` is set (they are skipped otherwise)
-- `npm run e2e` runs the v0.1 acceptance tests in a browser against the real UI, API and local Supabase (starts the API and Vite itself)
+- `npm run e2e` runs the acceptance tests in a browser against the real UI, API and local Supabase (starts the API and Vite itself)
 - `npm run build`
 
 The migration runner applies the ordered SQL files in `db/migrations` transactionally and records them in `app_schema_migrations`. Do not edit an already-applied migration; add a new one instead.
+
+## Releases
+
+Release notes are in [docs/release-notes](docs/release-notes). The specs are [docs/srs.md](docs/srs.md) (what) and [docs/technical-plan.md](docs/technical-plan.md) (how, by version, including an "As built" note per finished version).
+
+## v0.2 scope: catalogue and stock
+
+Categories, brands, tax categories and units; products with SKUs, several units per SKU (piece, pack, carton) and barcodes; price lists with quantity breaks; CSV import and export with a preview of every problem; opening stock; an append-only stock ledger with running balances; stock adjustments that wait for approval above a threshold; stock valuation at cost and sale price as of any date; barcode label printing for A4 sheets and label rolls.
+
+Cost prices are visible only to roles with `products.cost.view`. Money is integer paisa and quantities are exact (see `shared/money.ts` and `shared/units.ts`).
 
 ## v0.1 scope
 
