@@ -19,6 +19,33 @@ export const permissionDefinitions = [
   ["audit.view", "View audit history"],
   ["auth.pin_switch", "Switch the active terminal user with a PIN"],
   ["auth.manager_override", "Approve a manager-PIN override"],
+  ["catalog.view", "View products, categories, brands, units and price lists"],
+  ["catalog.manage", "Create, update and archive products, categories, brands, tax categories and price lists"],
+  ["products.cost.view", "See product cost prices and stock valuation"],
+  ["products.import", "Import products and prices from CSV"],
+  ["products.export", "Export products and prices to CSV"],
+  ["inventory.view", "View stock levels and the stock ledger"],
+  ["inventory.adjust", "Request stock adjustments"],
+  ["inventory.approve", "Approve or reject stock adjustments above the approval threshold"],
+  ["inventory.opening_stock", "Import opening stock"],
 ] as const;
 
 export type PermissionKey = (typeof permissionDefinitions)[number][0];
+
+export const allPermissionKeys: PermissionKey[] = permissionDefinitions.map(([key]) => key);
+
+/** Default permissions for the system roles created when a business is set up. The Owner holds every key. */
+export const managerPermissionKeys: PermissionKey[] = [
+  "business.view", "business.update", "branches.view", "branches.manage",
+  "locations.view", "locations.manage", "terminals.view", "terminals.manage",
+  "document_series.view", "document_series.manage", "users.view", "users.manage",
+  "roles.view", "settings.view", "settings.manage", "audit.view", "auth.pin_switch",
+  "auth.manager_override",
+  "catalog.view", "catalog.manage", "products.cost.view", "products.import", "products.export",
+  "inventory.view", "inventory.adjust", "inventory.approve", "inventory.opening_stock",
+];
+
+export const cashierPermissionKeys: PermissionKey[] = [
+  "branches.view", "locations.view", "terminals.view", "auth.pin_switch",
+  "catalog.view", "inventory.view",
+];

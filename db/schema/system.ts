@@ -1,4 +1,5 @@
 import {
+  bigint,
   boolean,
   index,
   integer,
@@ -163,5 +164,6 @@ export const businessSettings = pgTable("business_settings", {
   amountRounding: integer("amount_rounding").notNull().default(2),
   sessionTimeoutMinutes: integer("session_timeout_minutes").notNull().default(30),
   posSessionTimeoutHours: integer("pos_session_timeout_hours").notNull().default(12),
+  adjustmentApprovalThresholdPaisa: bigint("adjustment_approval_threshold_paisa", { mode: "number" }).notNull().default(1000000),
   ...timestamps,
 });

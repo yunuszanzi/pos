@@ -1,8 +1,8 @@
 import { validateJson } from "../../lib/validate";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { auditLog, businessSettings, businesses, branches, documentSeries, locations, permissions, rolePermissions, roles, terminals, userBranches, appUsers } from "../../../db/schema";
-import { permissionDefinitions } from "../../../shared/permissions";
+import { cashierPermissionKeys, managerPermissionKeys, permissionDefinitions } from "../../../shared/permissions";
 import { branchSchema, businessUpdateSchema, documentSeriesSchema, locationSchema, setupBusinessSchema, terminalSchema } from "./schema";
 import { auditPrincipal } from "../../lib/audit";
 import { db } from "../../lib/db";
@@ -74,16 +74,8 @@ orgRoutes.post("/org/setup", validateJson(setupBusinessSchema), async (context) 
     }).returning();
     const permissionRows = await tx.select({ key: permissions.key }).from(permissions);
     await tx.insert(rolePermissions).values(permissionRows.map(({ key }) => ({ roleId: ownerRole.id, permissionKey: key })));
-    const managerKeys = [
-      "business.view", "business.update", "branches.view", "branches.manage",
-      "locations.view", "locations.manage", "terminals.view", "terminals.manage",
-      "document_series.view", "document_series.manage", "users.view", "users.manage",
-      "roles.view", "settings.view", "settings.manage", "audit.view", "auth.pin_switch",
-      "auth.manager_override",
-    ];
-    await tx.insert(rolePermissions).values(managerKeys.map((permissionKey) => ({ roleId: managerRole.id, permissionKey })));
-    const cashierKeys = ["branches.view", "locations.view", "terminals.view", "auth.pin_switch"];
-    await tx.insert(rolePermissions).values(cashierKeys.map((permissionKey) => ({ roleId: cashierRole.id, permissionKey })));
+    await tx.insert(rolePermissions).values(managerPermissionKeys.map((permissionKey) => ({ roleId: managerRole.id, permissionKey })));
+    await tx.insert(rolePermissions).values(cashierPermissionKeys.map((permissionKey) => ({ roleId: cashierRole.id, permissionKey })));
     const [owner] = await tx.insert(appUsers).values({
       id: principal.authUserId,
       businessId: business.id,
@@ -95,6 +87,7 @@ orgRoutes.post("/org/setup", validateJson(setupBusinessSchema), async (context) 
     }).returning({ id: appUsers.id });
     await tx.insert(userBranches).values({ userId: owner.id, branchId: branch.id });
     await tx.insert(businessSettings).values({ businessId: business.id, ...authorship });
+    await tx.execute(sql`SELECT seed_catalogue_defaults(${business.id}, ${authorship.createdBy})`);
     await tx.insert(documentSeries).values({
       businessId: business.id,
       branchId: branch.id,

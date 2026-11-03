@@ -8,6 +8,8 @@ const integration = describe.skipIf(!hasLocalStack);
 const foundationTables = [
   "businesses", "branches", "locations", "terminals", "roles", "permissions", "role_permissions", "users",
   "user_branches", "auth_sessions", "pin_attempts", "document_series", "business_settings", "audit_log",
+  "idempotency_keys", "categories", "brands", "tax_categories", "units", "products", "product_variants", "product_units",
+  "price_lists", "price_list_items", "stock_ledger", "stock_balances", "stock_adjustments", "stock_adjustment_lines",
 ];
 
 function supabaseAs(accessToken: string) {
@@ -47,7 +49,7 @@ integration("database access outside the API (technical-plan 3.3)", { timeout: 6
       `;
       expect(updated).toEqual({ created_by: business.ownerId, updated_by: manager.id });
 
-      for (const table of ["businesses", "branches", "locations", "terminals", "roles", "users", "document_series", "business_settings"]) {
+      for (const table of ["businesses", "branches", "locations", "terminals", "roles", "users", "document_series", "business_settings", "tax_categories", "units"]) {
         const [row] = await client<{ missing: number }[]>`
           SELECT count(*)::int AS missing FROM ${client(table)}
           WHERE created_by IS NULL AND ${client(table === "businesses" ? "id" : "business_id")} = ${business.businessId}
