@@ -23,7 +23,7 @@ export function sql() {
 }
 
 export function uniqueEmail(label: string): string {
-  return `${label}-${randomUUID().slice(0, 8)}@example.test`;
+  return `${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${randomUUID().slice(0, 8)}@example.test`;
 }
 
 export async function createConfirmedAuthUser(email: string): Promise<string> {

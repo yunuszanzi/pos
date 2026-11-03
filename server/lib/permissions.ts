@@ -45,6 +45,19 @@ export function hasPermission(principal: Principal, permission: string): boolean
   return principal.permissions.has("*") || principal.permissions.has(permission);
 }
 
+/** Nobody may grant, or manage a user holding, a permission they do not hold themselves. */
+export function holdsAllPermissions(principal: Principal, keys: Iterable<string>): boolean {
+  if (principal.permissions.has("*")) return true;
+  for (const key of keys) {
+    if (!principal.permissions.has(key)) return false;
+  }
+  return true;
+}
+
+export async function canManageRole(principal: Principal, roleId: string): Promise<boolean> {
+  return holdsAllPermissions(principal, await getRolePermissions(roleId));
+}
+
 export function requirePermission(permission: string) {
   return async (context: Context, next: () => Promise<void>) => {
     const principal = getPrincipal(context);

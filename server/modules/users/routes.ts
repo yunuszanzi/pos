@@ -5,8 +5,8 @@ import { appUsers, branches, permissions, rolePermissions, roles, userBranches }
 import { roleSchema, userCreateSchema, userUpdateSchema } from "./schema";
 import { auditPrincipal } from "../../lib/audit";
 import { db } from "../../lib/db";
-import { apiError } from "../../lib/http";
-import { getPrincipal, requirePermission } from "../../lib/permissions";
+import { apiError, roleAboveActor } from "../../lib/http";
+import { canManageRole, getPrincipal, holdsAllPermissions, requirePermission } from "../../lib/permissions";
 import { hashPin } from "../auth/pin";
 import { supabaseAdmin } from "../../lib/supabaseAdmin";
 
@@ -43,6 +43,7 @@ usersRoutes.post("/users", requirePermission("users.manage"), zValidator("json",
   const input = context.req.valid("json");
   const [role] = await db.select().from(roles).where(and(eq(roles.id, input.roleId), eq(roles.businessId, principal.businessId!))).limit(1);
   if (!role || role.name === "Owner") return apiError(context, 400, "INVALID_ROLE", "Choose an assignable role in this business");
+  if (!await canManageRole(principal, role.id)) return roleAboveActor(context);
   const assignedBranches = await db.select({ id: branches.id }).from(branches)
     .where(and(eq(branches.businessId, principal.businessId!), inArray(branches.id, input.branchIds)));
   if (assignedBranches.length !== new Set(input.branchIds).size) {
@@ -99,15 +100,14 @@ usersRoutes.put("/users/:id", requirePermission("users.manage"), zValidator("jso
   if (before.id === principal.activeUserId && context.req.valid("json").roleId && context.req.valid("json").roleId !== before.roleId) {
     return apiError(context, 400, "CANNOT_CHANGE_OWN_ROLE", "You cannot change your own role");
   }
-  if (before.roleId === principal.roleId && context.req.valid("json").active === false) {
-    return apiError(context, 400, "OWNER_PROTECTED", "The active owner's account cannot be deactivated");
-  }
+  if (!await canManageRole(principal, before.roleId)) return roleAboveActor(context);
 
   const input = context.req.valid("json");
   if (input.roleId) {
     const [role] = await db.select().from(roles)
       .where(and(eq(roles.id, input.roleId), eq(roles.businessId, principal.businessId!))).limit(1);
     if (!role || role.name === "Owner") return apiError(context, 400, "INVALID_ROLE", "Choose an assignable role in this business");
+    if (!await canManageRole(principal, role.id)) return roleAboveActor(context);
   }
   if (input.branchIds) {
     const validBranches = await db.select({ id: branches.id }).from(branches)
@@ -150,6 +150,7 @@ usersRoutes.post("/users/:id/password-reset", requirePermission("users.manage"),
   const [user] = await db.select().from(appUsers)
     .where(and(eq(appUsers.id, id), eq(appUsers.businessId, principal.businessId!))).limit(1);
   if (!user || !user.active) return apiError(context, 404, "NOT_FOUND", "Active user not found");
+  if (!await canManageRole(principal, user.roleId)) return roleAboveActor(context);
   const { data, error } = await supabaseAdmin.auth.admin.generateLink({ type: "recovery", email: user.email });
   if (error || !data.properties?.action_link) {
     console.error("Failed to create user recovery link", error?.message);
@@ -181,6 +182,7 @@ usersRoutes.post("/roles", requirePermission("roles.manage"), zValidator("json",
   const principal = getPrincipal(context);
   const input = context.req.valid("json");
   if (input.permissionKeys.includes("*")) return apiError(context, 400, "INVALID_PERMISSION", "The wildcard permission is reserved for the Owner role");
+  if (!holdsAllPermissions(principal, input.permissionKeys)) return roleAboveActor(context);
   const valid = await db.select({ key: permissions.key }).from(permissions)
     .where(inArray(permissions.key, input.permissionKeys));
   if (valid.length !== new Set(input.permissionKeys).size) return apiError(context, 400, "INVALID_PERMISSION", "One or more permission keys are invalid");
@@ -203,6 +205,7 @@ usersRoutes.put("/roles/:id", requirePermission("roles.manage"), zValidator("jso
   const [before] = await db.select().from(roles)
     .where(and(eq(roles.id, id), eq(roles.businessId, principal.businessId!))).limit(1);
   if (!before || before.isSystem) return apiError(context, 404, "NOT_FOUND", "Editable role not found");
+  if (!holdsAllPermissions(principal, input.permissionKeys) || !await canManageRole(principal, id)) return roleAboveActor(context);
   const valid = await db.select({ key: permissions.key }).from(permissions)
     .where(inArray(permissions.key, input.permissionKeys));
   if (valid.length !== new Set(input.permissionKeys).size) return apiError(context, 400, "INVALID_PERMISSION", "One or more permission keys are invalid");
