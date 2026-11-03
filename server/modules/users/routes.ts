@@ -5,7 +5,7 @@ import { appUsers, branches, permissions, rolePermissions, roles, userBranches }
 import { roleSchema, userCreateSchema, userUpdateSchema } from "./schema";
 import { auditPrincipal } from "../../lib/audit";
 import { db } from "../../lib/db";
-import { apiError, roleAboveActor } from "../../lib/http";
+import { apiError, paramId, roleAboveActor } from "../../lib/http";
 import { canManageRole, createdByActor, getPrincipal, holdsAllPermissions, requirePermission, updatedByActor } from "../../lib/permissions";
 import { hashPin } from "../auth/pin";
 import { supabaseAdmin } from "../../lib/supabaseAdmin";
@@ -90,7 +90,7 @@ usersRoutes.post("/users", requirePermission("users.manage"), validateJson(userC
 
 usersRoutes.put("/users/:id", requirePermission("users.manage"), validateJson(userUpdateSchema), async (context) => {
   const principal = getPrincipal(context);
-  const id = context.req.param("id");
+  const id = paramId(context);
   if (!id) return apiError(context, 400, "INVALID_USER_ID", "User ID is required");
   if (id === principal.activeUserId && context.req.valid("json").active === false) {
     return apiError(context, 400, "CANNOT_DEACTIVATE_SELF", "You cannot deactivate your own account");
@@ -146,7 +146,7 @@ usersRoutes.put("/users/:id", requirePermission("users.manage"), validateJson(us
 
 usersRoutes.post("/users/:id/password-reset", requirePermission("users.manage"), async (context) => {
   const principal = getPrincipal(context);
-  const id = context.req.param("id");
+  const id = paramId(context);
   if (!id) return apiError(context, 400, "INVALID_USER_ID", "User ID is required");
   const [user] = await db.select().from(appUsers)
     .where(and(eq(appUsers.id, id), eq(appUsers.businessId, principal.businessId!))).limit(1);
@@ -201,7 +201,7 @@ usersRoutes.post("/roles", requirePermission("roles.manage"), validateJson(roleS
 usersRoutes.put("/roles/:id", requirePermission("roles.manage"), validateJson(roleSchema), async (context) => {
   const principal = getPrincipal(context);
   const input = context.req.valid("json");
-  const id = context.req.param("id");
+  const id = paramId(context);
   if (input.permissionKeys.includes("*")) return apiError(context, 400, "INVALID_PERMISSION", "The wildcard permission is reserved for the Owner role");
   const [before] = await db.select().from(roles)
     .where(and(eq(roles.id, id), eq(roles.businessId, principal.businessId!))).limit(1);

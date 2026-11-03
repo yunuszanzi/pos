@@ -6,7 +6,7 @@ import { cashierPermissionKeys, managerPermissionKeys, permissionDefinitions } f
 import { branchSchema, businessUpdateSchema, documentSeriesSchema, locationSchema, setupBusinessSchema, terminalSchema } from "./schema";
 import { auditPrincipal } from "../../lib/audit";
 import { db } from "../../lib/db";
-import { apiError } from "../../lib/http";
+import { apiError, paramId } from "../../lib/http";
 import { createdByActor, getPrincipal, requirePermission, updatedByActor } from "../../lib/permissions";
 import { hashPin } from "../auth/pin";
 
@@ -148,7 +148,7 @@ orgRoutes.post("/branches", requirePermission("branches.manage"), validateJson(b
 
 orgRoutes.put("/branches/:id", requirePermission("branches.manage"), validateJson(branchSchema.partial()), async (context) => {
   const principal = getPrincipal(context);
-  const id = context.req.param("id");
+  const id = paramId(context);
   const [before] = await db.select().from(branches).where(and(eq(branches.id, id), eq(branches.businessId, principal.businessId!))).limit(1);
   if (!before) return apiError(context, 404, "NOT_FOUND", "Branch not found");
   const [after] = await db.update(branches).set({ ...context.req.valid("json"), ...updatedByActor(principal) })
@@ -175,7 +175,7 @@ orgRoutes.post("/locations", requirePermission("locations.manage"), validateJson
 
 orgRoutes.put("/locations/:id", requirePermission("locations.manage"), validateJson(locationSchema.partial()), async (context) => {
   const principal = getPrincipal(context);
-  const id = context.req.param("id");
+  const id = paramId(context);
   const [before] = await db.select().from(locations).where(and(eq(locations.id, id), eq(locations.businessId, principal.businessId!))).limit(1);
   if (!before) return apiError(context, 404, "NOT_FOUND", "Location not found");
   const input = context.req.valid("json");
@@ -208,7 +208,7 @@ orgRoutes.post("/terminals", requirePermission("terminals.manage"), validateJson
 
 orgRoutes.put("/terminals/:id", requirePermission("terminals.manage"), validateJson(terminalSchema.partial()), async (context) => {
   const principal = getPrincipal(context);
-  const id = context.req.param("id");
+  const id = paramId(context);
   const [before] = await db.select().from(terminals).where(and(eq(terminals.id, id), eq(terminals.businessId, principal.businessId!))).limit(1);
   if (!before) return apiError(context, 404, "NOT_FOUND", "Terminal not found");
   const input = context.req.valid("json");
@@ -241,7 +241,7 @@ orgRoutes.post("/document-series", requirePermission("document_series.manage"), 
 
 orgRoutes.put("/document-series/:id", requirePermission("document_series.manage"), validateJson(documentSeriesSchema.partial()), async (context) => {
   const principal = getPrincipal(context);
-  const id = context.req.param("id");
+  const id = paramId(context);
   const [before] = await db.select().from(documentSeries)
     .where(and(eq(documentSeries.id, id), eq(documentSeries.businessId, principal.businessId!))).limit(1);
   if (!before) return apiError(context, 404, "NOT_FOUND", "Document series not found");

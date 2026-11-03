@@ -38,6 +38,17 @@ integration("API conventions and tenant isolation", { timeout: 60_000 }, () => {
     expect(audit.body.data.every((entry: { businessId: string }) => entry.businessId === shopB.businessId)).toBe(true);
   });
 
+  it("answers 404, not a server error, for a malformed id in any path", async () => {
+    const business = await createTestBusiness();
+    for (const [method, path] of [
+      ["PUT", "/branches/abc"], ["PUT", "/locations/abc"], ["PUT", "/terminals/abc"], ["PUT", "/document-series/abc"],
+      ["PUT", "/users/abc"], ["POST", "/users/abc/password-reset"], ["PUT", "/roles/abc"],
+    ] as const) {
+      const response = await callApi(business.ownerToken, method, path, { body: { name: "x", code: "x", permissionKeys: [], active: true } });
+      expect(response.status, `${method} ${path}`).toBe(404);
+    }
+  });
+
   it("expires a back-office session after the inactivity timeout (FR-USR-01)", async () => {
     const business = await createTestBusiness();
     expect((await callApi(business.ownerToken, "GET", "/me")).status).toBe(200);
