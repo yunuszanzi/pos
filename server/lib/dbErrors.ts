@@ -40,3 +40,8 @@ export function conflictOrThrow(context: Context, error: unknown): Response {
   if (conflict) return conflict;
   throw error;
 }
+
+/** The message a Postgres function raised (RAISE EXCEPTION), for errors we raise on purpose such as STOCK_INSUFFICIENT. */
+export function dbErrorMessage(error: unknown): string {
+  return pgError(error).message ?? (error instanceof Error ? error.message : "");
+}
