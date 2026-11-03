@@ -7,6 +7,7 @@ const lookups = (overrides: Partial<ImportLookups> = {}): ImportLookups => ({
   unitIdsByName: new Map([["piece", "u-piece"], ["carton", "u-carton"], ["pack", "u-pack"]]),
   existingSkus: new Map(),
   existingBarcodes: new Map(),
+  canSetCost: true,
   ...overrides,
 });
 
@@ -74,7 +75,7 @@ describe("analyseProductImport", () => {
 
   it("matches SKUs case-insensitively and updates existing variants", () => {
     const result = analyse("sku,name,sale_price\nA1,Pump,10\nNEW,Hose,5", lookups({
-      existingSkus: new Map([["a1", { variantId: "v1", productId: "p1" }]]),
+      existingSkus: new Map([["a1", { variantId: "v1", productId: "p1", baseUnitId: "u-piece" }]]),
     }));
     expect(result.issues).toEqual([]);
     expect(result.variantsToUpdate).toBe(1);
@@ -85,7 +86,7 @@ describe("analyseProductImport", () => {
 
   it("allows a variant to keep its own barcode but not take another product's", () => {
     const existing = lookups({
-      existingSkus: new Map([["a1", { variantId: "v1", productId: "p1" }]]),
+      existingSkus: new Map([["a1", { variantId: "v1", productId: "p1", baseUnitId: "u-piece" }]]),
       existingBarcodes: new Map([["111", "v1"], ["222", "v-other"]]),
     });
     expect(analyse("sku,name,barcode\nA1,Pump,111", existing).issues).toEqual([]);
@@ -100,10 +101,48 @@ describe("analyseProductImport", () => {
 
   it("refuses SKUs of one product that belong to different existing products", () => {
     const result = analyse("sku,name\nA1,Balloon\nB1,Balloon", lookups({
-      existingSkus: new Map([["a1", { variantId: "v1", productId: "p1" }], ["b1", { variantId: "v2", productId: "p2" }]]),
+      existingSkus: new Map([["a1", { variantId: "v1", productId: "p1", baseUnitId: "u-piece" }], ["b1", { variantId: "v2", productId: "p2", baseUnitId: "u-piece" }]]),
     }));
     expect(result.issues).toHaveLength(1);
     expect(result.issues[0].message).toContain("different existing products");
+  });
+
+  it("treats blank cells on a new SKU as defaults and on an existing SKU as 'leave unchanged'", () => {
+    const fresh = analyse("sku,name,sale_price,cost,variant_name\nNEW,Hose,,,");
+    expect(fresh.issues).toEqual([]);
+    expect(fresh.products[0].variants[0]).toMatchObject({ costPaisa: null, variantName: null, reorderLevel: null });
+    expect(fresh.products[0].variants[0].units[0].salePricePaisa).toBeNull();
+
+    const known = lookups({ existingSkus: new Map([["a1", { variantId: "v1", productId: "p1", baseUnitId: "u-piece" }]]) });
+    const blank = analyse("sku,name,sale_price,cost\nA1,Pump,,", known);
+    expect(blank.products[0].variants[0].costPaisa).toBeNull();
+    expect(blank.products[0].variants[0].units[0].salePricePaisa).toBeNull();
+    const priced = analyse("sku,name,sale_price,cost\nA1,Pump,0,0", known);
+    expect(priced.products[0].variants[0].costPaisa).toBe(0);
+    expect(priced.products[0].variants[0].units[0].salePricePaisa).toBe(0);
+  });
+
+  it("lets a blank cell in one row of a product defer to another row", () => {
+    const result = analyse("sku,name,brand,hs_code\nR1,Balloon,Party Co,\nB1,Balloon,,9503.0090");
+    expect(result.issues).toEqual([]);
+    expect(result.products[0]).toMatchObject({ brand: "Party Co", hsCode: "9503.0090" });
+  });
+
+  it("only lets users who can see costs import them", () => {
+    const denied = analyse("sku,name,cost\nA1,Pump,50", lookups({ canSetCost: false }));
+    expect(denied.issues).toEqual([{ row: 2, field: "cost", message: "You do not have permission to import cost prices; leave this column empty" }]);
+    expect(analyse("sku,name,cost\nA1,Pump,", lookups({ canSetCost: false })).issues).toEqual([]);
+  });
+
+  it("will not change the base unit of an existing product, and keeps it when the column is blank", () => {
+    const known = lookups({ existingSkus: new Map([["a1", { variantId: "v1", productId: "p1", baseUnitId: "u-piece" }]]) });
+    expect(analyse("sku,name,base_unit\nA1,Pump,Pack", known).issues).toEqual([
+      { row: 2, field: "base_unit", message: "The base unit of an existing product cannot be changed by import" },
+    ]);
+    expect(analyse("sku,name,base_unit\nA1,Pump,Piece", known).issues).toEqual([]);
+    const kept = analyse("sku,name\nA1,Pump", lookups({ existingSkus: new Map([["a1", { variantId: "v1", productId: "p1", baseUnitId: "u-pack" }]]) }));
+    expect(kept.issues).toEqual([]);
+    expect(kept.products[0].baseUnitId).toBe("u-pack");
   });
 
   it("validates the alternative unit", () => {

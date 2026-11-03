@@ -26,6 +26,11 @@ export function formatRupees(paisa: Paisa): string {
   return `${negative ? "-" : ""}${whole}.${fraction}`;
 }
 
+/** 123450 -> "1234.50": no thousands separators, for CSV cells and form inputs. */
+export function toPlainRupees(paisa: Paisa): string {
+  return formatRupees(paisa).replaceAll(",", "");
+}
+
 export function formatPkr(paisa: Paisa): string {
   return `Rs ${formatRupees(paisa)}`;
 }

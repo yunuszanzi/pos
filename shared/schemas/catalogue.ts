@@ -63,6 +63,8 @@ export const productSchema = z.object({
   imageUrl: z.string().url().max(500).nullable().default(null),
   productType: z.enum(["stocked", "non_stock", "service"]).default("stocked"),
   baseUnitId: uuid,
+  /** Archive or restore on update; ignored on create. */
+  active: z.boolean().optional(),
   variants: z.array(variantSchema).min(1).max(200),
 }).superRefine((product, context) => {
   const skus = new Set<string>();

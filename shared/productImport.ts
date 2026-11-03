@@ -2,7 +2,9 @@ import { parseRupees, type Paisa } from "./money";
 import { formatQuantity, parseQuantity } from "./units";
 
 // CSV product import. One row per SKU. Rows sharing a product `name` become variants of one product.
-// Importing an existing SKU updates that variant and its product. All-or-nothing: any error blocks the import.
+// Importing an existing SKU updates that variant and its product. On an existing SKU a blank cell means
+// "leave unchanged" (so a file exported without costs cannot wipe them); on a new SKU it means the default.
+// Units not mentioned in a row are kept. All-or-nothing: any error blocks the import.
 
 export const importColumns = [
   "sku", "name", "variant_name", "category", "brand", "tax_category", "hs_code", "base_unit",
@@ -17,21 +19,24 @@ export type ImportIssue = { row: number; field: string; message: string };
 export type ImportLookups = {
   taxCategoryIdsByName: Map<string, string>;
   unitIdsByName: Map<string, string>;
-  /** lower-case SKU -> existing variant */
-  existingSkus: Map<string, { variantId: string; productId: string }>;
+  /** lower-case SKU -> existing variant and its product's base unit */
+  existingSkus: Map<string, { variantId: string; productId: string; baseUnitId: string }>;
   /** barcode -> variant that owns it */
   existingBarcodes: Map<string, string>;
+  /** False when the user lacks products.cost.view: they may not set cost prices through an import. */
+  canSetCost: boolean;
 };
 
-export type ImportUnit = { unitId: string; factorToBase: string; barcode: string | null; salePricePaisa: Paisa };
+/** null means "not given": keep the current value on an existing unit, use the default on a new one. */
+export type ImportUnit = { unitId: string; factorToBase: string; barcode: string | null; salePricePaisa: Paisa | null };
 export type ImportVariant = {
   row: number;
   existingVariantId: string | null;
   sku: string;
-  variantName: string;
-  costPaisa: Paisa;
-  reorderLevel: string;
-  reorderQuantity: string;
+  variantName: string | null;
+  costPaisa: Paisa | null;
+  reorderLevel: string | null;
+  reorderQuantity: string | null;
   units: ImportUnit[];
 };
 export type ImportProduct = {
@@ -109,7 +114,11 @@ export function analyseProductImport(
     }
 
     const baseUnitName = get("base_unit") || "Piece";
-    const baseUnitId = lookups.unitIdsByName.get(key(baseUnitName));
+    // An existing product keeps its base unit when the column is blank; a new one defaults to Piece.
+    const existingProduct = sku ? lookups.existingSkus.get(key(sku)) : undefined;
+    const baseUnitId = get("base_unit") || !existingProduct
+      ? lookups.unitIdsByName.get(key(baseUnitName))
+      : existingProduct.baseUnitId;
     if (!baseUnitId) problem("base_unit", `Unknown unit "${baseUnitName}"`);
     const taxName = get("tax_category");
     const taxCategoryId = taxName ? lookups.taxCategoryIdsByName.get(key(taxName)) ?? null : null;
@@ -117,18 +126,19 @@ export function analyseProductImport(
     const hsCode = get("hs_code") || null;
     if (hsCode && !hsCodePattern.test(hsCode)) problem("hs_code", `HS code "${hsCode}" should use digits and dots, e.g. 9503.0090`);
 
-    const salePrice = get("sale_price") ? parse("sale_price", () => parseRupees(get("sale_price")), 0) : 0;
-    const cost = get("cost") ? parse("cost", () => parseRupees(get("cost")), 0) : 0;
-    if (salePrice < 0) problem("sale_price", "Sale price cannot be negative");
-    if (cost < 0) problem("cost", "Cost cannot be negative");
-    const reorderLevel = get("reorder_level") ? parse("reorder_level", () => formatQuantity(parseQuantity(get("reorder_level"))), "0") : "0";
-    const reorderQuantity = get("reorder_quantity") ? parse("reorder_quantity", () => formatQuantity(parseQuantity(get("reorder_quantity"))), "0") : "0";
+    const salePrice = get("sale_price") ? parse<Paisa | null>("sale_price", () => parseRupees(get("sale_price")), 0) : null;
+    const cost = get("cost") ? parse<Paisa | null>("cost", () => parseRupees(get("cost")), 0) : null;
+    if (salePrice !== null && salePrice < 0) problem("sale_price", "Sale price cannot be negative");
+    if (cost !== null && cost < 0) problem("cost", "Cost cannot be negative");
+    if (cost !== null && !lookups.canSetCost) problem("cost", "You do not have permission to import cost prices; leave this column empty");
+    const reorderLevel = get("reorder_level") ? parse<string | null>("reorder_level", () => formatQuantity(parseQuantity(get("reorder_level"))), "0") : null;
+    const reorderQuantity = get("reorder_quantity") ? parse<string | null>("reorder_quantity", () => formatQuantity(parseQuantity(get("reorder_quantity"))), "0") : null;
 
     const barcode = get("barcode") || null;
     if (barcode && !barcodePattern.test(barcode)) problem("barcode", `Barcode "${barcode}" must have no spaces and at most 64 characters`);
 
     const units: ImportUnit[] = [];
-    if (baseUnitId) units.push({ unitId: baseUnitId, factorToBase: "1", barcode, salePricePaisa: Math.max(0, salePrice) });
+    if (baseUnitId) units.push({ unitId: baseUnitId, factorToBase: "1", barcode, salePricePaisa: salePrice === null ? null : Math.max(0, salePrice) });
     const altUnitName = get("alt_unit");
     if (altUnitName) {
       const altUnitId = lookups.unitIdsByName.get(key(altUnitName));
@@ -141,14 +151,17 @@ export function analyseProductImport(
       else if (parseQuantity(factor) <= 0) problem("alt_factor", "The factor must be greater than zero");
       const altBarcode = get("alt_barcode") || null;
       if (altBarcode && !barcodePattern.test(altBarcode)) problem("alt_barcode", `Barcode "${altBarcode}" must have no spaces and at most 64 characters`);
-      const altPrice = get("alt_price") ? parse("alt_price", () => parseRupees(get("alt_price")), 0) : 0;
-      if (altPrice < 0) problem("alt_price", "Price cannot be negative");
+      const altPrice = get("alt_price") ? parse<Paisa | null>("alt_price", () => parseRupees(get("alt_price")), 0) : null;
+      if (altPrice !== null && altPrice < 0) problem("alt_price", "Price cannot be negative");
       if (altUnitId && altUnitId !== baseUnitId && parseQuantity(factor) > 0) {
-        units.push({ unitId: altUnitId, factorToBase: factor, barcode: altBarcode, salePricePaisa: Math.max(0, altPrice) });
+        units.push({ unitId: altUnitId, factorToBase: factor, barcode: altBarcode, salePricePaisa: altPrice === null ? null : Math.max(0, altPrice) });
       }
     }
 
     const existing = sku ? lookups.existingSkus.get(key(sku)) ?? null : null;
+    if (existing && baseUnitId && get("base_unit") && existing.baseUnitId !== baseUnitId) {
+      problem("base_unit", "The base unit of an existing product cannot be changed by import");
+    }
     for (const unit of units) {
       if (!unit.barcode) continue;
       const firstSeen = seenBarcodes.get(unit.barcode);
@@ -165,8 +178,8 @@ export function analyseProductImport(
       row,
       existingVariantId: existing?.variantId ?? null,
       sku,
-      variantName: get("variant_name"),
-      costPaisa: Math.max(0, cost),
+      variantName: get("variant_name") || null,
+      costPaisa: cost === null ? null : Math.max(0, cost),
       reorderLevel,
       reorderQuantity,
       units,
@@ -186,13 +199,19 @@ export function analyseProductImport(
       return;
     }
     const same = (field: string, a: unknown, b: unknown) => {
+      const empty = (value: unknown) => value === null || value === undefined || (Array.isArray(value) && !value.length);
+      if (empty(a) || empty(b)) return;
       if (JSON.stringify(a) !== JSON.stringify(b)) problem(field, `Rows for "${name}" must agree on ${field.replace(/_/g, " ")} (row ${group.variants[0].row} differs)`);
     };
     same("category", group.categoryPath, categoryPath);
     same("brand", group.brand, brand);
     same("tax_category", group.taxCategoryId, taxCategoryId);
     same("hs_code", group.hsCode, hsCode);
-    if (baseUnitId) same("base_unit", group.baseUnitId, baseUnitId);
+    if (get("base_unit") && baseUnitId) same("base_unit", group.baseUnitId, baseUnitId);
+    if (!group.categoryPath.length) group.categoryPath = categoryPath;
+    group.brand ??= brand;
+    group.taxCategoryId ??= taxCategoryId;
+    group.hsCode ??= hsCode;
     if (existing) {
       if (group.existingProductId && group.existingProductId !== existing.productId) {
         problem("sku", `SKUs of "${name}" belong to different existing products`);

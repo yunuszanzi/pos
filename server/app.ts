@@ -3,7 +3,9 @@ import { authenticate } from "./lib/auth";
 import { apiError } from "./lib/http";
 import { auditRoutes } from "./modules/audit/routes";
 import { authRoutes } from "./modules/auth/routes";
+import { catalogueRoutes } from "./modules/catalogue/routes";
 import { orgRoutes } from "./modules/org/routes";
+import { productsRoutes } from "./modules/products/routes";
 import { settingsRoutes } from "./modules/settings/routes";
 import { usersRoutes } from "./modules/users/routes";
 
@@ -16,6 +18,8 @@ app.route("/api/v1", orgRoutes);
 app.route("/api/v1", usersRoutes);
 app.route("/api/v1", settingsRoutes);
 app.route("/api/v1", auditRoutes);
+app.route("/api/v1", catalogueRoutes);
+app.route("/api/v1", productsRoutes);
 
 app.notFound((context) => apiError(context, 404, "NOT_FOUND", "API route not found"));
 app.onError((error, context) => {
