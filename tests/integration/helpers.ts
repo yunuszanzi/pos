@@ -49,15 +49,19 @@ type CallOptions = { body?: unknown; terminalId?: string; pinSession?: string };
 // Response shapes vary per route; tests assert on them directly instead of typing each one.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function callApi<T = any>(token: string, method: string, path: string, options: CallOptions = {}): Promise<ApiResponse<T>> {
-  const { app } = await import("../../server/app");
   const headers = new Headers({ Authorization: `Bearer ${token}`, "Content-Type": "application/json" });
   if (options.terminalId) headers.set("X-Terminal-Id", options.terminalId);
   if (options.pinSession) headers.set("X-PIN-Session", options.pinSession);
-  const response = await app.fetch(new Request(`http://localhost/api/v1${path}`, {
+  // Integration tests call the Hono app in-process; e2e tests set TEST_API_URL to use the running server.
+  const baseUrl = process.env.TEST_API_URL ?? "http://localhost";
+  const request = new Request(`${baseUrl}/api/v1${path}`, {
     method,
     headers,
     body: options.body === undefined ? undefined : JSON.stringify(options.body),
-  }));
+  });
+  const response = process.env.TEST_API_URL
+    ? await fetch(request)
+    : await (await import("../../server/app")).app.fetch(request);
   return { status: response.status, body: await response.json() as T };
 }
 

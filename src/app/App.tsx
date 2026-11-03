@@ -85,12 +85,14 @@ function Shell({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
 
   useEffect(() => {
+    // Wait for the list: while it loads (or after a cache clear) it is empty, and the saved terminal would be wiped.
+    if (!terminalQuery.isSuccess) return;
     if (terminalId && !terminals.some((terminal) => terminal.id === terminalId)) {
       setTerminalId(terminals[0]?.id ?? "");
     } else if (!terminalId && terminals[0]) {
       setTerminalId(terminals[0].id);
     }
-  }, [terminalId, terminals, setTerminalId]);
+  }, [terminalQuery.isSuccess, terminalId, terminals, setTerminalId]);
 
   const visibleRoutes = appRoutes.filter((route) => !route.permission || hasPermission(currentUser?.permissions ?? [], route.permission));
 

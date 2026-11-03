@@ -11,7 +11,8 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      "/api": "http://localhost:3000",
+      // 127.0.0.1, not localhost: on Windows localhost can resolve to ::1 while the API listens on IPv4.
+      "/api": "http://127.0.0.1:3000",
     },
   },
 });

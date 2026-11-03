@@ -21,6 +21,8 @@ export async function requestApi<T>(path: string, init: RequestInit = {}): Promi
       sessionStorage.removeItem("pos.pinSession");
       await supabase.auth.signOut({ scope: "local" });
     }
+    // A rejected PIN session would otherwise be resent forever; fall back to the signed-in account.
+    if (result.error?.code === "INVALID_TERMINAL_SESSION") sessionStorage.removeItem("pos.pinSession");
     throw new Error(result.error?.message ?? `Request failed (${response.status})`);
   }
   return result;
