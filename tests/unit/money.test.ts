@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { divideRounded, formatBps, formatPkr, formatRupees, lineValue, parsePercentToBps, parseRupees } from "../../shared/money";
+import { divideRounded, formatBps, formatPkr, formatRupees, lineValue, normaliseMoneyText, parsePercentToBps, parseRupees } from "../../shared/money";
 
 describe("parseRupees", () => {
   it.each([
@@ -94,5 +94,15 @@ describe("tax rate percentages", () => {
   it("formats and round-trips", () => {
     expect([1800, 750, 25, 0, 10000].map(formatBps)).toEqual(["18", "7.5", "0.25", "0", "100"]);
     for (const bps of [0, 1, 5, 99, 100, 1850, 10000]) expect(parsePercentToBps(formatBps(bps))).toBe(bps);
+  });
+});
+
+describe("normaliseMoneyText", () => {
+  it.each([["3.2", "3.20"], ["5", "5.00"], ["1,234.5", "1234.50"], [".5", "0.50"], [" 7 ", "7.00"], ["12.34", "12.34"], ["", ""], ["   ", ""]])("%j -> %j", (input, expected) => {
+    expect(normaliseMoneyText(input)).toBe(expected);
+  });
+
+  it.each(["3.456", "abc", "1.2.3", "5%", "1e3", "5."])("%j is not an amount", (input) => {
+    expect(normaliseMoneyText(input)).toBeNull();
   });
 });

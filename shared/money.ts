@@ -65,3 +65,17 @@ export function formatBps(bps: number): string {
   const fraction = String(bps % 100).padStart(2, "0").replace(/0+$/, "");
   return `${Math.trunc(bps / 100)}${fraction ? `.${fraction}` : ""}`;
 }
+
+/**
+ * What an amount box should show once the person leaves it: "3.2" -> "3.20", "1,234.5" -> "1234.50", ".5" -> "0.50".
+ * An empty box stays empty. Returns null when the text is not an amount (including 3 or more decimals), so the caller can flag it.
+ */
+export function normaliseMoneyText(input: string): string | null {
+  const text = input.trim();
+  if (text === "") return "";
+  try {
+    return toPlainRupees(parseRupees(text.startsWith(".") ? `0${text}` : text));
+  } catch {
+    return null;
+  }
+}

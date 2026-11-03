@@ -8,6 +8,7 @@ import { productSchema, type ProductInput } from "../../../shared/schemas/catalo
 import { getAllBrands, getAllCategories, getAllTaxCategories, getAllUnits, type Unit } from "../../api/catalogueApi";
 import { createProduct, getProductById, updateProduct, type Product } from "../../api/productsApi";
 import { ErrorMessage, Field, PageTitle, SelectInput, TextInput } from "../../app/FormElements";
+import { MoneyInput } from "../../app/MoneyInput";
 import { useCan } from "../../app/permissions";
 import { categoryLabels } from "./categoryLabels";
 
@@ -227,8 +228,8 @@ export function ProductFormPage() {
         <div className="form-grid">
           <Field label="SKU"><TextInput {...form.register(`variants.${index}.sku`, { required: true })} required maxLength={64} /></Field>
           <Field label="Variant name"><TextInput {...form.register(`variants.${index}.variantName`)} placeholder="Red / 12 inch" maxLength={200} /></Field>
-          <Field label="Sale price per base unit (PKR)"><TextInput {...form.register(`variants.${index}.basePrice`)} inputMode="decimal" placeholder="0.00" /></Field>
-          {canSeeCost && <Field label="Cost per base unit (PKR)"><TextInput {...form.register(`variants.${index}.cost`)} inputMode="decimal" placeholder="0.00" /></Field>}
+          <Field label="Sale price per base unit (PKR)"><MoneyInput {...form.register(`variants.${index}.basePrice`)} placeholder="0.00" /></Field>
+          {canSeeCost && <Field label="Cost per base unit (PKR)"><MoneyInput {...form.register(`variants.${index}.cost`)} placeholder="0.00" /></Field>}
           <Field label="Barcode (base unit)">
             <div className="button-row">
               <TextInput {...form.register(`variants.${index}.baseBarcode`)} maxLength={64} />
@@ -270,7 +271,7 @@ function OtherUnits({ index, control, register, units, baseUnitId }: {
           <Field label="Unit"><SelectInput {...register(`variants.${index}.otherUnits.${unitIndex}.unitId`)}>{choices.map((unit) => <option key={unit.id} value={unit.id}>{unit.name}</option>)}</SelectInput></Field>
           <Field label={`${unitName(baseUnitId)}s in one of this unit`}><TextInput {...register(`variants.${index}.otherUnits.${unitIndex}.factor`)} inputMode="decimal" placeholder="200" /></Field>
           <Field label="Barcode (this unit)"><TextInput {...register(`variants.${index}.otherUnits.${unitIndex}.barcode`)} maxLength={64} /></Field>
-          <Field label="Sale price per this unit (PKR)"><TextInput {...register(`variants.${index}.otherUnits.${unitIndex}.price`)} inputMode="decimal" placeholder="0.00" /></Field>
+          <Field label="Sale price per this unit (PKR)"><MoneyInput {...register(`variants.${index}.otherUnits.${unitIndex}.price`)} placeholder="0.00" /></Field>
         </div>
         <div className="button-row">
           {row?.factor && <span className="muted">1 {unitName(row.unitId)} = {row.factor} {unitName(baseUnitId)}</span>}

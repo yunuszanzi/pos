@@ -56,8 +56,13 @@ test("2. a product sold in pieces and cartons converts correctly and can be foun
   await page.getByLabel("Tax category").selectOption({ label: "Standard rate 18%" });
   await page.getByLabel("SKU", { exact: true }).fill("BAL-12-RED");
   await page.getByLabel("Variant name").fill("Red");
+  // Amounts are always shown with 2 decimals once you leave the box.
   await page.getByLabel("Sale price per base unit (PKR)").fill("5");
-  await page.getByLabel("Cost per base unit (PKR)").fill("3.20");
+  await page.getByLabel("Sale price per base unit (PKR)").blur();
+  await expect(page.getByLabel("Sale price per base unit (PKR)")).toHaveValue("5.00");
+  await page.getByLabel("Cost per base unit (PKR)").fill("3.2");
+  await page.getByLabel("Cost per base unit (PKR)").blur();
+  await expect(page.getByLabel("Cost per base unit (PKR)")).toHaveValue("3.20");
   await page.getByLabel(/^Barcode \(base unit\)/).fill("8964000000017");
   await page.getByRole("button", { name: "Add unit" }).click();
   await page.locator('select[name="variants.0.otherUnits.0.unitId"]').selectOption({ label: "Carton" });

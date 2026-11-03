@@ -73,7 +73,8 @@ integration("database migrations", { timeout: 120_000 }, () => {
         roleIds[name] = role.id;
       }
       await sql`INSERT INTO users (id, business_id, role_id, email, display_name) VALUES (${owner.id}, ${business.id}, ${roleIds.Owner}, 'owner@legacy.test', 'Owner')`;
-      await sql`INSERT INTO business_settings (business_id) VALUES (${business.id})`;
+      // v0.1 let a business choose 0 or 1 decimal places; the upgrade must bring it back to 2.
+      await sql`INSERT INTO business_settings (business_id, amount_rounding) VALUES (${business.id}, 0)`;
       await sql`INSERT INTO role_permissions (role_id, permission_key) VALUES (${roleIds.Cashier}, 'branches.view'), (${roleIds.Cashier}, 'auth.pin_switch')`;
       const [custom] = await sql<{ id: string }[]>`INSERT INTO roles (business_id, name, is_system) VALUES (${business.id}, 'Custom', false) RETURNING id`;
       await sql`INSERT INTO role_permissions (role_id, permission_key) VALUES (${custom.id}, 'branches.view')`;
@@ -95,6 +96,8 @@ integration("database migrations", { timeout: 120_000 }, () => {
 
       const [settings] = await sql<{ adjustment_approval_threshold_paisa: string }[]>`SELECT adjustment_approval_threshold_paisa FROM business_settings WHERE business_id = ${business.id}`;
       expect(Number(settings.adjustment_approval_threshold_paisa)).toBe(1_000_000);
+      const [precision] = await sql<{ amount_rounding: number }[]>`SELECT amount_rounding FROM business_settings WHERE business_id = ${business.id}`;
+      expect(precision.amount_rounding).toBe(2);
 
       // The stock machinery works on the upgraded database.
       const [location] = await sql<{ id: string }[]>`

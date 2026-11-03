@@ -8,6 +8,7 @@ import {
 } from "../../api/catalogueApi";
 import type { Product, ProductVariant } from "../../api/productsApi";
 import { ErrorMessage, Field, PageTitle, SelectInput, SuccessMessage, TextInput } from "../../app/FormElements";
+import { MoneyInput } from "../../app/MoneyInput";
 import { useCan } from "../../app/permissions";
 import { ProductPicker } from "./ProductPicker";
 
@@ -126,7 +127,7 @@ function PriceListEditor({ detail, canManage, onSaved }: { detail: PriceListDeta
             {row.unitIds.map((unitId) => <option key={unitId} value={unitId}>{unitName(unitId)}</option>)}
           </SelectInput></td>
           <td><TextInput aria-label={`From quantity for ${row.sku}`} value={row.minQuantity} readOnly={!canManage} inputMode="decimal" onChange={(event) => change(row.key, { minQuantity: event.target.value })} /></td>
-          <td><TextInput aria-label={`Price for ${row.sku}`} value={row.price} readOnly={!canManage} inputMode="decimal" onChange={(event) => change(row.key, { price: event.target.value })} /></td>
+          <td><MoneyInput aria-label={`Price for ${row.sku}`} value={row.price} readOnly={!canManage} onChange={(event) => change(row.key, { price: event.target.value })} /></td>
           <td className="action-cell">{canManage && <button className="text-button" type="button" onClick={() => setRows(rows.filter((candidate) => candidate.key !== row.key))}>Remove</button>}</td>
         </tr>)}</tbody>
       </table></div>

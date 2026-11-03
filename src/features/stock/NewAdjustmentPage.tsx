@@ -8,6 +8,7 @@ import { createStockAdjustment } from "../../api/inventoryApi";
 import { getAllLocations } from "../../api/orgApi";
 import type { Product, ProductVariant } from "../../api/productsApi";
 import { ErrorMessage, Field, PageTitle, SelectInput, TextInput } from "../../app/FormElements";
+import { MoneyInput } from "../../app/MoneyInput";
 import { useCan } from "../../app/permissions";
 import { ProductPicker } from "../products/ProductPicker";
 import { adjustmentReasonLabels } from "./stockFormat";
@@ -113,7 +114,7 @@ export function NewAdjustmentPage() {
           <Field label="Stock goes"><SelectInput value={line.direction} onChange={(event) => change(index, { direction: event.target.value as Line["direction"] })}><option value="remove">Down (remove)</option><option value="add">Up (add)</option></SelectInput></Field>
           <Field label="Quantity"><TextInput value={line.quantity} onChange={(event) => change(index, { quantity: event.target.value })} inputMode="decimal" placeholder="0" required /></Field>
           <Field label="Unit"><SelectInput value={line.unitId} onChange={(event) => change(index, { unitId: event.target.value })}>{line.variant.units.map((unit) => <option key={unit.unitId} value={unit.unitId}>{unitName(unit.unitId)}</option>)}</SelectInput></Field>
-          {canSeeCost && line.direction === "add" && <Field label="Cost per unit (PKR, optional)"><TextInput value={line.cost} onChange={(event) => change(index, { cost: event.target.value })} inputMode="decimal" placeholder="Uses the SKU cost" /></Field>}
+          {canSeeCost && line.direction === "add" && <Field label="Cost per unit (PKR, optional)"><MoneyInput value={line.cost} onChange={(event) => change(index, { cost: event.target.value })} placeholder="Uses the SKU cost" /></Field>}
           <button className="text-button" type="button" onClick={() => setLines(lines.filter((_, position) => position !== index))}>Remove line</button>
         </div>)}
         {!lines.length && <p className="muted">No products added yet.</p>}

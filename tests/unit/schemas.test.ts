@@ -48,6 +48,11 @@ describe("Foundation input schemas", () => {
     }).success).toBe(false);
   });
 
+  it("keeps amounts at 2 decimal places: no other precision is accepted", () => {
+    expect(settingsSchema.parse({}).amountRounding).toBe(2);
+    for (const amountRounding of [0, 1, 3]) expect(settingsSchema.safeParse({ amountRounding }).success, String(amountRounding)).toBe(false);
+  });
+
   it("rejects duplicated permission assignments in a role", () => {
     expect(roleSchema.safeParse({ name: "Cashier", permissionKeys: ["users.view", "users.view"] }).success).toBe(false);
     expect(roleSchema.safeParse({ name: "Cashier", permissionKeys: ["users.view"] }).success).toBe(true);

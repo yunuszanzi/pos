@@ -1,7 +1,8 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { formatRupees, parseRupees } from "../../../shared/money";
+import { parseRupees, toPlainRupees } from "../../../shared/money";
 import { getBusinessSettings, updateBusinessSettings, type BusinessSettings } from "../../api/settingsApi";
 import { ErrorMessage, Field, PageTitle, SelectInput, SuccessMessage, TextInput } from "../../app/FormElements";
+import { MoneyInput } from "../../app/MoneyInput";
 
 const defaults: BusinessSettings = {
   currency: "PKR",
@@ -35,7 +36,7 @@ export function SettingsPage() {
         currency: "PKR",
         timezone: "Asia/Karachi",
         dateFormat: String(data.get("dateFormat")) as BusinessSettings["dateFormat"],
-        amountRounding: Number(data.get("amountRounding")),
+        amountRounding: 2,
         sessionTimeoutMinutes: Number(data.get("sessionTimeoutMinutes")),
         posSessionTimeoutHours: Number(data.get("posSessionTimeoutHours")),
         adjustmentApprovalThresholdPaisa: threshold,
@@ -57,10 +58,10 @@ export function SettingsPage() {
       <Field label="Date format"><SelectInput name="dateFormat" value={settings.dateFormat} onChange={(event) => setSettings({ ...settings, dateFormat: event.target.value as BusinessSettings["dateFormat"] })}>
         <option value="dd/MM/yyyy">DD/MM/YYYY</option><option value="MM/dd/yyyy">MM/DD/YYYY</option><option value="yyyy-MM-dd">YYYY-MM-DD</option>
       </SelectInput></Field>
-      <Field label="Amount decimal places"><TextInput name="amountRounding" type="number" min={0} max={2} value={settings.amountRounding} onChange={(event) => setSettings({ ...settings, amountRounding: Number(event.target.value) })} /></Field>
+      <Field label="Amount decimal places"><TextInput value="2" readOnly /></Field>
       <Field label="Back-office session expiry (minutes)"><TextInput name="sessionTimeoutMinutes" type="number" min={5} max={240} value={settings.sessionTimeoutMinutes} onChange={(event) => setSettings({ ...settings, sessionTimeoutMinutes: Number(event.target.value) })} /></Field>
       <Field label="POS session expiry (hours)"><TextInput name="posSessionTimeoutHours" type="number" min={1} max={24} value={settings.posSessionTimeoutHours} onChange={(event) => setSettings({ ...settings, posSessionTimeoutHours: Number(event.target.value) })} /></Field>
-      <Field label="Stock adjustment approval above (PKR)"><TextInput name="adjustmentApprovalThreshold" inputMode="decimal" pattern="[0-9,]+(\.[0-9]{1,2})?" key={settings.adjustmentApprovalThresholdPaisa} defaultValue={formatRupees(settings.adjustmentApprovalThresholdPaisa)} required /></Field>
+      <Field label="Stock adjustment approval above (PKR)"><MoneyInput name="adjustmentApprovalThreshold" pattern="[0-9,]+(\.[0-9]{1,2})?" key={settings.adjustmentApprovalThresholdPaisa} defaultValue={toPlainRupees(settings.adjustmentApprovalThresholdPaisa)} required /></Field>
       <button className="button primary" disabled={!loaded}>Save settings</button>
     </form>
   </div>;

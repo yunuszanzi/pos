@@ -80,7 +80,7 @@ Modules: `auth`, `org`, `users`, `products`, `inventory`, `customers`, `supplier
 
 Conventions:
 
-- Money is an integer number of paisa everywhere (`amount_paisa`); format only at display
+- Money is an integer number of paisa everywhere (`amount_paisa`); format only at display, always with exactly 2 decimals (`formatPkr`, and `MoneyInput` for entry). The "amount decimal places" setting is fixed at 2. Costs, average costs and tax round to the whole paisa; rounding a cash total to the nearest 1, 5 or 10 rupees (FR-SAL-16) stays an optional, separate setting
 - Quantities are stored in the product's base unit as `numeric(14,3)`, plus the unit and factor used on the line
 - IDs are UUIDs; every business table has `business_id`, `created_at`, `created_by`, `updated_at`, `updated_by`
 - All calculations (pricing, discounts, tax, totals) live in `shared/` and run identically in the browser (for preview) and in the API (as the source of truth)

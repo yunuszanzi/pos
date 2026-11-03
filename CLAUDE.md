@@ -10,7 +10,9 @@ React Hook Form + Zod. API: single Vercel function (Hono) at api/[[...route]].ts
 DB: Supabase Postgres via Drizzle; posting logic in SQL functions. Auth: Supabase Auth.
 
 ## Rules
-- Money is integer paisa. Never use floats for money.
+- Money is integer paisa. Never use floats for money. Every amount is shown and entered with exactly
+  2 decimals: display with formatPkr/formatRupees, type into <MoneyInput>, never toFixed or
+  Intl.NumberFormat. Costs, averages and tax round to the whole paisa.
 - All pricing/tax/discount math lives in shared/ and is unit-tested.
 - Posted documents are immutable; corrections are new documents.
 - Every API route checks permissions server-side.
