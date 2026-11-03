@@ -17,6 +17,7 @@ const SettingsPage = lazy(() => import("../features/settings/SettingsPage").then
 const UsersPage = lazy(() => import("../features/users/UsersPage").then(({ UsersPage: Page }) => ({ default: Page })));
 const ProductsPage = lazy(() => import("../features/products/ProductsPage").then(({ ProductsPage: Page }) => ({ default: Page })));
 const ProductFormPage = lazy(() => import("../features/products/ProductFormPage").then(({ ProductFormPage: Page }) => ({ default: Page })));
+const LabelsPage = lazy(() => import("../features/labels/LabelsPage").then(({ LabelsPage: Page }) => ({ default: Page })));
 const ImportPage = lazy(() => import("../features/products/ImportPage").then(({ ImportPage: Page }) => ({ default: Page })));
 const CatalogueSetupPage = lazy(() => import("../features/products/CatalogueSetupPage").then(({ CatalogueSetupPage: Page }) => ({ default: Page })));
 const StockPage = lazy(() => import("../features/stock/StockPage").then(({ StockPage: Page }) => ({ default: Page })));
@@ -40,6 +41,7 @@ const appRoutes: AppRoute[] = [
   { path: "/organization", label: "Business & organisation", permission: "business.view", element: <OrganizationPage /> },
   { path: "/products", label: "Products", permission: "catalog.view", element: <ProductsPage /> },
   { path: "/products/new", label: "New product", permission: "catalog.manage", element: <ProductFormPage />, nav: false },
+  { path: "/products/labels", label: "Print labels", permission: "catalog.view", element: <LabelsPage />, nav: false },
   { path: "/products/import", label: "Import products", permission: "products.import", element: <ImportPage />, nav: false },
   { path: "/products/:id", label: "Edit product", permission: "catalog.manage", element: <ProductFormPage />, nav: false },
   { path: "/catalogue", label: "Categories & tax", permission: "catalog.view", element: <CatalogueSetupPage /> },

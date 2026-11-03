@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
 import { parseRupees } from "../../../shared/money";
@@ -6,9 +6,10 @@ import { stockAdjustmentSchema, adjustmentReasons } from "../../../shared/schema
 import { getAllUnits } from "../../api/catalogueApi";
 import { createStockAdjustment } from "../../api/inventoryApi";
 import { getAllLocations } from "../../api/orgApi";
-import { getAllProducts, type Product, type ProductVariant } from "../../api/productsApi";
+import type { Product, ProductVariant } from "../../api/productsApi";
 import { ErrorMessage, Field, PageTitle, SelectInput, TextInput } from "../../app/FormElements";
 import { useCan } from "../../app/permissions";
+import { ProductPicker } from "../products/ProductPicker";
 import { adjustmentReasonLabels } from "./stockFormat";
 import { StockTabs } from "./StockTabs";
 
@@ -29,39 +30,24 @@ export function NewAdjustmentPage() {
   const [reason, setReason] = useState<(typeof adjustmentReasons)[number]>("damage");
   const [note, setNote] = useState("");
   const [lines, setLines] = useState<Line[]>([]);
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   // One key for this form: a double click or a retry after a dropped connection adjusts stock once.
   const idempotencyKey = useRef(crypto.randomUUID());
 
-  useEffect(() => {
-    const timer = window.setTimeout(() => setDebouncedSearch(search.trim()), 300);
-    return () => window.clearTimeout(timer);
-  }, [search]);
-
   const units = useQuery({ queryKey: ["units"], queryFn: getAllUnits, staleTime: 5 * 60_000 });
   const locations = useQuery({ queryKey: ["locations"], queryFn: getAllLocations, staleTime: 5 * 60_000 });
-  const results = useQuery({
-    queryKey: ["products", { picker: debouncedSearch }],
-    queryFn: ({ signal }) => getAllProducts({ q: debouncedSearch, pageSize: 8, active: "true" }, signal),
-    enabled: debouncedSearch.length > 0,
-  });
 
   const activeLocations = (locations.data ?? []).filter((location) => location.active);
   // Until the user picks one, use the first location.
   const chosenLocationId = locationId || activeLocations[0]?.id || "";
 
   const unitName = (unitId: string) => units.data?.find((unit) => unit.id === unitId)?.name ?? "";
-  const pickable = (results.data?.data ?? []).filter((product: Product) => product.productType === "stocked")
-    .flatMap((product) => product.variants.filter((variant) => variant.active).map((variant) => ({ product, variant })));
 
   function addLine(product: Product, variant: ProductVariant) {
     if (lines.some((line) => line.variant.id === variant.id)) return;
     const base = variant.units.find((unit) => unit.isBase) ?? variant.units[0];
     setLines([...lines, { variant, productName: product.name, unitId: base.unitId, direction: "remove", quantity: "", cost: "" }]);
-    setSearch("");
   }
 
   const change = (index: number, patch: Partial<Line>) => setLines(lines.map((line, position) => (position === index ? { ...line, ...patch } : line)));
@@ -120,13 +106,7 @@ export function NewAdjustmentPage() {
 
       <section className="panel stack">
         <h2>Products</h2>
-        <Field label="Find a product to add"><TextInput type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Name, SKU or barcode" /></Field>
-        {debouncedSearch && results.isPending && <p className="muted">Searching…</p>}
-        {debouncedSearch && results.data && !pickable.length && <p className="muted">No stocked product matches.</p>}
-        {pickable.length > 0 && <ul className="role-list" aria-label="Search results">{pickable.map(({ product, variant }) => <li key={variant.id}>
-          <span><strong>{product.name}</strong><small>{variant.sku}{variant.variantName ? ` · ${variant.variantName}` : ""}</small></span>
-          <button className="text-button" type="button" disabled={lines.some((line) => line.variant.id === variant.id)} onClick={() => addLine(product, variant)}>Add {variant.sku}</button>
-        </li>)}</ul>}
+        <ProductPicker stockedOnly isPicked={(variantId) => lines.some((line) => line.variant.id === variantId)} onPick={addLine} />
 
         {lines.map((line, index) => <div className="form-grid" key={line.variant.id} role="group" aria-label={`Line ${line.variant.sku}`}>
           <div><strong>{line.productName}</strong><br /><span className="mono">{line.variant.sku}</span></div>

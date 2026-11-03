@@ -93,6 +93,7 @@ export function ProductsPage() {
       <div className="button-row">
         {canManage && <Link className="button primary" to="/products/new">New product</Link>}
         {canImport && <Link className="button secondary" to="/products/import">Import CSV</Link>}
+        <Link className="button secondary" to="/products/labels">Print labels</Link>
         {canExport && <button className="button secondary" type="button" onClick={() => void exportCsv()}>Export CSV</button>}
       </div>
       <div className="table-scroll"><table>

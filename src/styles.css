@@ -142,3 +142,18 @@ details pre { max-width: 380px; overflow: auto; font-size: .7rem; }
   .topbar { gap: 10px; }
   .terminal-choice { align-items: flex-end; flex-direction: column; gap: 4px; }
 }
+
+/* Barcode labels. Page size and grid come from labelPageCss in shared/labels.ts. */
+.label-preview { overflow: auto; padding: 14px; border-radius: 10px; background: #eef1f6; }
+.label-preview .label-page { margin: 0 auto 16px; background: #fff; box-shadow: 0 2px 10px #0003; }
+.label-cell { display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box; overflow: hidden; padding: 1.5mm 2mm; color: #000; font: 8pt/1.15 Arial, sans-serif; }
+.label-name { max-height: 2.4em; overflow: hidden; font-weight: 700; }
+.label-variant, .label-sku { font-size: 6.5pt; }
+.label-price { font-size: 11pt; font-weight: 800; }
+.label-barcode { align-self: center; max-width: 100%; max-height: 12mm; object-fit: contain; }
+.label-print-root { display: none; }
+@media print {
+  #root { display: none !important; }
+  .label-print-root { display: block !important; }
+  html, body { background: #fff !important; }
+}
