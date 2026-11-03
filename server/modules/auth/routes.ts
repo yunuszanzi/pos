@@ -1,4 +1,4 @@
-import { zValidator } from "@hono/zod-validator";
+import { validateJson } from "../../lib/validate";
 import { and, eq, ilike, inArray } from "drizzle-orm";
 import { Hono } from "hono";
 import { appUsers, auditLog, rolePermissions, terminals, userBranches } from "../../../db/schema";
@@ -42,7 +42,7 @@ authRoutes.post("/auth/login-event", async (context) => {
   return context.json({ recorded: true });
 });
 
-authRoutes.post("/auth/pin-switch", requirePermission("auth.pin_switch"), zValidator("json", pinSwitchSchema), async (context) => {
+authRoutes.post("/auth/pin-switch", requirePermission("auth.pin_switch"), validateJson(pinSwitchSchema), async (context) => {
   const principal = getPrincipal(context);
   const { targetEmail, pin, terminalId } = context.req.valid("json");
   if (context.req.header("X-Terminal-Id") !== terminalId) {
@@ -91,7 +91,7 @@ authRoutes.post("/auth/pin-switch", requirePermission("auth.pin_switch"), zValid
   });
 });
 
-authRoutes.post("/auth/manager-override", zValidator("json", managerOverrideSchema), async (context) => {
+authRoutes.post("/auth/manager-override", validateJson(managerOverrideSchema), async (context) => {
   const principal = getPrincipal(context);
   if (!principal.businessId || !principal.activeUserId) {
     return apiError(context, 403, "PERMISSION_DENIED", "A business user is required for this action");

@@ -1,4 +1,4 @@
-import { zValidator } from "@hono/zod-validator";
+import { validateJson } from "../../lib/validate";
 import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { auditLog, businessSettings, businesses, branches, documentSeries, locations, permissions, rolePermissions, roles, terminals, userBranches, appUsers } from "../../../db/schema";
@@ -12,7 +12,7 @@ import { hashPin } from "../auth/pin";
 
 export const orgRoutes = new Hono();
 
-orgRoutes.post("/org/setup", zValidator("json", setupBusinessSchema), async (context) => {
+orgRoutes.post("/org/setup", validateJson(setupBusinessSchema), async (context) => {
   const principal = getPrincipal(context);
   if (!principal.authEmail) return apiError(context, 400, "EMAIL_REQUIRED", "Your signed-in account needs an email address");
   const ownerEmail = principal.authEmail;
@@ -119,7 +119,7 @@ orgRoutes.get("/business", requirePermission("business.view"), async (context) =
   return context.json(business);
 });
 
-orgRoutes.put("/business", requirePermission("business.update"), zValidator("json", businessUpdateSchema), async (context) => {
+orgRoutes.put("/business", requirePermission("business.update"), validateJson(businessUpdateSchema), async (context) => {
   const principal = getPrincipal(context);
   const values = context.req.valid("json");
   const [before] = await db.select().from(businesses).where(eq(businesses.id, principal.businessId!)).limit(1);
@@ -135,14 +135,14 @@ orgRoutes.get("/branches", requirePermission("branches.view"), async (context) =
   return context.json(await db.select().from(branches).where(eq(branches.businessId, principal.businessId!)));
 });
 
-orgRoutes.post("/branches", requirePermission("branches.manage"), zValidator("json", branchSchema), async (context) => {
+orgRoutes.post("/branches", requirePermission("branches.manage"), validateJson(branchSchema), async (context) => {
   const principal = getPrincipal(context);
   const [branch] = await db.insert(branches).values({ ...context.req.valid("json"), businessId: principal.businessId! }).returning();
   await auditPrincipal(context, principal, "branch", branch.id, "create", null, branch);
   return context.json(branch, 201);
 });
 
-orgRoutes.put("/branches/:id", requirePermission("branches.manage"), zValidator("json", branchSchema.partial()), async (context) => {
+orgRoutes.put("/branches/:id", requirePermission("branches.manage"), validateJson(branchSchema.partial()), async (context) => {
   const principal = getPrincipal(context);
   const id = context.req.param("id");
   const [before] = await db.select().from(branches).where(and(eq(branches.id, id), eq(branches.businessId, principal.businessId!))).limit(1);
@@ -158,7 +158,7 @@ orgRoutes.get("/locations", requirePermission("locations.view"), async (context)
   return context.json(await db.select().from(locations).where(eq(locations.businessId, principal.businessId!)));
 });
 
-orgRoutes.post("/locations", requirePermission("locations.manage"), zValidator("json", locationSchema), async (context) => {
+orgRoutes.post("/locations", requirePermission("locations.manage"), validateJson(locationSchema), async (context) => {
   const principal = getPrincipal(context);
   const input = context.req.valid("json");
   const [branch] = await db.select({ id: branches.id }).from(branches)
@@ -169,7 +169,7 @@ orgRoutes.post("/locations", requirePermission("locations.manage"), zValidator("
   return context.json(location, 201);
 });
 
-orgRoutes.put("/locations/:id", requirePermission("locations.manage"), zValidator("json", locationSchema.partial()), async (context) => {
+orgRoutes.put("/locations/:id", requirePermission("locations.manage"), validateJson(locationSchema.partial()), async (context) => {
   const principal = getPrincipal(context);
   const id = context.req.param("id");
   const [before] = await db.select().from(locations).where(and(eq(locations.id, id), eq(locations.businessId, principal.businessId!))).limit(1);
@@ -191,7 +191,7 @@ orgRoutes.get("/terminals", requirePermission("terminals.view"), async (context)
   return context.json(await db.select().from(terminals).where(eq(terminals.businessId, principal.businessId!)));
 });
 
-orgRoutes.post("/terminals", requirePermission("terminals.manage"), zValidator("json", terminalSchema), async (context) => {
+orgRoutes.post("/terminals", requirePermission("terminals.manage"), validateJson(terminalSchema), async (context) => {
   const principal = getPrincipal(context);
   const input = context.req.valid("json");
   const [branch] = await db.select({ id: branches.id }).from(branches)
@@ -202,7 +202,7 @@ orgRoutes.post("/terminals", requirePermission("terminals.manage"), zValidator("
   return context.json(terminal, 201);
 });
 
-orgRoutes.put("/terminals/:id", requirePermission("terminals.manage"), zValidator("json", terminalSchema.partial()), async (context) => {
+orgRoutes.put("/terminals/:id", requirePermission("terminals.manage"), validateJson(terminalSchema.partial()), async (context) => {
   const principal = getPrincipal(context);
   const id = context.req.param("id");
   const [before] = await db.select().from(terminals).where(and(eq(terminals.id, id), eq(terminals.businessId, principal.businessId!))).limit(1);
@@ -224,7 +224,7 @@ orgRoutes.get("/document-series", requirePermission("document_series.view"), asy
   return context.json(await db.select().from(documentSeries).where(eq(documentSeries.businessId, principal.businessId!)));
 });
 
-orgRoutes.post("/document-series", requirePermission("document_series.manage"), zValidator("json", documentSeriesSchema), async (context) => {
+orgRoutes.post("/document-series", requirePermission("document_series.manage"), validateJson(documentSeriesSchema), async (context) => {
   const principal = getPrincipal(context);
   const input = context.req.valid("json");
   const [branch] = await db.select({ id: branches.id }).from(branches)
@@ -235,7 +235,7 @@ orgRoutes.post("/document-series", requirePermission("document_series.manage"), 
   return context.json(series, 201);
 });
 
-orgRoutes.put("/document-series/:id", requirePermission("document_series.manage"), zValidator("json", documentSeriesSchema.partial()), async (context) => {
+orgRoutes.put("/document-series/:id", requirePermission("document_series.manage"), validateJson(documentSeriesSchema.partial()), async (context) => {
   const principal = getPrincipal(context);
   const id = context.req.param("id");
   const [before] = await db.select().from(documentSeries)

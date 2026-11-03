@@ -1,4 +1,4 @@
-import { zValidator } from "@hono/zod-validator";
+import { validateJson } from "../../lib/validate";
 import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { businessSettings } from "../../../db/schema";
@@ -18,7 +18,7 @@ settingsRoutes.get("/settings", requirePermission("settings.view"), async (conte
   return context.json(settings);
 });
 
-settingsRoutes.put("/settings", requirePermission("settings.manage"), zValidator("json", settingsSchema), async (context) => {
+settingsRoutes.put("/settings", requirePermission("settings.manage"), validateJson(settingsSchema), async (context) => {
   const principal = getPrincipal(context);
   const [before] = await db.select().from(businessSettings)
     .where(eq(businessSettings.businessId, principal.businessId!)).limit(1);

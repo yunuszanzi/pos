@@ -1,4 +1,4 @@
-import { zValidator } from "@hono/zod-validator";
+import { validateJson } from "../../lib/validate";
 import { and, count, desc, eq, ilike, inArray, or } from "drizzle-orm";
 import { Hono } from "hono";
 import { appUsers, branches, permissions, rolePermissions, roles, userBranches } from "../../../db/schema";
@@ -38,7 +38,7 @@ usersRoutes.get("/users", requirePermission("users.view"), async (context) => {
   return context.json({ data: rows, page, pageSize, total });
 });
 
-usersRoutes.post("/users", requirePermission("users.manage"), zValidator("json", userCreateSchema), async (context) => {
+usersRoutes.post("/users", requirePermission("users.manage"), validateJson(userCreateSchema), async (context) => {
   const principal = getPrincipal(context);
   const input = context.req.valid("json");
   const [role] = await db.select().from(roles).where(and(eq(roles.id, input.roleId), eq(roles.businessId, principal.businessId!))).limit(1);
@@ -87,7 +87,7 @@ usersRoutes.post("/users", requirePermission("users.manage"), zValidator("json",
   }
 });
 
-usersRoutes.put("/users/:id", requirePermission("users.manage"), zValidator("json", userUpdateSchema), async (context) => {
+usersRoutes.put("/users/:id", requirePermission("users.manage"), validateJson(userUpdateSchema), async (context) => {
   const principal = getPrincipal(context);
   const id = context.req.param("id");
   if (!id) return apiError(context, 400, "INVALID_USER_ID", "User ID is required");
@@ -178,7 +178,7 @@ usersRoutes.get("/roles", requirePermission("roles.view"), async (context) => {
   return context.json(rows.map((role) => ({ ...role, permissionKeys: byRole.get(role.id) ?? [] })));
 });
 
-usersRoutes.post("/roles", requirePermission("roles.manage"), zValidator("json", roleSchema), async (context) => {
+usersRoutes.post("/roles", requirePermission("roles.manage"), validateJson(roleSchema), async (context) => {
   const principal = getPrincipal(context);
   const input = context.req.valid("json");
   if (input.permissionKeys.includes("*")) return apiError(context, 400, "INVALID_PERMISSION", "The wildcard permission is reserved for the Owner role");
@@ -197,7 +197,7 @@ usersRoutes.post("/roles", requirePermission("roles.manage"), zValidator("json",
   return context.json({ ...role, permissionKeys: input.permissionKeys }, 201);
 });
 
-usersRoutes.put("/roles/:id", requirePermission("roles.manage"), zValidator("json", roleSchema), async (context) => {
+usersRoutes.put("/roles/:id", requirePermission("roles.manage"), validateJson(roleSchema), async (context) => {
   const principal = getPrincipal(context);
   const input = context.req.valid("json");
   const id = context.req.param("id");
