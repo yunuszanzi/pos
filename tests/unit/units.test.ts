@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { breakDownQuantity, formatQuantity, parseQuantity, toBaseQuantity } from "../../shared/units";
+import { breakDownQuantity, formatQuantity, parseQuantity, parseSignedQuantity, toBaseQuantity } from "../../shared/units";
 
 describe("parseQuantity and formatQuantity", () => {
   it.each([
@@ -75,5 +75,19 @@ describe("breakDownQuantity", () => {
 
   it("returns nothing for zero stock", () => {
     expect(breakDownQuantity(0, units)).toEqual([]);
+  });
+});
+
+describe("parseSignedQuantity", () => {
+  it("parses movements out of stock", () => {
+    expect(parseSignedQuantity("-30.000")).toBe(-30000);
+    expect(parseSignedQuantity("12.5")).toBe(12500);
+    expect(parseSignedQuantity("0.000")).toBe(0);
+  });
+
+  it("rejects what parseQuantity rejects", () => {
+    expect(() => parseSignedQuantity("--1")).toThrow(RangeError);
+    expect(() => parseSignedQuantity("abc")).toThrow(RangeError);
+    expect(() => parseSignedQuantity("-")).toThrow(RangeError);
   });
 });

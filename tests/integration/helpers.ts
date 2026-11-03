@@ -120,3 +120,48 @@ export async function inviteTestStaff(business: TestBusiness, roleName: string, 
   await setAuthPassword(created.body.id);
   return { id: created.body.id, email, token: await signIn(email), pin };
 }
+
+/** A custom role holding exactly the given permission keys, and a staff member in it. */
+export async function inviteStaffWithPermissions(business: TestBusiness, roleName: string, permissionKeys: string[]): Promise<TestStaff> {
+  const role = await callApi(business.ownerToken, "POST", "/roles", { body: { name: roleName, permissionKeys } });
+  if (role.status !== 201) throw new Error(`Creating role ${roleName} failed: ${JSON.stringify(role.body)}`);
+  business.roleIds[roleName] = role.body.id;
+  return inviteTestStaff(business, roleName);
+}
+
+export type SimpleProduct = { productId: string; variantId: string; pieceId: string; cartonId: string; packId: string };
+
+/** A product sold in pieces (base), packs of 10 and cartons of 200, with barcodes `${sku}-PC`, `-PK` and `-CTN`. */
+export async function createSimpleProduct(business: TestBusiness, sku: string, costPaisa = 100, extra: Record<string, unknown> = {}): Promise<SimpleProduct> {
+  const units = await callApi<Array<{ id: string; name: string }>>(business.ownerToken, "GET", "/units");
+  const unit = (name: string) => units.body.find((row) => row.name === name)!.id;
+  const [pieceId, packId, cartonId] = [unit("Piece"), unit("Pack"), unit("Carton")];
+  const created = await callApi(business.ownerToken, "POST", "/products", {
+    body: {
+      name: `Product ${sku}`,
+      baseUnitId: pieceId,
+      ...extra,
+      variants: [{
+        sku, costPaisa, reorderLevel: "0",
+        units: [
+          { unitId: pieceId, factorToBase: "1", barcode: `${sku}-PC`, salePricePaisa: 500 },
+          { unitId: packId, factorToBase: "10", barcode: `${sku}-PK`, salePricePaisa: 4800 },
+          { unitId: cartonId, factorToBase: "200", barcode: `${sku}-CTN`, salePricePaisa: 90000 },
+        ],
+      }],
+    },
+  });
+  if (created.status !== 201) throw new Error(`Creating product ${sku} failed: ${JSON.stringify(created.body)}`);
+  return { productId: created.body.id, variantId: created.body.variants[0].id, pieceId, cartonId, packId };
+}
+
+export async function firstLocationId(business: TestBusiness): Promise<string> {
+  const locations = await callApi<Array<{ id: string }>>(business.ownerToken, "GET", "/locations");
+  return locations.body[0].id;
+}
+
+export async function setAdjustmentThreshold(business: TestBusiness, paisa: number): Promise<void> {
+  const settings = await callApi(business.ownerToken, "GET", "/settings");
+  const updated = await callApi(business.ownerToken, "PUT", "/settings", { body: { ...settings.body, adjustmentApprovalThresholdPaisa: paisa } });
+  if (updated.status !== 200) throw new Error(`Setting the threshold failed: ${JSON.stringify(updated.body)}`);
+}

@@ -64,3 +64,9 @@ export function breakDownQuantity(
   }
   return result;
 }
+
+/** Like parseQuantity but allows a leading minus, for ledger movements: "-30.000" -> -30000. */
+export function parseSignedQuantity(input: string): Milli {
+  const trimmed = input.trim();
+  return trimmed.startsWith("-") ? -parseQuantity(trimmed.slice(1)) : parseQuantity(trimmed);
+}

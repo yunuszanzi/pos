@@ -1,7 +1,7 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { brands, categories, productUnits, productVariants, products, stockLedger, taxCategories, units } from "../../../db/schema";
 import type { ProductData } from "../../../shared/schemas/catalogue";
-import { formatQuantity, parseQuantity } from "../../../shared/units";
+import { formatQuantity, parseQuantity, parseSignedQuantity } from "../../../shared/units";
 import { db } from "../../lib/db";
 import { createdByActor, hasPermission, updatedByActor, type Principal } from "../../lib/permissions";
 
@@ -45,8 +45,8 @@ export type ProductView = {
 
 export const canSeeCost = (principal: Principal) => hasPermission(principal, "products.cost.view");
 
-/** numeric(14,3) comes back as "200.000"; show it as "200". */
-export const quantityText = (value: string) => formatQuantity(parseQuantity(value));
+/** numeric(14,3) comes back as "200.000" (or "-5.000" when stock is negative); show it as "200" / "-5". */
+export const quantityText = (value: string) => formatQuantity(parseSignedQuantity(value));
 
 export async function loadProductViews(businessId: string, productIds: string[], withCost: boolean): Promise<ProductView[]> {
   if (!productIds.length) return [];

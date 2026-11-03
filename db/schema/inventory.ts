@@ -15,6 +15,8 @@ export const stockLedger = pgTable("stock_ledger", {
   docId: uuid("doc_id").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   createdBy: uuid("created_by"),
+  /** Posting order; created_at ties within a transaction. See migration 0003. */
+  seq: bigint("seq", { mode: "number" }).generatedAlwaysAsIdentity().notNull(),
 }, (table) => [
   index("stock_ledger_variant_idx").on(table.businessId, table.variantId, table.locationId, table.createdAt),
 ]);
