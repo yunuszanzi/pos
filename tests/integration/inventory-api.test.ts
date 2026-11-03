@@ -261,6 +261,7 @@ integration("inventory API", { timeout: 120_000 }, () => {
     const all = await callApi(shopA.ownerToken, "GET", `/stock/ledger?variantId=${product.variantId}`);
     expect(all.body.data.map((row: { quantity: string; balanceAfter: string }) => [row.quantity, row.balanceAfter])).toEqual([["4", "94"], ["-10", "90"], ["100", "100"]]);
     expect(all.body.data[0].locationName).toBe("Main Store");
+    expect(all.body.variant).toMatchObject({ sku: "LED-1", productName: "Product LED-1", baseUnitId: product.pieceId });
 
     const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Karachi" }).format(new Date());
     const filtered = await callApi(shopA.ownerToken, "GET", `/stock/ledger?variantId=${product.variantId}&from=${today}&to=${today}&pageSize=2&page=2`);
@@ -270,7 +271,7 @@ integration("inventory API", { timeout: 120_000 }, () => {
     expect((await callApi(shopA.ownerToken, "GET", `/stock/ledger?variantId=${product.variantId}&docType=nothing`)).body.total).toBe(0);
     expect((await callApi(shopA.ownerToken, "GET", `/stock/ledger?variantId=${product.variantId}&from=yesterday`)).status).toBe(400);
     expect((await callApi(shopA.ownerToken, "GET", "/stock/ledger")).body.error.code).toBe("VARIANT_REQUIRED");
-    expect((await callApi(shopB.ownerToken, "GET", `/stock/ledger?variantId=${product.variantId}`)).body.total).toBe(0);
+    expect((await callApi(shopB.ownerToken, "GET", `/stock/ledger?variantId=${product.variantId}`)).status).toBe(404);
   });
 
   it("hides costs from roles without products.cost.view, and flags low stock", async () => {

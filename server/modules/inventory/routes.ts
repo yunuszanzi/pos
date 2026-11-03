@@ -161,7 +161,13 @@ inventoryRoutes.get("/stock/ledger", view, async (context) => {
     db.execute(sql`select count(*) as total from (${base}) x ${filters}`),
   ]);
   const withCost = canSeeCost(principal);
+  const [variant] = await db.select({
+    sku: productVariants.sku, variantName: productVariants.variantName, productName: products.name, baseUnitId: products.baseUnitId,
+  }).from(productVariants).innerJoin(products, eq(products.id, productVariants.productId))
+    .where(and(eq(productVariants.id, variantId), eq(productVariants.businessId, businessId))).limit(1);
+  if (!variant) return apiError(context, 404, "NOT_FOUND", "Product not found");
   return context.json({
+    variant,
     data: rows.map((row) => ({
       id: String(row.id),
       createdAt: row.created_at,
