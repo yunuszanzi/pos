@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
+import { formatRupees, parseRupees } from "../../../shared/money";
 import { getBusinessSettings, updateBusinessSettings, type BusinessSettings } from "../../api/settingsApi";
 import { ErrorMessage, Field, PageTitle, SelectInput, SuccessMessage, TextInput } from "../../app/FormElements";
 
@@ -9,6 +10,7 @@ const defaults: BusinessSettings = {
   amountRounding: 2,
   sessionTimeoutMinutes: 30,
   posSessionTimeoutHours: 12,
+  adjustmentApprovalThresholdPaisa: 1_000_000,
 };
 
 export function SettingsPage() {
@@ -28,6 +30,7 @@ export function SettingsPage() {
     setError("");
     const data = new FormData(event.currentTarget);
     try {
+      const threshold = parseRupees(String(data.get("adjustmentApprovalThreshold")));
       const updated = await updateBusinessSettings({
         currency: "PKR",
         timezone: "Asia/Karachi",
@@ -35,6 +38,7 @@ export function SettingsPage() {
         amountRounding: Number(data.get("amountRounding")),
         sessionTimeoutMinutes: Number(data.get("sessionTimeoutMinutes")),
         posSessionTimeoutHours: Number(data.get("posSessionTimeoutHours")),
+        adjustmentApprovalThresholdPaisa: threshold,
       });
       setSettings(updated);
       setSuccess("Settings saved.");
@@ -56,6 +60,7 @@ export function SettingsPage() {
       <Field label="Amount decimal places"><TextInput name="amountRounding" type="number" min={0} max={2} value={settings.amountRounding} onChange={(event) => setSettings({ ...settings, amountRounding: Number(event.target.value) })} /></Field>
       <Field label="Back-office session expiry (minutes)"><TextInput name="sessionTimeoutMinutes" type="number" min={5} max={240} value={settings.sessionTimeoutMinutes} onChange={(event) => setSettings({ ...settings, sessionTimeoutMinutes: Number(event.target.value) })} /></Field>
       <Field label="POS session expiry (hours)"><TextInput name="posSessionTimeoutHours" type="number" min={1} max={24} value={settings.posSessionTimeoutHours} onChange={(event) => setSettings({ ...settings, posSessionTimeoutHours: Number(event.target.value) })} /></Field>
+      <Field label="Stock adjustment approval above (PKR)"><TextInput name="adjustmentApprovalThreshold" inputMode="decimal" pattern="[0-9,]+(\.[0-9]{1,2})?" key={settings.adjustmentApprovalThresholdPaisa} defaultValue={formatRupees(settings.adjustmentApprovalThresholdPaisa)} required /></Field>
       <button className="button primary" disabled={!loaded}>Save settings</button>
     </form>
   </div>;

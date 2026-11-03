@@ -7,6 +7,8 @@ export type BusinessSettings = {
   amountRounding: number;
   sessionTimeoutMinutes: number;
   posSessionTimeoutHours: number;
+  /** Paisa. Stock adjustments worth more than this need approval. */
+  adjustmentApprovalThresholdPaisa: number;
 };
 
 export function getBusinessSettings() {
