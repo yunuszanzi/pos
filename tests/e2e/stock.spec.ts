@@ -92,7 +92,8 @@ test("3. an adjustment above the threshold stays pending until a manager approve
   await managerPage.goto("/stock");
   await expect(managerPage.getByRole("row").filter({ hasText: "ADJ-UI-1" })).toContainText("40 Piece");
   await managerPage.getByRole("link", { name: "Movements" }).click();
-  await expect(managerPage.getByRole("row").filter({ hasText: "-60" })).toContainText("40");
+  // Match the quantity cell itself: user names are random text and could contain "-60" too.
+  await expect(managerPage.getByRole("row").filter({ has: managerPage.getByRole("cell", { name: "-60", exact: true }) })).toContainText("40");
   await managerPage.context().close();
 });
 
