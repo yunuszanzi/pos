@@ -2,6 +2,7 @@ import { and, eq, ilike, inArray, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import { appUsers, auditLog, businessSettings, customerGroups, customers, priceListItems, priceLists, rolePermissions, roles, terminals, userBranches } from "../../../db/schema";
+import { formatPkr } from "../../../shared/money";
 import { effectivePriceListId, tierPrice, type PriceListItem } from "../../../shared/priceLists";
 import { PaymentError, settleTenders, type Tender } from "../../../shared/payments";
 import { discountsOverLimit, priceCart, PricingError, type PricingInput } from "../../../shared/pricing";
@@ -28,6 +29,7 @@ const postingErrors: Array<[prefix: string, status: 409 | 422, code: string]> = 
   ["STOCK_INSUFFICIENT", 409, "STOCK_INSUFFICIENT"],
   ["INVALID_LINE", 422, "INVALID_LINE"],
   ["PAYMENT_MISMATCH", 422, "PAYMENT_MISMATCH"],
+  ["INVALID_CUSTOMER", 422, "INVALID_CUSTOMER"],
 ];
 
 /** A manager's email and PIN, checked the same way as /auth/manager-override. Returns the manager's id. */
@@ -43,6 +45,20 @@ async function approveByManager(businessId: string, terminalBranchId: string, em
     .where(and(eq(rolePermissions.roleId, manager.roleId), inArray(rolePermissions.permissionKey, [permission, "*"]))).limit(1);
   await clearPinAttempts(rateKey);
   return branchGrant && grant ? manager.id : "not-allowed" as const;
+}
+
+/** The database says what is wrong with the credit in paisa; the cashier needs it in words. */
+function describeCredit(code: string, message: string, customerName: string): string {
+  if (code === "CREDIT_LIMIT_EXCEEDED") {
+    const found = /owes (-?\d+), this sale adds (\d+), limit (\d+)/.exec(message);
+    if (!found) return `${customerName} is over their credit limit`;
+    const [owes, adds, limit] = [Number(found[1]), Number(found[2]), Number(found[3])];
+    return limit === 0
+      ? `${customerName} has no credit account. A manager must approve putting ${formatPkr(adds)} on credit.`
+      : `${customerName} owes ${formatPkr(owes)}. Putting ${formatPkr(adds)} more on credit passes their limit of ${formatPkr(limit)}. A manager must approve.`;
+  }
+  const days = /more than (\d+) days/.exec(message)?.[1];
+  return `${customerName} has an invoice unpaid for more than ${days ?? "the agreed"} days. A manager must approve more credit.`;
 }
 
 /** The database says which SKU ran short by id; the cashier needs its name and the numbers. */
@@ -95,11 +111,13 @@ salesRoutes.post("/sales", requirePermission("sales.create"), idempotent(), vali
 
   // A named customer buys at their tier: their own price list, else their group's.
   let customerId: string | null = null;
+  let customerName = "";
   let tierItems: PriceListItem[] = [];
   if (input.customerId) {
     const [customer] = await db.select().from(customers).where(and(eq(customers.id, input.customerId), eq(customers.businessId, businessId), eq(customers.active, true))).limit(1);
     if (!customer) return apiError(context, 422, "INVALID_CUSTOMER", "This customer is not available");
     customerId = customer.id;
+    customerName = customer.name;
     const [group] = customer.groupId ? await db.select().from(customerGroups).where(eq(customerGroups.id, customer.groupId)).limit(1) : [];
     const listId = effectivePriceListId(customer, group);
     if (listId) {
@@ -168,7 +186,7 @@ salesRoutes.post("/sales", requirePermission("sales.create"), idempotent(), vali
   }
 
   // Payments: the method's kind decides whether it can be over-tendered (cash) or must match exactly.
-  const methods = await db.execute<{ id: string; kind: string }>(sql`
+  const methods = input.payments.length === 0 ? [] : await db.execute<{ id: string; kind: string }>(sql`
     select id, kind from payment_methods where business_id = ${businessId} and active and id in (${sql.join(input.payments.map((payment) => sql`${payment.methodId}::uuid`), sql`, `)})
   `);
   const kindOf = (id: string) => methods.find((method) => method.id === id)?.kind;
@@ -181,10 +199,23 @@ salesRoutes.post("/sales", requirePermission("sales.create"), idempotent(), vali
     if (error instanceof PaymentError) return apiError(context, 422, error.code, error.message);
     throw error;
   }
-  if (settlement.balancePaisa !== 0) return apiError(context, 422, "PAYMENT_MISMATCH", "The payments do not cover the bill");
+  // Only a named customer may leave something unpaid: it goes on their account. A walk-in pays in full.
+  if (settlement.balancePaisa !== 0 && !customerId) {
+    return apiError(context, 422, "PAYMENT_MISMATCH", input.payments.length ? "The payments do not cover the bill" : "Choose a customer to sell on credit, or take the payment");
+  }
+
+  // Credit above the limit, or for an overdue customer, needs a manager. The database decides whether it is needed (it holds the
+  // customer's balance under a lock); here we only check who is approving.
+  let creditApprovedBy: string | null = null;
+  if (settlement.balancePaisa > 0 && input.approval) {
+    const manager = await approveByManager(businessId, terminal.branchId, input.approval.managerEmail, input.approval.pin, "sales.credit_override");
+    if (manager === "rate-limited") return apiError(context, 429, "RATE_LIMITED", "Too many PIN attempts. Wait 15 minutes and try again.");
+    if (manager === "invalid") return apiError(context, 401, "INVALID_PIN", "Manager email or PIN is incorrect");
+    if (manager !== "not-allowed") creditApprovedBy = manager;
+  }
 
   const payload = {
-    business_id: businessId, customer_id: customerId, branch_id: terminal.branchId, terminal_id: terminal.id, shift_id: input.shiftId, location_id: locationId,
+    business_id: businessId, customer_id: customerId, credit_approved_by: creditApprovedBy, branch_id: terminal.branchId, terminal_id: terminal.id, shift_id: input.shiftId, location_id: locationId,
     allow_negative_stock: settings.allowNegativeStock, tax_mode: settings.taxMode,
     gross_paisa: priced.grossPaisa, line_discount_paisa: priced.lineDiscountPaisa, invoice_discount_paisa: priced.invoiceDiscountPaisa,
     taxable_paisa: priced.taxablePaisa, tax_paisa: priced.taxPaisa, rounding_paisa: priced.roundingPaisa, total_paisa: priced.totalPaisa,
@@ -219,6 +250,8 @@ salesRoutes.post("/sales", requirePermission("sales.create"), idempotent(), vali
     const message = dbErrorMessage(error);
     const known = postingErrors.find(([prefix]) => message.includes(prefix));
     if (known?.[2] === "STOCK_INSUFFICIENT") return apiError(context, 409, "STOCK_INSUFFICIENT", await describeShortage(businessId, message));
+    const credit = /CREDIT_LIMIT_EXCEEDED|CUSTOMER_OVERDUE/.exec(message)?.[0];
+    if (credit) return apiError(context, 409, credit, describeCredit(credit, message, customerName));
     if (known) return apiError(context, known[1], known[2], message.replace(/^[A-Z_]+:?\s*/, "") || message);
     throw error;
   }
@@ -236,10 +269,15 @@ salesRoutes.post("/sales", requirePermission("sales.create"), idempotent(), vali
 
 async function loadInvoice(businessId: string, id: string, withCost: boolean) {
   const [invoice] = await db.execute(sql`
-    select i.*, b.name as branch_name, t.name as terminal_name, u.display_name as cashier_name
+    select i.*, b.name as branch_name, t.name as terminal_name, u.display_name as cashier_name, c.name as customer_name,
+           -- What the customer owed straight after this invoice, so a reprint shows the figure of the day.
+           (select coalesce(sum(l.debit_paisa - l.credit_paisa), 0) from party_ledger l
+            where l.business_id = i.business_id and l.party_type = 'customer' and l.party_id = i.customer_id
+              and l.seq <= (select max(x.seq) from party_ledger x where x.doc_id = i.id)) as customer_balance
     from sales_invoices i
     join branches b on b.id = i.branch_id join terminals t on t.id = i.terminal_id
     left join users u on u.id = i.cashier_id
+    left join customers c on c.id = i.customer_id
     where i.business_id = ${businessId} and i.id = ${id}
   `);
   if (!invoice) return null;
@@ -254,6 +292,9 @@ async function loadInvoice(businessId: string, id: string, withCost: boolean) {
     terminalName: invoice.terminal_name,
     cashierName: invoice.cashier_name,
     shiftId: invoice.shift_id,
+    customerId: invoice.customer_id ?? null,
+    customerName: invoice.customer_name ?? null,
+    customerBalancePaisa: invoice.customer_id ? paisa(invoice.customer_balance) : null,
     taxMode: invoice.tax_mode,
     grossPaisa: paisa(invoice.gross_paisa),
     lineDiscountPaisa: paisa(invoice.line_discount_paisa),

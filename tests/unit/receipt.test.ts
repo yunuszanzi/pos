@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildReceipt, formatDocumentDate, receiptPageCss, type ReceiptBusiness, type ReceiptInvoice } from "../../shared/receipt";
+import { buildPaymentReceipt, buildReceipt, formatDocumentDate, receiptPageCss, type ReceiptBusiness, type ReceiptInvoice, type ReceiptPayment } from "../../shared/receipt";
 
 const business: ReceiptBusiness = {
   tradeName: "SGA Balloons", legalName: "SGA Balloons (Pvt) Ltd", address: "Shop 4, Saddar, Karachi", phone: "021-111", ntn: "1234567-8", strn: null, receiptFooter: "",
@@ -90,5 +90,52 @@ describe("receipt model", () => {
     expect(owed.footer).toEqual(["No returns without receipt", "Welcome again"]);
     expect(owed.payments.at(-1)).toEqual({ label: "Balance due", value: "Rs 5.00", strong: true });
     expect(model.footer).toEqual(["Thank you for shopping with us."]);
+  });
+});
+
+describe("khata on a sales receipt", () => {
+  it("names the customer and shows what they owe after the sale, or the credit they hold", () => {
+    const owing = buildReceipt({ ...invoice, customerName: "Ali Traders", customerBalancePaisa: 30_000, balancePaisa: 5000, paidPaisa: 4245 }, "pos80", options);
+    expect(owing.customer).toBe("Ali Traders");
+    expect(owing.meta.at(-1)).toEqual({ label: "Customer", value: "Ali Traders" });
+    expect(owing.payments.slice(-2)).toEqual([
+      { label: "Balance due", value: "Rs 50.00", strong: true },
+      { label: "Account balance (khata)", value: "Rs 300.00" },
+    ]);
+    const credit = buildReceipt({ ...invoice, customerName: "Ali Traders", customerBalancePaisa: -1250 }, "pos80", options);
+    expect(credit.payments.at(-1)).toEqual({ label: "Credit on account", value: "Rs 12.50" });
+    // A walk-in's receipt has no customer rows at all.
+    const walkIn = buildReceipt(invoice, "pos80", options);
+    expect(walkIn.customer).toBeNull();
+    expect(walkIn.meta.map((row) => row.label)).toEqual(["No.", "Date", "Cashier", "Till"]);
+  });
+});
+
+describe("payment receipt", () => {
+  const payment: ReceiptPayment = {
+    number: "RCT-KHI-000007", postedAt: "2026-11-08T09:35:00.000Z", receivedBy: "Ayesha", branchName: "Main Branch", customerName: "Ali Traders",
+    methodName: "JazzCash", amountPaisa: 15_000, reference: "JC-77", note: "", customerBalancePaisa: 45_000,
+    allocations: [{ number: "INV-KHI-000001", amountPaisa: 10_000 }, { number: "INV-KHI-000002", amountPaisa: 4_000 }],
+  };
+
+  it("shows what was received, which invoices it settled, any left on account, and what is still owed", () => {
+    const model = buildPaymentReceipt(payment, options);
+    expect(model).toMatchObject({ title: "PAYMENT RECEIPT", number: "RCT-KHI-000007", customer: "Ali Traders", lines: [], taxRows: [], footer: ["Thank you."] });
+    expect(model.meta).toEqual([
+      { label: "No.", value: "RCT-KHI-000007" }, { label: "Date", value: "08/11/2026 14:35" }, { label: "Customer", value: "Ali Traders" }, { label: "Received by", value: "Ayesha" },
+    ]);
+    expect(model.totals).toEqual([{ label: "JazzCash (JC-77)", value: "Rs 150.00" }, { label: "RECEIVED", value: "Rs 150.00", strong: true }]);
+    expect(model.payments).toEqual([
+      { label: "Against INV-KHI-000001", value: "Rs 100.00" },
+      { label: "Against INV-KHI-000002", value: "Rs 40.00" },
+      { label: "On account", value: "Rs 10.00" },
+      { label: "Balance still owed", value: "Rs 450.00", strong: true },
+    ]);
+  });
+
+  it("shows credit when the customer has paid ahead, and marks a copy as a duplicate", () => {
+    const model = buildPaymentReceipt({ ...payment, allocations: [], customerBalancePaisa: -15_000 }, { ...options, duplicate: { copyNumber: 2 } });
+    expect(model.duplicateBanner).toBe("DUPLICATE — copy 2, not the original");
+    expect(model.payments).toEqual([{ label: "On account", value: "Rs 150.00" }, { label: "Credit on account", value: "Rs 150.00", strong: true }]);
   });
 });

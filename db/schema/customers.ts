@@ -50,5 +50,54 @@ export const customers = pgTable("customers", {
   active: boolean("active").notNull().default(true),
   /** Set by a trigger to the dataset version this row last changed at. */
   changeVersion: bigint("change_version", { mode: "number" }).notNull().default(0),
+  /** What the customer owes (positive) or is owed (negative, store credit). Written only by the party_ledger trigger. */
+  balancePaisa: bigint("balance_paisa", { mode: "number" }).notNull().default(0),
   ...audited,
+});
+
+// Tables from migration 0007. The posting functions write them; the API reads them.
+export const partyLedger = pgTable("party_ledger", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  seq: bigint("seq", { mode: "number" }).notNull().generatedAlwaysAsIdentity(),
+  businessId: businessId(),
+  partyType: text("party_type").notNull(),
+  partyId: uuid("party_id").notNull(),
+  docType: text("doc_type").notNull(),
+  docId: uuid("doc_id").notNull(),
+  docNumber: text("doc_number").notNull().default(""),
+  memo: text("memo").notNull().default(""),
+  debitPaisa: bigint("debit_paisa", { mode: "number" }).notNull().default(0),
+  creditPaisa: bigint("credit_paisa", { mode: "number" }).notNull().default(0),
+  entryAt: timestamp("entry_at", { withTimezone: true }).notNull().defaultNow(),
+  createdBy: uuid("created_by"),
+});
+
+export const customerPayments = pgTable("customer_payments", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  businessId: businessId(),
+  branchId: uuid("branch_id").notNull(),
+  customerId: uuid("customer_id").notNull(),
+  number: text("number").notNull(),
+  sequenceNo: integer("sequence_no").notNull(),
+  shiftId: uuid("shift_id"),
+  methodId: uuid("method_id").notNull(),
+  methodCode: text("method_code").notNull(),
+  methodName: text("method_name").notNull(),
+  tenderKind: text("tender_kind").notNull(),
+  amountPaisa: bigint("amount_paisa", { mode: "number" }).notNull(),
+  reference: text("reference").notNull().default(""),
+  note: text("note").notNull().default(""),
+  postedAt: timestamp("posted_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  createdBy: uuid("created_by"),
+});
+
+export const paymentAllocations = pgTable("payment_allocations", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  businessId: businessId(),
+  sourceType: text("source_type").notNull(),
+  sourceId: uuid("source_id").notNull(),
+  invoiceId: uuid("invoice_id").notNull(),
+  amountPaisa: bigint("amount_paisa", { mode: "number" }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

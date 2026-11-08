@@ -28,13 +28,16 @@ export const postSaleSchema = z.object({
   customerId: z.string().uuid().nullish(),
   lines: z.array(saleLineSchema).min(1).max(200),
   invoiceDiscount: discountSchema.nullish(),
-  /** What each customer handed over; only cash may be more than what is due, the rest is change. */
+  /**
+   * What each customer handed over; only cash may be more than what is due, the rest is change. A named customer with credit
+   * may pay less than the bill, or nothing at all, and the rest goes on their account (khata).
+   */
   payments: z.array(z.object({
     methodId: z.string().uuid(),
     amountPaisa: paisa.refine((value) => value > 0, "Enter an amount more than zero"),
     reference: z.string().trim().max(100).default(""),
-  })).min(1).max(10),
-  /** A manager who agreed to a discount above the cashier's limit. */
+  })).max(10),
+  /** A manager who agreed to a discount above the cashier's limit, or to credit above the limit or for an overdue customer. */
   approval: z.object({ managerEmail: z.string().email(), pin: pinSchema }).optional(),
   /** What the till showed. If the server works out something else (a price changed meanwhile) the sale is refused, not posted. */
   expectedTotalPaisa: paisa.optional(),

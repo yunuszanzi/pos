@@ -20,15 +20,18 @@ type Row = typeof customers.$inferSelect;
 
 /** The CNIC is an identity number: only people who manage customers see it, and it never reaches a till's cache. */
 const present = (row: Row, principal: Principal) => {
-  const { cnic, changeVersion, ...rest } = row;
+  const { cnic, changeVersion, balancePaisa, ...rest } = row;
   void changeVersion;
-  return hasPermission(principal, "customers.manage") ? { ...rest, cnic } : rest;
+  // What a customer owes is for people who may see the khata.
+  const visible = hasPermission(principal, "customers.ledger") ? { ...rest, balancePaisa } : rest;
+  return hasPermission(principal, "customers.manage") ? { ...visible, cnic } : visible;
 };
 
-/** An audit entry records what changed, not the CNIC itself. */
+/** An audit entry records what changed, not the CNIC itself. The balance is the ledger's, not an edit. */
 const forAudit = (row: Row) => {
-  const { cnic, changeVersion, ...rest } = row;
+  const { cnic, changeVersion, balancePaisa, ...rest } = row;
   void changeVersion;
+  void balancePaisa;
   return { ...rest, cnicSet: Boolean(cnic) };
 };
 
@@ -225,6 +228,7 @@ customersRoutes.get("/pos/customers/changes", view, async (context) => {
   }
   const groups = await db.select().from(customerGroups).where(eq(customerGroups.businessId, businessId));
   const groupList = new Map(groups.map((group) => [group.id, group.priceListId]));
+  const seesBalance = hasPermission(principal, "customers.ledger");
   return context.json({
     version: hasMore ? page[page.length - 1].changeVersion : current,
     hasMore,
@@ -233,6 +237,8 @@ customersRoutes.get("/pos/customers/changes", view, async (context) => {
       areaId: row.areaId, groupId: row.groupId, registered: row.registered, ntn: row.ntn, strn: row.strn,
       priceListId: row.priceListId ?? (row.groupId ? groupList.get(row.groupId) ?? null : null),
       creditLimitPaisa: row.creditLimitPaisa, termsDays: row.termsDays, active: row.active,
+      // Zero for a till user who may not see the khata; the server still enforces the real limit.
+      balancePaisa: seesBalance ? row.balancePaisa : 0,
     })),
   });
 });

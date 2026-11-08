@@ -32,7 +32,8 @@ type Executor = Pick<typeof db, "execute" | "select">;
 /** What a shift has taken, worked out from the posted documents. The same numbers feed the X and Z reports. */
 async function summarise(executor: Executor, businessId: string, shiftId: string, openingFloatPaisa: number) {
   const [sales] = await executor.execute(sql`
-    select count(*)::int as invoices, coalesce(sum(total_paisa), 0)::bigint as total, coalesce(sum(tax_paisa), 0)::bigint as tax,
+    select count(*)::int as invoices, coalesce(sum(total_paisa), 0)::bigint as total, coalesce(sum(balance_paisa), 0)::bigint as credit,
+           coalesce(sum(tax_paisa), 0)::bigint as tax,
            coalesce(sum(line_discount_paisa + invoice_discount_paisa), 0)::bigint as discount, coalesce(sum(rounding_paisa), 0)::bigint as rounding
     from sales_invoices where business_id = ${businessId} and shift_id = ${shiftId}
   `);
@@ -47,6 +48,11 @@ async function summarise(executor: Executor, businessId: string, shiftId: string
            coalesce(sum(amount_paisa) filter (where kind = 'cash_out'), 0)::bigint as cash_out
     from cash_movements where business_id = ${businessId} and shift_id = ${shiftId}
   `);
+  // Money taken from customers against their khata, outside any sale.
+  const [received] = await executor.execute(sql`
+    select coalesce(sum(amount_paisa), 0)::bigint as total, coalesce(sum(amount_paisa) filter (where tender_kind = 'cash'), 0)::bigint as cash
+    from customer_payments where business_id = ${businessId} and shift_id = ${shiftId}
+  `);
   // Payments are stored at the amount that counts towards the bill, so change given back is already left out.
   const cashSales = byMethod.filter((row) => row.tender_kind === "cash").reduce((total, row) => total + Number(row.amount), 0);
   const cashIn = Number(moves.cash_in);
@@ -54,6 +60,9 @@ async function summarise(executor: Executor, businessId: string, shiftId: string
   return {
     invoiceCount: Number(sales.invoices),
     totalPaisa: Number(sales.total),
+    creditSalesPaisa: Number(sales.credit),
+    customerPaymentsPaisa: Number(received.total),
+    customerPaymentsCashPaisa: Number(received.cash),
     taxPaisa: Number(sales.tax),
     discountPaisa: Number(sales.discount),
     roundingPaisa: Number(sales.rounding),
@@ -61,7 +70,7 @@ async function summarise(executor: Executor, businessId: string, shiftId: string
     cashSalesPaisa: cashSales,
     cashInPaisa: cashIn,
     cashOutPaisa: cashOut,
-    expectedCashPaisa: openingFloatPaisa + cashSales + cashIn - cashOut,
+    expectedCashPaisa: openingFloatPaisa + cashSales + Number(received.cash) + cashIn - cashOut,
   };
 }
 

@@ -39,6 +39,9 @@ export type ReceiptInvoice = {
   paidPaisa: number;
   changePaisa: number;
   balancePaisa: number;
+  /** Set when the sale was to a named customer. The balance is what they owed straight after this invoice. */
+  customerName?: string | null;
+  customerBalancePaisa?: number | null;
   lines: Array<{
     productName: string; variantName: string; sku: string; unitName: string; quantity: string; unitPricePaisa: number;
     lineDiscountPaisa: number; invoiceDiscountSharePaisa: number; taxRateBps: number; taxPaisa: number; totalPaisa: number;
@@ -70,6 +73,10 @@ export type ReceiptModel = {
   dateText: string;
   cashier: string;
   terminal: string;
+  /** The named customer, or null for a walk-in. */
+  customer: string | null;
+  /** The small facts under the heading (number, date, who, where), in the order they print. */
+  meta: ReceiptRow[];
   lines: ReceiptLine[];
   totals: ReceiptRow[];
   /** Tax by rate, for the buyer and the tax office. */
@@ -90,6 +97,13 @@ export function formatDocumentDate(iso: string, dateFormat: string, timezone: st
 }
 
 const negative = (paisa: number) => `-${formatPkr(paisa)}`;
+
+const duplicateBanner = (options: ReceiptOptions) => (options.duplicate ? `DUPLICATE — copy ${options.duplicate.copyNumber}, not the original` : null);
+
+function headerLinesOf(business: ReceiptBusiness, branchName: string): string[] {
+  const registration = [business.ntn ? `NTN ${business.ntn}` : "", business.strn ? `STRN ${business.strn}` : ""].filter(Boolean).join("  ");
+  return [branchName !== business.tradeName ? branchName : "", business.address, business.phone && `Tel ${business.phone}`, registration].filter((line): line is string => Boolean(line));
+}
 
 export function buildReceipt(invoice: ReceiptInvoice, format: PrintFormat, options: ReceiptOptions): ReceiptModel {
   const { business } = options;
@@ -118,17 +132,28 @@ export function buildReceipt(invoice: ReceiptInvoice, format: PrintFormat, optio
   }));
   if (invoice.changePaisa > 0) payments.push({ label: "Change", value: formatPkr(invoice.changePaisa), strong: true });
   if (invoice.balancePaisa > 0) payments.push({ label: "Balance due", value: formatPkr(invoice.balancePaisa), strong: true });
+  if (invoice.customerName && typeof invoice.customerBalancePaisa === "number") {
+    const owed = invoice.customerBalancePaisa;
+    payments.push(owed < 0
+      ? { label: "Credit on account", value: formatPkr(-owed) }
+      : { label: "Account balance (khata)", value: formatPkr(owed) });
+  }
 
-  const registration = [business.ntn ? `NTN ${business.ntn}` : "", business.strn ? `STRN ${business.strn}` : ""].filter(Boolean).join("  ");
+  const dateText = formatDocumentDate(invoice.postedAt, options.dateFormat, options.timezone);
   return {
     title: sheet ? "SALES INVOICE" : "SALES RECEIPT",
-    duplicateBanner: options.duplicate ? `DUPLICATE — copy ${options.duplicate.copyNumber}, not the original` : null,
+    duplicateBanner: duplicateBanner(options),
     businessName: business.tradeName,
-    headerLines: [invoice.branchName !== business.tradeName ? invoice.branchName : "", business.address, business.phone && `Tel ${business.phone}`, registration].filter((line): line is string => Boolean(line)),
+    headerLines: headerLinesOf(business, invoice.branchName),
     number: invoice.number,
-    dateText: formatDocumentDate(invoice.postedAt, options.dateFormat, options.timezone),
+    dateText,
     cashier: invoice.cashierName ?? "",
     terminal: invoice.terminalName,
+    customer: invoice.customerName || null,
+    meta: [
+      { label: "No.", value: invoice.number }, { label: "Date", value: dateText }, { label: "Cashier", value: invoice.cashierName ?? "" },
+      { label: "Till", value: invoice.terminalName }, ...(invoice.customerName ? [{ label: "Customer", value: invoice.customerName }] : []),
+    ],
     lines: invoice.lines.map((line) => {
       const discount = line.lineDiscountPaisa + line.invoiceDiscountSharePaisa;
       return {
@@ -144,5 +169,56 @@ export function buildReceipt(invoice: ReceiptInvoice, format: PrintFormat, optio
     taxRows: [...taxByRate.entries()].sort(([a], [b]) => a - b).map(([rate, entry]) => ({ rate: `${formatBps(rate)}%`, taxable: formatPkr(entry.taxable), tax: formatPkr(entry.tax) })),
     payments,
     footer: business.receiptFooter ? business.receiptFooter.split(/\r?\n/).filter(Boolean) : ["Thank you for shopping with us."],
+  };
+}
+
+/** Money received from a customer against their khata. */
+export type ReceiptPayment = {
+  number: string;
+  postedAt: string;
+  receivedBy: string | null;
+  branchName: string;
+  customerName: string;
+  methodName: string;
+  amountPaisa: number;
+  reference: string;
+  note: string;
+  /** The invoices it settled. Whatever is left over stays on the account. */
+  allocations: Array<{ number: string; amountPaisa: number }>;
+  /** What the customer owes now (negative: they hold credit). */
+  customerBalancePaisa: number;
+};
+
+export function buildPaymentReceipt(payment: ReceiptPayment, options: ReceiptOptions): ReceiptModel {
+  const { business } = options;
+  const dateText = formatDocumentDate(payment.postedAt, options.dateFormat, options.timezone);
+  const allocated = payment.allocations.reduce((sum, row) => sum + row.amountPaisa, 0);
+  const rows: ReceiptRow[] = payment.allocations.map((row) => ({ label: `Against ${row.number}`, value: formatPkr(row.amountPaisa) }));
+  if (payment.amountPaisa > allocated) rows.push({ label: "On account", value: formatPkr(payment.amountPaisa - allocated) });
+  rows.push(payment.customerBalancePaisa < 0
+    ? { label: "Credit on account", value: formatPkr(-payment.customerBalancePaisa), strong: true }
+    : { label: "Balance still owed", value: formatPkr(payment.customerBalancePaisa), strong: true });
+  return {
+    title: "PAYMENT RECEIPT",
+    duplicateBanner: duplicateBanner(options),
+    businessName: business.tradeName,
+    headerLines: headerLinesOf(business, payment.branchName),
+    number: payment.number,
+    dateText,
+    cashier: payment.receivedBy ?? "",
+    terminal: payment.branchName,
+    customer: payment.customerName,
+    meta: [
+      { label: "No.", value: payment.number }, { label: "Date", value: dateText }, { label: "Customer", value: payment.customerName },
+      ...(payment.receivedBy ? [{ label: "Received by", value: payment.receivedBy }] : []),
+    ],
+    lines: [],
+    totals: [
+      { label: payment.reference ? `${payment.methodName} (${payment.reference})` : payment.methodName, value: formatPkr(payment.amountPaisa) },
+      { label: "RECEIVED", value: formatPkr(payment.amountPaisa), strong: true },
+    ],
+    taxRows: [],
+    payments: rows,
+    footer: payment.note ? [payment.note, "Thank you."] : ["Thank you."],
   };
 }
