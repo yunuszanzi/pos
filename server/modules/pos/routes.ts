@@ -1,7 +1,7 @@
 import { and, asc, eq, gt, lte, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import {
-  brands, businessSettings, businesses, branches, categories, dataVersions, heldSales, paymentMethods, priceLists, products, roles, shifts,
+  brands, businessSettings, businesses, branches, categories, dataVersions, heldSales, paymentMethods, priceListItems, priceLists, products, roles, shifts,
   taxCategories, terminals, units,
 } from "../../../db/schema";
 import { holdSaleSchema, maxHeldSalesPerTerminal } from "../../../shared/schemas/heldSales";
@@ -9,12 +9,12 @@ import { db } from "../../lib/db";
 import { apiError, paramId } from "../../lib/http";
 import { getActorId, getPrincipal, requirePermission } from "../../lib/permissions";
 import { validateJson } from "../../lib/validate";
-import { canSeeCost, loadProductViews } from "../products/service";
+import { canSeeCost, loadProductViews, quantityText } from "../products/service";
 import { resolveSalesLocationId } from "../sales/location";
 
 export const posRoutes = new Hono();
 
-const datasets = ["catalogue", "reference", "settings", "access"] as const;
+const datasets = ["catalogue", "reference", "settings", "access", "customers"] as const;
 
 /** The change counter of every dataset; 0 for one that has never changed. A terminal compares these with what it holds. */
 async function readVersions(businessId: string) {
@@ -86,6 +86,16 @@ posRoutes.get("/pos/bootstrap", use, async (context) => {
     paymentMethods: methods,
     priceLists: lists,
   });
+});
+
+/** The items of one price list, for a till that has just picked a customer on that tier. Quantities are text, as everywhere in the API. */
+posRoutes.get("/pos/price-lists/:id", use, async (context) => {
+  const principal = getPrincipal(context);
+  const id = paramId(context);
+  const [list] = await db.select().from(priceLists).where(and(eq(priceLists.id, id), eq(priceLists.businessId, principal.businessId!), eq(priceLists.active, true))).limit(1);
+  if (!list) return apiError(context, 404, "NOT_FOUND", "Price list not found");
+  const items = await db.select().from(priceListItems).where(and(eq(priceListItems.priceListId, id), eq(priceListItems.businessId, principal.businessId!)));
+  return context.json({ id: list.id, name: list.name, items: items.map((item) => ({ variantId: item.variantId, unitId: item.unitId, minQuantity: quantityText(item.minQuantity), pricePaisa: item.pricePaisa })) });
 });
 
 const changesPageSize = 500;

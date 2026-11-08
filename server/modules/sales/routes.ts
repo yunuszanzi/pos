@@ -1,7 +1,8 @@
 import { and, eq, ilike, inArray, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
-import { appUsers, auditLog, businessSettings, rolePermissions, roles, terminals, userBranches } from "../../../db/schema";
+import { appUsers, auditLog, businessSettings, customerGroups, customers, priceListItems, priceLists, rolePermissions, roles, terminals, userBranches } from "../../../db/schema";
+import { effectivePriceListId, tierPrice, type PriceListItem } from "../../../shared/priceLists";
 import { PaymentError, settleTenders, type Tender } from "../../../shared/payments";
 import { discountsOverLimit, priceCart, PricingError, type PricingInput } from "../../../shared/pricing";
 import { postSaleSchema } from "../../../shared/schemas/sales";
@@ -92,6 +93,23 @@ salesRoutes.post("/sales", requirePermission("sales.create"), idempotent(), vali
   const missing = input.lines.findIndex((line) => !factsOf(line.variantId, line.unitId));
   if (missing >= 0) return apiError(context, 422, "INVALID_LINE", `Line ${missing + 1} is not an active product sold in that unit`);
 
+  // A named customer buys at their tier: their own price list, else their group's.
+  let customerId: string | null = null;
+  let tierItems: PriceListItem[] = [];
+  if (input.customerId) {
+    const [customer] = await db.select().from(customers).where(and(eq(customers.id, input.customerId), eq(customers.businessId, businessId), eq(customers.active, true))).limit(1);
+    if (!customer) return apiError(context, 422, "INVALID_CUSTOMER", "This customer is not available");
+    customerId = customer.id;
+    const [group] = customer.groupId ? await db.select().from(customerGroups).where(eq(customerGroups.id, customer.groupId)).limit(1) : [];
+    const listId = effectivePriceListId(customer, group);
+    if (listId) {
+      const rows = await db.select({ variantId: priceListItems.variantId, unitId: priceListItems.unitId, min: priceListItems.minQuantity, price: priceListItems.pricePaisa })
+        .from(priceListItems).innerJoin(priceLists, eq(priceLists.id, priceListItems.priceListId))
+        .where(and(eq(priceListItems.priceListId, listId), eq(priceListItems.businessId, businessId), eq(priceLists.active, true)));
+      tierItems = rows.map((row) => ({ variantId: row.variantId, unitId: row.unitId, minQuantityMilli: parseQuantity(quantityText(row.min)), pricePaisa: row.price }));
+    }
+  }
+
   const mayOverridePrice = hasPermission(principal, "sales.price_override");
   const pricingInput: PricingInput = {
     taxMode: settings.taxMode,
@@ -101,12 +119,13 @@ salesRoutes.post("/sales", requirePermission("sales.create"), idempotent(), vali
   };
   for (const [index, line] of input.lines.entries()) {
     const fact = factsOf(line.variantId, line.unitId)!;
-    const shelfPrice = Number(fact.sale_price_paisa);
+    const qtyMilli = parseQuantity(line.quantity);
+    const shelfPrice = tierPrice(tierItems, line.variantId, line.unitId, qtyMilli) ?? Number(fact.sale_price_paisa);
     if (line.unitPricePaisa !== undefined && line.unitPricePaisa !== shelfPrice && !mayOverridePrice) {
       return apiError(context, 403, "PRICE_OVERRIDE_DENIED", `Line ${index + 1}: you may not change the price`);
     }
     pricingInput.lines.push({
-      qtyMilli: parseQuantity(line.quantity),
+      qtyMilli,
       unitPricePaisa: line.unitPricePaisa ?? shelfPrice,
       taxRateBps: fact.rate_bps ?? 0,
       discount: line.discount ?? null,
@@ -165,7 +184,7 @@ salesRoutes.post("/sales", requirePermission("sales.create"), idempotent(), vali
   if (settlement.balancePaisa !== 0) return apiError(context, 422, "PAYMENT_MISMATCH", "The payments do not cover the bill");
 
   const payload = {
-    business_id: businessId, branch_id: terminal.branchId, terminal_id: terminal.id, shift_id: input.shiftId, location_id: locationId,
+    business_id: businessId, customer_id: customerId, branch_id: terminal.branchId, terminal_id: terminal.id, shift_id: input.shiftId, location_id: locationId,
     allow_negative_stock: settings.allowNegativeStock, tax_mode: settings.taxMode,
     gross_paisa: priced.grossPaisa, line_discount_paisa: priced.lineDiscountPaisa, invoice_discount_paisa: priced.invoiceDiscountPaisa,
     taxable_paisa: priced.taxablePaisa, tax_paisa: priced.taxPaisa, rounding_paisa: priced.roundingPaisa, total_paisa: priced.totalPaisa,

@@ -24,6 +24,8 @@ export const saleLineSchema = z.object({
 
 export const postSaleSchema = z.object({
   shiftId: z.string().uuid(),
+  /** Empty for a walk-in. A named customer buys at their price tier. */
+  customerId: z.string().uuid().nullish(),
   lines: z.array(saleLineSchema).min(1).max(200),
   invoiceDiscount: discountSchema.nullish(),
   /** What each customer handed over; only cash may be more than what is due, the rest is change. */

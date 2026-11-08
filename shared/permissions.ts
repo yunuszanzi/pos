@@ -39,6 +39,9 @@ export const permissionDefinitions = [
   ["shifts.view_all", "See and report on other users' shifts"],
   ["cash.movement", "Record cash in and cash out during a shift"],
   ["reports.sales.view", "View sales reports"],
+  ["customers.view", "View customers (name, phone, tier, credit limit)"],
+  ["customers.create", "Add a customer (for example from the till)"],
+  ["customers.manage", "Edit and archive customers, groups and areas; see CNIC"],
 ] as const;
 
 export type PermissionKey = (typeof permissionDefinitions)[number][0];
@@ -56,10 +59,12 @@ export const managerPermissionKeys: PermissionKey[] = [
   "inventory.view", "inventory.adjust", "inventory.approve", "inventory.opening_stock",
   "sales.create", "sales.discount", "sales.discount.above_limit", "sales.price_override", "sales.reprint", "sales.void",
   "shifts.open", "shifts.close", "shifts.view_all", "cash.movement", "reports.sales.view",
+  "customers.view", "customers.create", "customers.manage",
 ];
 
 export const cashierPermissionKeys: PermissionKey[] = [
   "branches.view", "locations.view", "terminals.view", "auth.pin_switch",
   "catalog.view", "inventory.view",
   "sales.create", "sales.discount", "sales.reprint", "sales.void", "shifts.open", "shifts.close", "cash.movement",
+  "customers.view", "customers.create",
 ];
