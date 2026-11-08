@@ -8,7 +8,11 @@ import { printFormatLabels, printFormats, type PrintFormat } from "../../shared/
 import { holdSale, reprintSale, type PostedSale } from "../api/posApi";
 import { SelectInput } from "../app/FormElements";
 import { useTerminalStore } from "../app/terminalStore";
+import { parseQuantity as parseQty } from "../../shared/units";
+import type { PriceListItem } from "../../shared/priceLists";
+import { getPriceListItems } from "../api/customersApi";
 import { totalsOf, type CartLine } from "./cart";
+import { CustomerDialog } from "./CustomerDialog";
 import { useCartStore } from "./cartStore";
 import { BillDiscountDialog, HeldSalesDialog, LineDialog } from "./CartDialogs";
 import type { CatalogueEntry } from "./catalogueIndex";
@@ -20,7 +24,7 @@ import { PosProvider } from "./PosProvider";
 import { usePos } from "./pos-context";
 import { CashMovementDialog, CloseShiftDialog, OpenShiftForm } from "./ShiftPanels";
 
-type Modal = "pay" | "discount" | "held" | "cash" | "close" | "history" | { line: string } | null;
+type Modal = "customer" | "pay" | "discount" | "held" | "cash" | "close" | "history" | { line: string } | null;
 
 export function PosPage() {
   const terminalId = useTerminalStore((state) => state.terminalId);
@@ -72,9 +76,22 @@ function PosScreen() {
   const [done, setDone] = useState<PostedSale | null>(null);
   const [job, setJob] = useState<PrintJob | null>(null);
 
+  // A named customer buys at their tier. The list arrives once per customer and is kept until reference data changes.
+  const customer = cart.customerId ? pos.customers.get(cart.customerId) : undefined;
+  const tierList = useQuery({
+    queryKey: ["pos-price-list", customer?.priceListId, data.versions.reference],
+    queryFn: () => getPriceListItems(customer!.priceListId!),
+    enabled: Boolean(customer?.priceListId),
+    staleTime: Infinity,
+  });
+  const tier = useMemo<PriceListItem[]>(
+    () => (customer?.priceListId && tierList.data ? tierList.data.items.map((item) => ({ variantId: item.variantId, unitId: item.unitId, minQuantityMilli: parseQty(item.minQuantity), pricePaisa: item.pricePaisa })) : []),
+    [customer?.priceListId, tierList.data],
+  );
+  const waitingForTier = Boolean(customer?.priceListId) && tierList.isPending;
   const totals = useMemo(
-    () => totalsOf(cart, catalogue, data.settings.taxMode, data.settings.cashRoundingPaisa),
-    [cart, catalogue, data.settings.taxMode, data.settings.cashRoundingPaisa],
+    () => totalsOf(cart, catalogue, data.settings.taxMode, data.settings.cashRoundingPaisa, tier),
+    [cart, catalogue, data.settings.taxMode, data.settings.cashRoundingPaisa, tier],
   );
   const grid = useMemo(() => catalogue.all().filter((entry) => entry.isBaseUnit).slice(0, 48), [catalogue]);
   const focusSearch = () => searchRef.current?.focus();
@@ -111,7 +128,7 @@ function PosScreen() {
   async function hold() {
     if (!cart.lines.length || !totals) return;
     try {
-      await holdSale({ name: `Hold ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`, cart: { lines: cart.lines, invoiceDiscount: cart.invoiceDiscount }, totalPaisa: totals.priced.totalPaisa });
+      await holdSale({ name: `Hold ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`, cart: { lines: cart.lines, invoiceDiscount: cart.invoiceDiscount, customerId: cart.customerId }, totalPaisa: totals.priced.totalPaisa });
       cart.clear();
       setNotice("Sale put on hold");
     } catch (caught) {
@@ -120,6 +137,7 @@ function PosScreen() {
   }
 
   function startPayment() {
+    if (waitingForTier) return setNotice("Loading this customer's prices…");
     if (!totals || totals.missing.length) return setNotice(totals?.missing.length ? "An item in the cart is no longer sold. Remove it first." : "Add an item first");
     setModal("pay");
   }
@@ -133,6 +151,7 @@ function PosScreen() {
         F4: startPayment,
         F6: () => void hold(),
         F7: () => setModal("held"),
+        F8: () => setModal("customer"),
         F9: () => { if (can("sales.discount")) setModal("discount"); },
       };
       const action = actions[event.key];
@@ -188,6 +207,10 @@ function PosScreen() {
       </section>
 
       <aside className="pos-right">
+        <div className="customer-bar">
+          <div><small>Customer (F8)</small><strong data-testid="cart-customer">{customer ? customer.name : cart.customerId ? "Unknown customer" : "Walk-in"}</strong>{customer?.priceListId && <small>Tier: {data.priceLists.find((list) => list.id === customer.priceListId)?.name ?? "price list"}</small>}</div>
+          <button className="button secondary" onClick={() => setModal("customer")}>{cart.customerId ? "Change" : "Select"}</button>
+        </div>
         <div className="cart-scroll">
           <table className="cart-table" aria-label="Cart">
             <thead><tr><th>Item</th><th className="num">Qty</th><th className="num">Price</th><th className="num">Total</th></tr></thead>
@@ -223,11 +246,12 @@ function PosScreen() {
 
     {modal === "pay" && totals && <PaymentDialog cart={cart} totalPaisa={totals.priced.totalPaisa} onClose={() => { setModal(null); focusSearch(); }}
       onPaid={(sale) => { cart.clear(); setModal(null); setDone(sale); }} />}
+    {modal === "customer" && <CustomerDialog onClose={() => { setModal(null); focusSearch(); }} onPick={(customerId) => { cart.setCustomer(customerId); setModal(null); focusSearch(); }} />}
     {modal === "discount" && <BillDiscountDialog current={cart.invoiceDiscount} onClose={() => setModal(null)} onApply={(discount) => { cart.setInvoiceDiscount(discount); setModal(null); focusSearch(); }} />}
     {modal === "held" && <HeldSalesDialog onClose={() => setModal(null)} onRecalled={(recalled) => {
       // Whatever was in the cart goes on hold first, so recalling never loses a sale in progress.
       if (cart.lines.length && totals) {
-        void holdSale({ name: "Hold (before recall)", cart: { lines: cart.lines, invoiceDiscount: cart.invoiceDiscount }, totalPaisa: totals.priced.totalPaisa }).catch(() => setNotice("The previous cart could not be put on hold"));
+        void holdSale({ name: "Hold (before recall)", cart: { lines: cart.lines, invoiceDiscount: cart.invoiceDiscount, customerId: cart.customerId }, totalPaisa: totals.priced.totalPaisa }).catch(() => setNotice("The previous cart could not be put on hold"));
       }
       cart.replace(recalled);
       setModal(null);
@@ -235,7 +259,7 @@ function PosScreen() {
     }} />}
     {modal === "cash" && <CashMovementDialog onClose={() => setModal(null)} onDone={(message) => { setNotice(message); setModal(null); focusSearch(); }} />}
     {modal === "close" && <CloseShiftDialog onClose={() => setModal(null)} onClosed={() => { cart.clear(); setModal(null); }} />}
-    {editing && <LineDialog line={editing} onClose={() => setModal(null)}
+    {editing && <LineDialog line={editing} tier={tier} onClose={() => setModal(null)}
       onApply={(change) => { cart.update(editing.key, change); setModal(null); focusSearch(); }}
       onRemove={() => { cart.remove(editing.key); setModal(null); focusSearch(); }} />}
     {modal === "history" && <SalesHistoryDialog onClose={() => setModal(null)} onReprint={printDuplicate} />}

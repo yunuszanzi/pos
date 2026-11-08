@@ -23,6 +23,7 @@ type CartState = Cart & {
   update: (key: string, change: Partial<Omit<CartLine, "key" | "variantId">>) => void;
   remove: (key: string) => void;
   setInvoiceDiscount: (discount: Discount | null) => void;
+  setCustomer: (customerId: string | null) => void;
   replace: (cart: Cart) => void;
   /** The key for this checkout, made on first use. */
   beginCheckout: () => string;
@@ -39,6 +40,8 @@ export const useCartStore = create<CartState>((set, get) => {
     update: (key, change) => set((state) => ({ ...updateLine(state, key, change), checkoutKey: null })),
     remove: (key) => set((state) => ({ ...removeLine(state, key), checkoutKey: null })),
     setInvoiceDiscount: (invoiceDiscount) => set({ invoiceDiscount, checkoutKey: null }),
+    // A different customer may mean a different price list, so it is a different sale and gets a new key.
+    setCustomer: (customerId) => set({ customerId, checkoutKey: null }),
     replace: (cart) => set({ ...cart, checkoutKey: null }),
     beginCheckout: () => {
       const existing = get().checkoutKey;
@@ -53,7 +56,7 @@ export const useCartStore = create<CartState>((set, get) => {
 
 useCartStore.subscribe((state) => {
   try {
-    localStorage.setItem(storageKey, JSON.stringify({ cart: { lines: state.lines, invoiceDiscount: state.invoiceDiscount }, checkoutKey: state.checkoutKey }));
+    localStorage.setItem(storageKey, JSON.stringify({ cart: { lines: state.lines, invoiceDiscount: state.invoiceDiscount, customerId: state.customerId }, checkoutKey: state.checkoutKey }));
   } catch {
     // The cart still works in memory.
   }

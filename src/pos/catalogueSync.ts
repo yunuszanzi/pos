@@ -1,3 +1,4 @@
+import type { CustomerChanges } from "../api/customersApi";
 import type { DataVersions, ProductChanges } from "../api/posApi";
 import type { PosCache } from "./catalogueCache";
 
@@ -22,4 +23,19 @@ export async function syncCatalogue(cache: PosCache, fetchChanges: FetchChanges,
 /** Whether the server's counters say anything the till holds is out of date. A cheap check, so the till does not re-download on a timer. */
 export function whatChanged(held: DataVersions, current: DataVersions): Array<keyof DataVersions> {
   return (Object.keys(current) as Array<keyof DataVersions>).filter((dataset) => current[dataset] !== held[dataset]);
+}
+
+type FetchCustomerChanges = (since: number, signal?: AbortSignal) => Promise<CustomerChanges>;
+
+/** The same paged, resumable sync for the customer list. */
+export async function syncCustomers(cache: PosCache, fetchChanges: FetchCustomerChanges, signal?: AbortSignal): Promise<{ version: number; changed: number }> {
+  let version = await cache.getCustomersVersion();
+  let changed = 0;
+  for (;;) {
+    const page = await fetchChanges(version, signal);
+    if (page.customers.length || page.version !== version) await cache.applyCustomerChanges(page.customers, page.version);
+    changed += page.customers.length;
+    version = page.version;
+    if (!page.hasMore) return { version, changed };
+  }
 }

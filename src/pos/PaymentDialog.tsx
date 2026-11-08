@@ -79,7 +79,7 @@ export function PaymentDialog({ cart, totalPaisa, onClose, onPaid }: { cart: Car
         if (caught.code === "DISCOUNT_APPROVAL_REQUIRED") setNeedsManager(true);
         // The same key with a different body is refused; the sale is different now, so give it a new key.
         if (caught.code === "IDEMPOTENCY_KEY_REUSED" || caught.code === "TOTAL_CHANGED") {
-          useCartStore.getState().replace({ lines: cart.lines, invoiceDiscount: cart.invoiceDiscount });
+          useCartStore.getState().replace({ lines: cart.lines, invoiceDiscount: cart.invoiceDiscount, customerId: cart.customerId });
           if (caught.code === "TOTAL_CHANGED") void syncNow();
         }
       }

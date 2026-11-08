@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { getCustomerChangesSince, type TillCustomer } from "../api/customersApi";
 import { getAppBootstrapData, getDataVersions, getProductChangesSince, getStockLevelsForProducts, type AppBootstrapData, type DataVersions } from "../api/posApi";
 import type { Product } from "../api/productsApi";
 import { useTerminalStore } from "../app/terminalStore";
 import { PosCache, cacheScope } from "./catalogueCache";
 import { CatalogueIndex } from "./catalogueIndex";
-import { syncCatalogue, whatChanged } from "./catalogueSync";
+import { syncCatalogue, syncCustomers, whatChanged } from "./catalogueSync";
+import { CustomerIndex } from "./customerIndex";
 import { rememberCacheScope } from "./localData";
 import { PosContext, type PosContextValue } from "./pos-context";
 
@@ -34,6 +36,7 @@ function Loaded({ data, reloadBootstrap, children }: { data: AppBootstrapData; r
   const [products, setProducts] = useState<Product[]>([]);
   const [status, setStatus] = useState<PosContextValue["catalogueStatus"]>("loading");
   const [error, setError] = useState("");
+  const [customerList, setCustomerList] = useState<TillCustomer[]>([]);
   const [shift, setShift] = useState(data.shift);
   const [stock, setStock] = useState<ReadonlyMap<string, string>>(new Map());
   const cacheRef = useRef<PosCache | null>(null);
@@ -43,6 +46,7 @@ function Loaded({ data, reloadBootstrap, children }: { data: AppBootstrapData; r
   const stockLoaded = useRef(false);
 
   const scope = cacheScope(data.business.id, data.user.id);
+  const mayReadCustomers = data.user.permissions.includes("*") || data.user.permissions.includes("customers.view");
   const stockLocation = data.terminal.salesLocationId;
   const mayReadStock = data.user.permissions.includes("*") || data.user.permissions.includes("inventory.view");
 
@@ -59,6 +63,18 @@ function Loaded({ data, reloadBootstrap, children }: { data: AppBootstrapData; r
       // Keep what is shown.
     }
   }, [stockLocation, mayReadStock]);
+
+  /** Customers by version, like the catalogue. A failure keeps the list the till already holds. */
+  const syncCustomerList = useCallback(async () => {
+    const cache = cacheRef.current;
+    if (!cache || !mayReadCustomers) return;
+    try {
+      const { changed } = await syncCustomers(cache, getCustomerChangesSince);
+      if (changed) setCustomerList(await cache.getCustomers());
+    } catch {
+      // The next version check tries again.
+    }
+  }, [mayReadCustomers]);
 
   const sync = useCallback(async () => {
     const cache = cacheRef.current;
@@ -88,8 +104,10 @@ function Loaded({ data, reloadBootstrap, children }: { data: AppBootstrapData; r
         cacheRef.current = cache;
         rememberCacheScope(scope);
         setProducts(await cache.getProducts());
+        setCustomerList(await cache.getCustomers());
         setStatus("syncing");
         await sync();
+        await syncCustomerList();
       } catch (caught) {
         if (alive) {
           setStatus("error");
@@ -102,7 +120,7 @@ function Loaded({ data, reloadBootstrap, children }: { data: AppBootstrapData; r
       cacheRef.current?.close();
       cacheRef.current = null;
     };
-  }, [scope, sync]);
+  }, [scope, sync, syncCustomerList]);
 
   // A tiny version check, on focus and every five minutes, decides what (if anything) is downloaded again.
   useEffect(() => {
@@ -116,7 +134,8 @@ function Loaded({ data, reloadBootstrap, children }: { data: AppBootstrapData; r
         versionsRef.current = current;
         if (changed.includes("catalogue")) await sync();
         await refreshStock();
-        if (changed.some((dataset) => dataset !== "catalogue")) await reloadBootstrap();
+        if (changed.includes("customers")) await syncCustomerList();
+        if (changed.some((dataset) => dataset !== "catalogue" && dataset !== "customers")) await reloadBootstrap();
       } catch {
         // Offline or a hiccup: the next check tries again.
       } finally {
@@ -129,7 +148,7 @@ function Loaded({ data, reloadBootstrap, children }: { data: AppBootstrapData; r
       window.clearInterval(timer);
       window.removeEventListener("focus", check);
     };
-  }, [sync, reloadBootstrap, refreshStock]);
+  }, [sync, reloadBootstrap, refreshStock, syncCustomerList]);
 
   useEffect(() => {
     versionsRef.current = data.versions;
@@ -144,11 +163,14 @@ function Loaded({ data, reloadBootstrap, children }: { data: AppBootstrapData; r
     }
   }, [products, status, refreshStock]);
 
+  const customers = useMemo(() => new CustomerIndex(customerList), [customerList]);
   const catalogue = useMemo(() => new CatalogueIndex(products, data), [products, data]);
   const permissions = data.user.permissions;
   const value = useMemo<PosContextValue>(() => ({
     data,
     catalogue,
+    customers,
+    rememberCustomer: (customer) => setCustomerList((current) => [...current.filter((row) => row.id !== customer.id), customer]),
     catalogueStatus: status,
     catalogueError: error,
     shift,
@@ -161,7 +183,7 @@ function Loaded({ data, reloadBootstrap, children }: { data: AppBootstrapData; r
     }),
     can: (permission) => permissions.includes("*") || permissions.includes(permission),
     syncNow: sync,
-  }), [data, catalogue, status, error, shift, stock, permissions, sync]);
+  }), [data, catalogue, customers, status, error, shift, stock, permissions, sync]);
 
   return <PosContext.Provider value={value}>{children}</PosContext.Provider>;
 }

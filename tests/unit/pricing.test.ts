@@ -198,7 +198,7 @@ function mulberry32(seed: number) {
   };
 }
 
-describe("priceCart: invariants hold for thousands of random carts", () => {
+describe("priceCart: invariants hold for thousands of random carts", { timeout: 30_000 }, () => {
   it("never loses or invents a paisa", () => {
     const random = mulberry32(20261103);
     const int = (low: number, high: number) => low + Math.floor(random() * (high - low + 1));

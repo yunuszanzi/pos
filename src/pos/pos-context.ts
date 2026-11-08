@@ -1,10 +1,16 @@
 import { createContext, useContext } from "react";
 import type { AppBootstrapData, Shift } from "../api/posApi";
+import type { TillCustomer } from "../api/customersApi";
 import type { CatalogueIndex } from "./catalogueIndex";
+import type { CustomerIndex } from "./customerIndex";
 
 export type PosContextValue = {
   data: AppBootstrapData;
   catalogue: CatalogueIndex;
+  /** The customers held on this till; searched locally. */
+  customers: CustomerIndex;
+  /** Puts a customer just added at the till into the local list, so no re-download is needed. */
+  rememberCustomer: (customer: TillCustomer) => void;
   /** "syncing" while the catalogue is being brought up to date; the till is usable from what is already held. */
   catalogueStatus: "loading" | "syncing" | "ready" | "error";
   catalogueError: string;

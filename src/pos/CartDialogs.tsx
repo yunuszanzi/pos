@@ -7,7 +7,8 @@ import { discardHeldSale, getAllHeldSales, recallHeldSale } from "../api/posApi"
 import { ErrorMessage, Field, SelectInput, TextInput } from "../app/FormElements";
 import { MoneyInput } from "../app/MoneyInput";
 import { amountOf } from "./amounts";
-import { parseStoredCart, type Cart, type CartLine } from "./cart";
+import type { PriceListItem } from "../../shared/priceLists";
+import { parseStoredCart, unitPriceOf, type Cart, type CartLine } from "./cart";
 import { Dialog } from "./Dialog";
 import { usePos } from "./pos-context";
 
@@ -58,15 +59,15 @@ export function BillDiscountDialog({ current, onClose, onApply }: { current: Dis
   </form></Dialog>;
 }
 
-export function LineDialog({ line, onClose, onApply, onRemove }: {
-  line: CartLine; onClose: () => void; onApply: (change: Partial<Omit<CartLine, "key" | "variantId">>) => void; onRemove: () => void;
+export function LineDialog({ line, tier, onClose, onApply, onRemove }: {
+  line: CartLine; /** The customer's price list items, empty for a walk-in. */ tier: readonly PriceListItem[]; onClose: () => void; onApply: (change: Partial<Omit<CartLine, "key" | "variantId">>) => void; onRemove: () => void;
 }) {
   const { catalogue, can } = usePos();
   const units = catalogue.unitsOf(line.variantId);
   const entry = catalogue.get(line.variantId, line.unitId);
   const [unitId, setUnitId] = useState(line.unitId);
   const [quantity, setQuantity] = useState(formatQuantity(line.quantityMilli));
-  const [price, setPrice] = useState(toPlainRupees(line.priceOverridePaisa ?? catalogue.get(line.variantId, line.unitId)?.pricePaisa ?? 0));
+  const [price, setPrice] = useState(toPlainRupees(entry ? unitPriceOf(line, entry, tier) : 0));
   const [kind, setKind] = useState<"percent" | "fixed">(line.discount?.type ?? "percent");
   const [discount, setDiscount] = useState(discountText(line.discount));
   const [error, setError] = useState("");
@@ -85,8 +86,9 @@ export function LineDialog({ line, onClose, onApply, onRemove }: {
     const chosen = catalogue.get(line.variantId, unitId);
     const typed = amountOf(price);
     if (typed === null) return setError("Enter the price as rupees");
-    // Only a price that differs from the shelf price is an override.
-    const priceOverridePaisa = chosen && typed !== chosen.pricePaisa ? typed : null;
+    // Only a price that differs from what the customer would be charged anyway (shelf or tier, for this quantity) is an override.
+    const normal = chosen ? unitPriceOf({ variantId: line.variantId, unitId, quantityMilli, priceOverridePaisa: null }, chosen, tier) : typed;
+    const priceOverridePaisa = chosen && typed !== normal ? typed : null;
     onApply({ unitId, quantityMilli, discount: read, priceOverridePaisa });
   }
 
@@ -95,8 +97,9 @@ export function LineDialog({ line, onClose, onApply, onRemove }: {
       <Field label="Quantity"><TextInput value={quantity} inputMode="decimal" autoFocus onFocus={(event) => event.currentTarget.select()} onChange={(event) => setQuantity(event.target.value)} /></Field>
       <Field label="Unit"><SelectInput value={unitId} onChange={(event) => {
         setUnitId(event.target.value);
-        setPrice(toPlainRupees(catalogue.get(line.variantId, event.target.value)?.pricePaisa ?? 0));
-      }}>{units.map((unit) => <option key={unit.unitId} value={unit.unitId}>{unit.unitName} — {formatPkr(unit.pricePaisa)}</option>)}</SelectInput></Field>
+        const next = catalogue.get(line.variantId, event.target.value);
+        setPrice(toPlainRupees(next ? unitPriceOf({ variantId: line.variantId, unitId: event.target.value, quantityMilli: line.quantityMilli, priceOverridePaisa: null }, next, tier) : 0));
+      }}>{units.map((unit) => <option key={unit.unitId} value={unit.unitId}>{unit.unitName} — {formatPkr(unitPriceOf({ variantId: line.variantId, unitId: unit.unitId, quantityMilli: line.quantityMilli, priceOverridePaisa: null }, unit, tier))}</option>)}</SelectInput></Field>
     </div>
     {can("sales.price_override") && <Field label="Price per unit (Rs)"><MoneyInput value={price} onChange={(event) => setPrice(event.target.value)} /></Field>}
     {can("sales.discount") && <Field label="Line discount"><DiscountFields kind={kind} text={discount} onKind={setKind} onText={setDiscount} /></Field>}

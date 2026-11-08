@@ -251,3 +251,11 @@ fieldset { border: 1px solid #e0e6ef; border-radius: 8px; }
 .nav-link.disabled { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px; color: #9aa5b6; cursor: not-allowed; user-select: none; }
 .nav-link.disabled:hover { background: transparent; }
 .badge { padding: 2px 7px; border-radius: 99px; background: #f1f3f6; color: #7b8799; font-size: .64rem; font-weight: 700; white-space: nowrap; }
+
+/* ---- Customer on the till ---- */
+.customer-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-bottom: 10px; border-bottom: 1px solid #eef0f4; }
+.customer-bar small { display: block; color: #6d778a; }
+.customer-results { display: grid; max-height: 280px; gap: 4px; overflow: auto; }
+.customer-row { display: grid; padding: 8px 10px; border: 1px solid #e3e8f0; border-radius: 8px; background: #fff; text-align: left; }
+.customer-row:hover { border-color: #5c83ce; background: #f5f8ff; }
+.customer-row small { color: #6d778a; }

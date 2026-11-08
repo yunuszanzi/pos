@@ -122,7 +122,7 @@ describe("catalogue cache and sync", () => {
   });
 
   it("names the datasets whose counters moved", () => {
-    const held = { catalogue: 5, reference: 2, settings: 1, access: 3 };
+    const held = { catalogue: 5, reference: 2, settings: 1, access: 3, customers: 7 };
     expect(whatChanged(held, held)).toEqual([]);
     expect(whatChanged(held, { ...held, catalogue: 6, access: 4 })).toEqual(["catalogue", "access"]);
   });

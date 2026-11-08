@@ -1,8 +1,11 @@
+import type { TillCustomer } from "../api/customersApi";
 import type { Product } from "../api/productsApi";
 
 const productsStore = "products";
 const metaStore = "meta";
+const customersStore = "customers";
 const versionKey = "catalogueVersion";
+const customersVersionKey = "customersVersion";
 
 const wait = <T>(request: IDBRequest<T>) => new Promise<T>((resolve, reject) => {
   request.onsuccess = () => resolve(request.result);
@@ -23,10 +26,13 @@ export class PosCache {
   private constructor(private readonly db: IDBDatabase) {}
 
   static async open(scope: string): Promise<PosCache> {
-    const request = indexedDB.open(scope, 1);
+    const request = indexedDB.open(scope, 2);
+    // Version 1 held products; version 2 adds customers. An upgrade keeps what is there.
     request.onupgradeneeded = () => {
-      request.result.createObjectStore(productsStore, { keyPath: "id" });
-      request.result.createObjectStore(metaStore);
+      const names = request.result.objectStoreNames;
+      if (!names.contains(productsStore)) request.result.createObjectStore(productsStore, { keyPath: "id" });
+      if (!names.contains(metaStore)) request.result.createObjectStore(metaStore);
+      if (!names.contains(customersStore)) request.result.createObjectStore(customersStore, { keyPath: "id" });
     };
     return new PosCache(await wait(request));
   }
@@ -66,8 +72,30 @@ export class PosCache {
     await finished(transaction);
   }
 
+  async getCustomersVersion(): Promise<number> {
+    const stored = await wait(this.db.transaction(metaStore).objectStore(metaStore).get(customersVersionKey));
+    return typeof stored === "number" ? stored : 0;
+  }
+
+  getCustomers(): Promise<TillCustomer[]> {
+    return wait(this.db.transaction(customersStore).objectStore(customersStore).getAll() as IDBRequest<TillCustomer[]>);
+  }
+
+  /** Same rule as products: one transaction for the rows and the version, archived customers dropped. */
+  async applyCustomerChanges(changed: TillCustomer[], version: number): Promise<void> {
+    const transaction = this.db.transaction([customersStore, metaStore], "readwrite");
+    const store = transaction.objectStore(customersStore);
+    for (const customer of changed) {
+      if (customer.active) store.put(customer);
+      else store.delete(customer.id);
+    }
+    transaction.objectStore(metaStore).put(version, customersVersionKey);
+    await finished(transaction);
+  }
+
   async clear(): Promise<void> {
-    const transaction = this.db.transaction([productsStore, metaStore], "readwrite");
+    const transaction = this.db.transaction([productsStore, metaStore, customersStore], "readwrite");
+    transaction.objectStore(customersStore).clear();
     transaction.objectStore(productsStore).clear();
     transaction.objectStore(metaStore).clear();
     await finished(transaction);

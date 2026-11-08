@@ -4,7 +4,7 @@ import type { Product } from "./productsApi";
 
 import type { PrintFormat } from "../../shared/receipt";
 export type { PrintFormat };
-export type DataVersions = { catalogue: number; reference: number; settings: number; access: number };
+export type DataVersions = { catalogue: number; reference: number; settings: number; access: number; customers: number };
 
 export type AppBootstrapData = {
   versions: DataVersions;
