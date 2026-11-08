@@ -173,5 +173,6 @@ export const businessSettings = pgTable("business_settings", {
   cashRoundingPaisa: integer("cash_rounding_paisa").notNull().default(0),
   allowNegativeStock: boolean("allow_negative_stock").notNull().default(false),
   autoPrintReceipt: boolean("auto_print_receipt").notNull().default(true),
+  returnWindowDays: integer("return_window_days").notNull().default(14),
   ...timestamps,
 });

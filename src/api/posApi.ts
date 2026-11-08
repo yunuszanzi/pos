@@ -11,7 +11,7 @@ export type AppBootstrapData = {
   business: { id: string; tradeName: string; legalName: string; address: string; phone: string; ntn: string | null; strn: string | null; receiptFooter: string; logoUrl: string | null };
   branch: { id: string; name: string; code: string };
   terminal: { id: string; name: string; defaultPrintFormat: PrintFormat; salesLocationId: string | null };
-  settings: { currency: string; timezone: string; dateFormat: string; taxMode: "inclusive" | "exclusive"; cashRoundingPaisa: 0 | 100 | 500 | 1000; allowNegativeStock: boolean; autoPrintReceipt: boolean };
+  settings: { currency: string; timezone: string; dateFormat: string; taxMode: "inclusive" | "exclusive"; cashRoundingPaisa: 0 | 100 | 500 | 1000; allowNegativeStock: boolean; autoPrintReceipt: boolean; returnWindowDays: number };
   user: { id: string; name: string | null; email: string | null; roleName: string | null; maxDiscountBps: number; permissions: string[] };
   shift: { id: string; openedAt: string; openingFloatPaisa: number } | null;
   taxCategories: Array<{ id: string; name: string; kind: string; rateBps: number }>;

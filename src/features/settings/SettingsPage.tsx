@@ -16,6 +16,7 @@ const defaults: BusinessSettings = {
   cashRoundingPaisa: 0,
   allowNegativeStock: false,
   autoPrintReceipt: true,
+  returnWindowDays: 14,
 };
 
 export function SettingsPage() {
@@ -48,6 +49,7 @@ export function SettingsPage() {
         cashRoundingPaisa: settings.cashRoundingPaisa,
         allowNegativeStock: settings.allowNegativeStock,
         autoPrintReceipt: settings.autoPrintReceipt,
+        returnWindowDays: Number(data.get("returnWindowDays")),
       });
       setSettings(updated);
       setSuccess("Settings saved.");
@@ -82,6 +84,7 @@ export function SettingsPage() {
       </Field>
       <label className="checkbox-row"><input type="checkbox" checked={settings.allowNegativeStock} onChange={(event) => setSettings({ ...settings, allowNegativeStock: event.target.checked })} /><span><strong>Allow selling below zero stock</strong><small>Off: a sale of more than is on hand is refused.</small></span></label>
       <label className="checkbox-row"><input type="checkbox" checked={settings.autoPrintReceipt} onChange={(event) => setSettings({ ...settings, autoPrintReceipt: event.target.checked })} /><span><strong>Print the receipt after each sale</strong></span></label>
+      <Field label="Return window (days)"><TextInput name="returnWindowDays" type="number" min={0} max={365} value={settings.returnWindowDays} onChange={(event) => setSettings({ ...settings, returnWindowDays: Number(event.target.value) })} /></Field>
       <button className="button primary" disabled={!loaded}>Save settings</button>
     </form>
   </div>;

@@ -13,6 +13,8 @@ export type BusinessSettings = {
   cashRoundingPaisa: 0 | 100 | 500 | 1000;
   allowNegativeStock: boolean;
   autoPrintReceipt: boolean;
+  /** Days after a sale that goods can come back without a manager. */
+  returnWindowDays: number;
 };
 
 export function getBusinessSettings() {

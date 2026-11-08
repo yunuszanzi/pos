@@ -1,7 +1,7 @@
-import { and, eq, ilike, inArray, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
-import { appUsers, auditLog, businessSettings, customerGroups, customers, priceListItems, priceLists, rolePermissions, roles, terminals, userBranches } from "../../../db/schema";
+import { auditLog, businessSettings, customerGroups, customers, priceListItems, priceLists, roles, terminals } from "../../../db/schema";
 import { formatPkr } from "../../../shared/money";
 import { effectivePriceListId, tierPrice, type PriceListItem } from "../../../shared/priceLists";
 import { PaymentError, settleTenders, type Tender } from "../../../shared/payments";
@@ -9,15 +9,13 @@ import { discountsOverLimit, priceCart, PricingError, type PricingInput } from "
 import { postSaleSchema } from "../../../shared/schemas/sales";
 import { formatQuantity, parseQuantity, toBaseQuantity } from "../../../shared/units";
 import { auditPrincipal } from "../../lib/audit";
-import { createPinRateKey } from "../../lib/auth";
 import { db } from "../../lib/db";
 import { dbErrorMessage } from "../../lib/dbErrors";
 import { apiError, paramId } from "../../lib/http";
 import { idempotent } from "../../lib/idempotency";
 import { getActorId, getPrincipal, hasPermission, requirePermission } from "../../lib/permissions";
 import { validateJson } from "../../lib/validate";
-import { verifyPin } from "../auth/pin";
-import { clearPinAttempts, registerPinAttempt } from "../auth/pinRateLimit";
+import { approveByManager } from "./approval";
 import { resolveSalesLocationId } from "./location";
 import { canSeeCost, escapeLike, quantityText } from "../products/service";
 
@@ -31,21 +29,6 @@ const postingErrors: Array<[prefix: string, status: 409 | 422, code: string]> = 
   ["PAYMENT_MISMATCH", 422, "PAYMENT_MISMATCH"],
   ["INVALID_CUSTOMER", 422, "INVALID_CUSTOMER"],
 ];
-
-/** A manager's email and PIN, checked the same way as /auth/manager-override. Returns the manager's id. */
-async function approveByManager(businessId: string, terminalBranchId: string, email: string, pin: string, permission: string) {
-  const rateKey = createPinRateKey(`override|${email.toLowerCase()}`);
-  if (!(await registerPinAttempt(rateKey)).allowed) return "rate-limited" as const;
-  const [manager] = await db.select().from(appUsers)
-    .where(and(eq(appUsers.businessId, businessId), ilike(appUsers.email, email), eq(appUsers.active, true))).limit(1);
-  if (!manager || !await verifyPin(pin, manager.pinHash)) return "invalid" as const;
-  const [branchGrant] = await db.select().from(userBranches)
-    .where(and(eq(userBranches.userId, manager.id), eq(userBranches.branchId, terminalBranchId))).limit(1);
-  const [grant] = await db.select().from(rolePermissions)
-    .where(and(eq(rolePermissions.roleId, manager.roleId), inArray(rolePermissions.permissionKey, [permission, "*"]))).limit(1);
-  await clearPinAttempts(rateKey);
-  return branchGrant && grant ? manager.id : "not-allowed" as const;
-}
 
 /** The database says what is wrong with the credit in paisa; the cashier needs it in words. */
 function describeCredit(code: string, message: string, customerName: string): string {

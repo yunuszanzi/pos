@@ -16,4 +16,6 @@ export const settingsSchema = z.object({
   cashRoundingPaisa: z.union([z.literal(0), z.literal(100), z.literal(500), z.literal(1000)]).default(0),
   allowNegativeStock: z.boolean().default(false),
   autoPrintReceipt: z.boolean().default(true),
+  // A return after this many days, or without a receipt, needs a manager's approval.
+  returnWindowDays: z.number().int().min(0).max(365).default(14),
 });

@@ -73,6 +73,7 @@ posRoutes.get("/pos/bootstrap", use, async (context) => {
     settings: settings && {
       currency: settings.currency, timezone: settings.timezone, dateFormat: settings.dateFormat, taxMode: settings.taxMode,
       cashRoundingPaisa: settings.cashRoundingPaisa, allowNegativeStock: settings.allowNegativeStock, autoPrintReceipt: settings.autoPrintReceipt,
+      returnWindowDays: settings.returnWindowDays,
     },
     user: {
       id: getActorId(principal), name: principal.activeUserName, email: principal.activeUserEmail, roleName: role?.name ?? null,
