@@ -26,6 +26,7 @@ const LedgerPage = lazy(() => import("../features/stock/LedgerPage").then(({ Led
 const AdjustmentsPage = lazy(() => import("../features/stock/AdjustmentsPage").then(({ AdjustmentsPage: Page }) => ({ default: Page })));
 const NewAdjustmentPage = lazy(() => import("../features/stock/NewAdjustmentPage").then(({ NewAdjustmentPage: Page }) => ({ default: Page })));
 const OpeningStockPage = lazy(() => import("../features/stock/OpeningStockPage").then(({ OpeningStockPage: Page }) => ({ default: Page })));
+const PosPage = lazy(() => import("../pos/PosPage").then(({ PosPage: Page }) => ({ default: Page })));
 const ValuationPage = lazy(() => import("../features/stock/ValuationPage").then(({ ValuationPage: Page }) => ({ default: Page })));
 
 type AppRoute = {
@@ -84,6 +85,9 @@ function AppRoutes() {
   if (!currentUser.businessId && location.pathname !== "/setup") return <Navigate to="/setup" replace />;
   if (currentUser.businessId && location.pathname === "/setup") return <Navigate to="/" replace />;
   if (!currentUser.businessId) return <Routes><Route path="/setup" element={<SetupPage />} /><Route path="*" element={<Navigate to="/setup" replace />} /></Routes>;
+
+  // The till is a full screen of its own, without the back-office menu.
+  if (location.pathname === "/pos") return <PosPage />;
 
   return <Shell>
     <Routes>
@@ -154,6 +158,7 @@ function Shell({ children }: { children: ReactNode }) {
     <aside className="sidebar">
       <Link to="/" className="brand"><span className="brand-mark">P</span><span>POS System<small>Foundation</small></span></Link>
       <nav aria-label="Main navigation">
+        {hasPermission(currentUser?.permissions ?? [], "sales.create") && <NavLink to="/pos" className="nav-link">Point of sale</NavLink>}
         {visibleRoutes.map((route) => <NavLink key={route.path} to={route.path} className={({ isActive }) => isActive ? "nav-link selected" : "nav-link"}>{route.label}</NavLink>)}
       </nav>
       <div className="sidebar-bottom">

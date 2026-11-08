@@ -5,6 +5,7 @@ import { signOutUser } from "../api/authApi";
 import { supabase } from "../api/supabase";
 import { AuthContext, type AuthContextValue, type CurrentUser } from "./auth-context";
 import { queryClient } from "./queryClient";
+import { wipeLocalPosData } from "../pos/localData";
 import { useTerminalStore } from "./terminalStore";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -27,6 +28,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!nextSession) {
         setCurrentUser(null);
         queryClient.clear();
+        void wipeLocalPosData();
         useTerminalStore.getState().setTerminalId("");
         setLoading(false);
         return;
@@ -68,6 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signOut: async () => {
       await signOutUser();
       queryClient.clear();
+      await wipeLocalPosData();
       useTerminalStore.getState().setTerminalId("");
       setCurrentUser(null);
       setSession(null);
