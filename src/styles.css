@@ -205,3 +205,41 @@ details pre { max-width: 380px; overflow: auto; font-size: .7rem; }
 .report-table tr.variance td { color: #a3312c; font-weight: 700; }
 fieldset { border: 1px solid #e0e6ef; border-radius: 8px; }
 @media (max-width: 900px) { .pos { height: auto; min-height: 100vh; } .pos-main { grid-template-columns: 1fr; } }
+
+/* ---- Printed receipts and invoices. The model comes from shared/receipt.ts; @page size is injected per format. ---- */
+.receipt-print-root { display: none; }
+@media print {
+  #root { display: none !important; }
+  .receipt-print-root { display: block !important; }
+}
+.block { display: block; }
+.receipt { color: #000; font: 9pt/1.3 "Courier New", ui-monospace, monospace; }
+.receipt h1 { margin: 0 0 2px; font-size: 12pt; letter-spacing: 0; text-align: center; }
+.receipt h2 { margin: 6px 0; padding: 2px 0; border-block: 1px dashed #000; font-size: 9pt; text-align: center; }
+.receipt p { margin: 0; text-align: center; }
+.receipt .receipt-duplicate { margin-bottom: 6px; padding: 3px; border: 2px solid #000; font-weight: 800; text-transform: uppercase; }
+.receipt-pos80 { width: 74mm; }
+.receipt-pos58 { width: 54mm; font-size: 7.5pt; }
+.receipt-meta, .receipt-rows { display: grid; gap: 1px; margin: 6px 0; }
+.receipt-meta > div, .receipt-rows > div { display: flex; justify-content: space-between; gap: 8px; }
+.receipt dt, .receipt dd { margin: 0; }
+.receipt-rows { padding-top: 4px; border-top: 1px dashed #000; }
+.receipt-rows .strong { font-size: 1.15em; font-weight: 800; }
+.receipt-lines { margin: 6px 0; padding: 0; list-style: none; }
+.receipt-lines li { display: grid; padding: 3px 0; border-bottom: 1px dotted #999; }
+.receipt-lines .item-figures { display: flex; justify-content: space-between; }
+.receipt-lines small, .receipt-lines td small { display: block; color: #333; font-size: .85em; }
+.receipt-tax { width: 100%; margin-top: 6px; border-collapse: collapse; font-size: .9em; }
+.receipt-tax th { text-align: left; }
+.receipt .num { text-align: right; }
+.receipt-foot { margin-top: 8px; padding-top: 4px; border-top: 1px dashed #000; }
+.receipt-a4, .receipt-a5 { width: 100%; font: 10pt/1.4 Arial, Helvetica, sans-serif; }
+.receipt-a4 h1, .receipt-a5 h1 { font-size: 18pt; text-align: left; }
+.receipt-a4 .receipt-head p, .receipt-a5 .receipt-head p { text-align: left; }
+.receipt-a4 h2, .receipt-a5 h2 { border: 0; text-align: right; font-size: 14pt; }
+.receipt-a4 .receipt-meta, .receipt-a5 .receipt-meta { grid-template-columns: repeat(2, 1fr); gap: 2px 24px; }
+.receipt-a4 table.receipt-lines, .receipt-a5 table.receipt-lines { width: 100%; border-collapse: collapse; }
+.receipt-a4 table.receipt-lines th, .receipt-a5 table.receipt-lines th { padding: 4px; border-bottom: 2px solid #000; text-align: left; }
+.receipt-a4 table.receipt-lines td, .receipt-a5 table.receipt-lines td { padding: 4px; border-bottom: 1px solid #ccc; vertical-align: top; }
+.receipt-a4 .receipt-rows, .receipt-a5 .receipt-rows { width: 55%; margin-left: auto; }
+.receipt-a4 .receipt-foot p, .receipt-a5 .receipt-foot p { text-align: left; }

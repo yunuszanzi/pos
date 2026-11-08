@@ -4,7 +4,8 @@ import { Link } from "react-router-dom";
 import { formatPkr } from "../../shared/money";
 import { formatQuantity, parseQuantity } from "../../shared/units";
 import { getAllTerminals } from "../api/orgApi";
-import { holdSale, type PostedSale } from "../api/posApi";
+import { printFormatLabels, printFormats, type PrintFormat } from "../../shared/receipt";
+import { holdSale, reprintSale, type PostedSale } from "../api/posApi";
 import { SelectInput } from "../app/FormElements";
 import { useTerminalStore } from "../app/terminalStore";
 import { totalsOf, type CartLine } from "./cart";
@@ -13,11 +14,13 @@ import { BillDiscountDialog, HeldSalesDialog, LineDialog } from "./CartDialogs";
 import type { CatalogueEntry } from "./catalogueIndex";
 import { Dialog } from "./Dialog";
 import { PaymentDialog } from "./PaymentDialog";
+import { ReceiptPrinter, type PrintJob } from "./Receipt";
+import { SalesHistoryDialog } from "./SalesHistoryDialog";
 import { PosProvider } from "./PosProvider";
 import { usePos } from "./pos-context";
 import { CashMovementDialog, CloseShiftDialog, OpenShiftForm } from "./ShiftPanels";
 
-type Modal = "pay" | "discount" | "held" | "cash" | "close" | { line: string } | null;
+type Modal = "pay" | "discount" | "held" | "cash" | "close" | "history" | { line: string } | null;
 
 export function PosPage() {
   const terminalId = useTerminalStore((state) => state.terminalId);
@@ -67,6 +70,7 @@ function PosScreen() {
   const [modal, setModal] = useState<Modal>(null);
   const [notice, setNotice] = useState("");
   const [done, setDone] = useState<PostedSale | null>(null);
+  const [job, setJob] = useState<PrintJob | null>(null);
 
   const totals = useMemo(
     () => totalsOf(cart, catalogue, data.settings.taxMode, data.settings.cashRoundingPaisa),
@@ -93,6 +97,15 @@ function PosScreen() {
     if (found.length === 1) return addToCart(found[0], quantityMilli);
     setResults(found);
     setNotice(found.length ? "" : `Nothing found for "${code}"`);
+  }
+
+  const jobBase = { business: data.business, dateFormat: data.settings.dateFormat, timezone: data.settings.timezone };
+  /** The first print of a sale is the original. */
+  const printOriginal = (sale: PostedSale, format: PrintFormat) => setJob({ ...jobBase, invoice: sale.invoice, format });
+  /** Any later print is a logged duplicate, numbered by the server. */
+  async function printDuplicate(saleId: string, format: PrintFormat) {
+    const copy = await reprintSale(saleId, format);
+    setJob({ ...jobBase, invoice: copy.invoice, format: copy.format, duplicate: { copyNumber: copy.reprintNumber } });
   }
 
   async function hold() {
@@ -142,6 +155,7 @@ function PosScreen() {
       <span>{data.user.name ?? data.user.email}</span>
       <span className="grow" />
       {pos.catalogueStatus !== "ready" && <span className="status" role="status">{pos.catalogueStatus === "error" ? "Products not loaded" : "Updating products…"}</span>}
+      <button className="button secondary" onClick={() => setModal("history")}>Recent sales</button>
       <button className="button secondary" onClick={() => setModal("held")}>Held (F7)</button>
       {can("cash.movement") && <button className="button secondary" onClick={() => setModal("cash")}>Cash in/out</button>}
       {can("shifts.close") && <button className="button secondary" onClick={() => setModal("close")}>Close shift</button>}
@@ -217,12 +231,44 @@ function PosScreen() {
     {editing && <LineDialog line={editing} onClose={() => setModal(null)}
       onApply={(change) => { cart.update(editing.key, change); setModal(null); focusSearch(); }}
       onRemove={() => { cart.remove(editing.key); setModal(null); focusSearch(); }} />}
-    {done && <SaleDone sale={done} onNext={() => { setDone(null); focusSearch(); }} />}
+    {modal === "history" && <SalesHistoryDialog onClose={() => setModal(null)} onReprint={printDuplicate} />}
+    {done && <SaleDone sale={done} onNext={() => { setDone(null); focusSearch(); }} onPrintOriginal={printOriginal} onPrintDuplicate={printDuplicate} />}
+    <ReceiptPrinter job={job} onDone={() => setJob(null)} />
   </div>;
 }
 
-function SaleDone({ sale, onNext }: { sale: PostedSale; onNext: () => void }) {
+function SaleDone({ sale, onNext, onPrintOriginal, onPrintDuplicate }: {
+  sale: PostedSale; onNext: () => void; onPrintOriginal: (sale: PostedSale, format: PrintFormat) => void; onPrintDuplicate: (saleId: string, format: PrintFormat) => Promise<void>;
+}) {
+  const { data, can } = usePos();
   const { invoice } = sale;
+  const [format, setFormat] = useState<PrintFormat>(data.terminal.defaultPrintFormat);
+  const [printed, setPrinted] = useState(false);
+  const [error, setError] = useState("");
+  const autoPrinted = useRef(false);
+
+  // The receipt prints by itself when the shop wants it to; that print is the original.
+  useEffect(() => {
+    if (autoPrinted.current || !data.settings.autoPrintReceipt) return;
+    autoPrinted.current = true;
+    onPrintOriginal(sale, format);
+    setPrinted(true);
+  }, [data.settings.autoPrintReceipt, sale, format, onPrintOriginal]);
+
+  async function print() {
+    setError("");
+    try {
+      if (!printed) {
+        onPrintOriginal(sale, format);
+        setPrinted(true);
+      } else {
+        await onPrintDuplicate(invoice.id, format);
+      }
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not print");
+    }
+  }
+
   return <Dialog title="Sale complete" onClose={onNext}><div className="stack">
     <p className="eyebrow">{invoice.number}</p>
     <dl className="totals">
@@ -230,6 +276,13 @@ function SaleDone({ sale, onNext }: { sale: PostedSale; onNext: () => void }) {
       {invoice.payments.map((payment) => <div key={payment.methodCode + payment.reference}><dt>{payment.methodName}{payment.reference ? ` (${payment.reference})` : ""}</dt><dd>{formatPkr(payment.tenderedPaisa)}</dd></div>)}
       <div><dt>Change</dt><dd data-testid="done-change">{formatPkr(invoice.changePaisa)}</dd></div>
     </dl>
+    <div className="pay-row">
+      <SelectInput aria-label="Print format" value={format} onChange={(event) => setFormat(event.target.value as PrintFormat)}>
+        {printFormats.map((value) => <option key={value} value={value}>{printFormatLabels[value]}</option>)}
+      </SelectInput>
+      <button className="button secondary" disabled={printed && !can("sales.reprint")} onClick={() => void print()}>{printed ? "Print duplicate" : "Print"}</button>
+    </div>
+    {error && <p className="notice error" role="alert">{error}</p>}
     <button className="button primary" onClick={onNext} autoFocus>New sale</button>
   </div></Dialog>;
 }

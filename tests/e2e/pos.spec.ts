@@ -138,3 +138,83 @@ test("a held sale can be recalled", async ({ page }) => {
   await page.getByRole("button", { name: "Recall" }).click();
   await expect(page.getByTestId("cart-total")).toHaveText("Rs 10.00");
 });
+
+// ---- printing (FR-PRT) ----
+
+type Captured = { text: string; css: string };
+async function capturePrints(page: Page) {
+  await page.addInitScript(() => {
+    const prints: Array<{ text: string; css: string }> = [];
+    (window as unknown as { __prints: typeof prints }).__prints = prints;
+    window.print = () => {
+      const root = document.querySelector(".receipt-print-root");
+      prints.push({ text: root?.textContent ?? "", css: root?.querySelector("style")?.textContent ?? "" });
+    };
+  });
+  return () => page.evaluate(() => (window as unknown as { __prints: Array<{ text: string; css: string }> }).__prints as Captured[]);
+}
+
+test("2. prints an 80 mm slip, then reprints the same sale as A4 marked DUPLICATE and logged", async ({ page }) => {
+  const prints = await capturePrints(page);
+  const business = await stockedBusiness(["A", "B"]);
+  await openTill(page, business);
+  await scan(page, "2*A-PC");
+  await scan(page, "B-PC");
+  await page.getByRole("button", { name: /^Pay/ }).click();
+  await page.getByLabel("Amount 1").fill("20.00");
+  await page.getByRole("button", { name: /^Pay Rs 15.00/ }).click();
+  await expect(page.getByRole("dialog", { name: "Sale complete" })).toBeVisible();
+
+  // The shop auto-prints by default: one original slip.
+  await expect.poll(async () => (await prints()).length).toBe(1);
+  const [slip] = await prints();
+  expect(slip.css).toContain("80mm auto");
+  expect(slip.text).toContain("SALES RECEIPT");
+  expect(slip.text).toContain("INV-KHI-000001");
+  expect(slip.text).toContain("Rs 15.00");
+  expect(slip.text).toContain("Change");
+  expect(slip.text).toContain("Rs 5.00");
+  expect(slip.text).not.toContain("DUPLICATE");
+
+  await page.getByRole("dialog", { name: "Sale complete" }).getByLabel("Print format").selectOption("a4");
+  await page.getByRole("button", { name: "Print duplicate" }).click();
+  await expect.poll(async () => (await prints()).length).toBe(2);
+  const copy = (await prints())[1];
+  expect(copy.css).toContain("size: A4");
+  expect(copy.text).toContain("SALES INVOICE");
+  expect(copy.text).toContain("DUPLICATE — copy 1, not the original");
+  expect(copy.text).toContain("INV-KHI-000001");
+  expect(copy.text).toContain("Rs 15.00");
+
+  const audit = await callApi(business.ownerToken, "GET", "/audit-log?pageSize=100");
+  const reprints = audit.body.data.filter((row: { action: string; entity: string }) => row.entity === "sales_invoice" && row.action === "reprint");
+  expect(reprints).toHaveLength(1);
+  expect(reprints[0].after).toMatchObject({ format: "a4", number: "INV-KHI-000001" });
+
+  // Finding the sale again later: another copy, numbered 2.
+  await page.getByRole("button", { name: "New sale" }).click();
+  await page.getByRole("button", { name: "Recent sales" }).click();
+  await page.getByLabel("Find a sale by number").fill("000001");
+  await page.getByRole("button", { name: "Reprint" }).click();
+  await expect.poll(async () => (await prints()).length).toBe(3);
+  expect((await prints())[2].text).toContain("DUPLICATE — copy 2");
+});
+
+test("the slip width follows the chosen format, and auto-print off waits for the button", async ({ page }) => {
+  const prints = await capturePrints(page);
+  const business = await stockedBusiness(["A"]);
+  const settings = await callApi(business.ownerToken, "GET", "/settings");
+  await callApi(business.ownerToken, "PUT", "/settings", { body: { ...settings.body, autoPrintReceipt: false } });
+  await openTill(page, business);
+  await scan(page, "A-PC");
+  await page.getByRole("button", { name: /^Pay/ }).click();
+  await page.getByRole("button", { name: /^Pay Rs 5.00/ }).click();
+  await expect(page.getByRole("dialog", { name: "Sale complete" })).toBeVisible();
+  expect(await prints()).toHaveLength(0);
+  await page.getByRole("dialog", { name: "Sale complete" }).getByLabel("Print format").selectOption("pos58");
+  await page.getByRole("button", { name: "Print", exact: true }).click();
+  await expect.poll(async () => (await prints()).length).toBe(1);
+  const [slip] = await prints();
+  expect(slip.css).toContain("58mm auto");
+  expect(slip.text).not.toContain("DUPLICATE");
+});

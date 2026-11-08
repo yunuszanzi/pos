@@ -2,7 +2,8 @@ import type { PostSaleInput } from "../../shared/schemas/sales";
 import { deleteJson, postJson, requestApi } from "./client";
 import type { Product } from "./productsApi";
 
-export type PrintFormat = "pos80" | "pos58" | "a4" | "a5";
+import type { PrintFormat } from "../../shared/receipt";
+export type { PrintFormat };
 export type DataVersions = { catalogue: number; reference: number; settings: number; access: number };
 
 export type AppBootstrapData = {
