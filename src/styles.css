@@ -190,7 +190,7 @@ details pre { max-width: 380px; overflow: auto; font-size: .7rem; }
 .pay-button { min-height: 54px; font-size: 1.05rem; }
 .dialog-backdrop { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 16px; background: #0d1a3366; }
 .dialog { width: min(100%, 460px); max-height: calc(100vh - 32px); overflow: auto; padding: 20px; border-radius: 14px; background: #fff; box-shadow: 0 24px 70px #0d1a3340; }
-.dialog.wide { width: min(100%, 620px); }
+.dialog.wide { width: min(100%, 720px); }
 .dialog > header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
 .dialog > header h2 { margin: 0; }
 .pay-total { display: flex; align-items: baseline; justify-content: space-between; }
@@ -202,6 +202,14 @@ details pre { max-width: 380px; overflow: auto; font-size: .7rem; }
 .held-row small { display: block; color: #6d778a; }
 .report-table { width: 100%; border-collapse: collapse; font-size: .9rem; }
 .report-table td { padding: 5px 0; border-bottom: 1px solid #f0f2f6; }
+/* The return dialog's item table: room between columns, numbers lined up under their headings, and fixed widths for the two boxes. */
+.return-table th, .return-table td { padding: 8px 10px; vertical-align: middle; }
+.return-table th:first-child, .return-table td:first-child { padding-left: 0; }
+.return-table th:last-child, .return-table td:last-child { padding-right: 0; }
+.return-table td:nth-child(4) { width: 6.5rem; }
+.return-table td:nth-child(4) input { text-align: right; font-variant-numeric: tabular-nums; }
+.return-table td:nth-child(5) { width: 10.5rem; }
+.return-table .short { display: block; margin-top: 4px; text-align: right; }
 .report-table tr.variance td { color: #a3312c; font-weight: 700; }
 fieldset { border: 1px solid #e0e6ef; border-radius: 8px; }
 @media (max-width: 900px) { .pos { height: auto; min-height: 100vh; } .pos-main { grid-template-columns: 1fr; } }

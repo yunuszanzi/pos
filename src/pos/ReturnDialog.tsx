@@ -160,7 +160,7 @@ function ReturnItems({ chosen, onBack, onClose, onPosted }: { chosen: NonNullabl
       {info && <>
         {info.invoice.customerName && <p>Customer: <strong>{info.invoice.customerName}</strong>{owed > 0 ? ` — still owes ${formatPkr(owed)} on this bill` : ""}</p>}
         {info.outsideWindow && <p className="notice error" role="status">This bill is older than {info.windowDays} days. A manager must approve the return.</p>}
-        <table className="report-table" aria-label="Items on the bill">
+        <div className="table-scroll"><table className="report-table return-table" aria-label="Items on the bill">
           <thead><tr><th>Item</th><th className="num">Sold</th><th className="num">Left to return</th><th>Bring back</th><th>Goes to</th></tr></thead>
           <tbody>
             {lineRows.map(({ line, sold, factor, entered }) => {
@@ -177,7 +177,7 @@ function ReturnItems({ chosen, onBack, onClose, onPosted }: { chosen: NonNullabl
               </tr>;
             })}
           </tbody>
-        </table>
+        </table></div>
       </>}
 
       {chosen.kind === "none" && <>
