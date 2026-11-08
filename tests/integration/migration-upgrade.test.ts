@@ -90,7 +90,7 @@ integration("database migrations", { timeout: 120_000 }, () => {
       expect((await sql`SELECT 1 FROM units WHERE business_id = ${business.id}`)).toHaveLength(8);
 
       const granted = async (roleId: string) => (await sql<{ permission_key: string }[]>`SELECT permission_key FROM role_permissions WHERE role_id = ${roleId}`).map((row) => row.permission_key);
-      const addedSince = /^(catalog|products|inventory|sales|shifts|cash|reports)\./;
+      const addedSince = /^(catalog|products|inventory|sales|shifts|cash|reports|customers)\./;
       expect((await granted(roleIds.Owner)).filter((key) => addedSince.test(key)).sort()).toEqual(allPermissionKeys.filter((key) => addedSince.test(key)).sort());
       expect((await granted(roleIds.Manager)).filter((key) => addedSince.test(key)).sort()).toEqual(managerPermissionKeys.filter((key) => addedSince.test(key)).sort());
       expect((await granted(roleIds.Cashier)).sort()).toEqual(["auth.pin_switch", "branches.view", ...cashierPermissionKeys.filter((key) => addedSince.test(key))].sort());
