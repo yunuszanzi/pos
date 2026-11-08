@@ -45,10 +45,19 @@ async function loadBill(businessId: string, id: string) {
     select l.*, r.number as receipt_number from purchase_bill_lines l join goods_receipt_lines rl on rl.id = l.receipt_line_id join goods_receipts r on r.id = rl.receipt_id
     where l.business_id = ${businessId} and l.bill_id = ${id} order by l.line_no`);
   const charges = await db.execute(sql`select * from purchase_bill_charges where business_id = ${businessId} and bill_id = ${id} order by line_no`);
+  // What has been paid against this bill, or credited by a purchase return, and what is still owing.
+  const settled = await db.execute(sql`
+    select a.source_type, a.source_id, a.amount_paisa, coalesce(p.number, r.number) as number, coalesce(p.posted_at, r.posted_at) as posted_at
+    from supplier_payment_allocations a left join supplier_payments p on a.source_type = 'supplier_payment' and p.id = a.source_id
+    left join purchase_returns r on a.source_type = 'purchase_return' and r.id = a.source_id
+    where a.business_id = ${businessId} and a.bill_id = ${id} order by coalesce(p.posted_at, r.posted_at), a.created_at`);
+  const settledPaisa = settled.reduce((sum, row) => sum + paisa(row.amount_paisa), 0);
   return {
     id: String(row.id), number: String(row.number), supplierId: String(row.supplier_id), supplierName: String(row.supplier_name), branchName: String(row.branch_name),
     supplierInvoiceNo: String(row.supplier_invoice_no), billDate: day(row.bill_date), dueDate: day(row.due_date), note: String(row.note), createdAt: iso(row.created_at),
     subtotalPaisa: paisa(row.subtotal_paisa), chargesPaisa: paisa(row.charges_paisa), taxPaisa: paisa(row.tax_paisa), totalPaisa: paisa(row.total_paisa),
+    settledPaisa, outstandingPaisa: paisa(row.total_paisa) - settledPaisa,
+    settlements: settled.map((row) => ({ kind: String(row.source_type), id: String(row.source_id), number: String(row.number), at: iso(row.posted_at), amountPaisa: paisa(row.amount_paisa) })),
     lines: lines.map((line) => ({
       id: String(line.id), lineNo: Number(line.line_no), receiptLineId: String(line.receipt_line_id), receiptNumber: String(line.receipt_number),
       productName: String(line.product_name), variantName: String(line.variant_name), sku: String(line.sku), unitName: String(line.unit_name),
@@ -72,14 +81,15 @@ billRoutes.get("/purchase-bills", costs, bill, async (context) => {
     filters.push(sql`(b.number ilike ${pattern} or b.supplier_invoice_no ilike ${pattern} or s.name ilike ${pattern})`);
   }
   const rows = await db.execute(sql`
-    select b.id, b.number, b.supplier_invoice_no, b.bill_date, b.due_date, b.total_paisa, b.tax_paisa, s.name as supplier_name, count(*) over () as total
+    select b.id, b.number, b.supplier_invoice_no, b.bill_date, b.due_date, b.total_paisa, b.tax_paisa, s.name as supplier_name, count(*) over () as total,
+           b.total_paisa - coalesce((select sum(x.amount_paisa) from supplier_payment_allocations x where x.bill_id = b.id), 0) as outstanding
     from purchase_bills b join suppliers s on s.id = b.supplier_id
     where ${sql.join(filters, sql` and `)}
     order by b.bill_date desc, b.number desc limit ${pageSize} offset ${(page - 1) * pageSize}`);
   return context.json({
     data: rows.map((row) => ({
       id: String(row.id), number: String(row.number), supplierInvoiceNo: String(row.supplier_invoice_no), billDate: day(row.bill_date), dueDate: day(row.due_date),
-      supplierName: String(row.supplier_name), totalPaisa: paisa(row.total_paisa), taxPaisa: paisa(row.tax_paisa),
+      supplierName: String(row.supplier_name), totalPaisa: paisa(row.total_paisa), taxPaisa: paisa(row.tax_paisa), outstandingPaisa: paisa(row.outstanding),
     })),
     page, pageSize, total: rows.length ? paisa(rows[0].total) : 0,
   });

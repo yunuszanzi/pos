@@ -59,6 +59,11 @@ async function summarise(executor: Executor, businessId: string, shiftId: string
            coalesce(sum(total_paisa), 0)::bigint as returned, count(*)::int as returns
     from sales_returns where business_id = ${businessId} and shift_id = ${shiftId}
   `);
+  // Money paid to suppliers. Only cash comes out of the drawer.
+  const [supplierPaid] = await executor.execute(sql`
+    select coalesce(sum(amount_paisa), 0)::bigint as total, coalesce(sum(amount_paisa) filter (where tender_kind = 'cash'), 0)::bigint as cash
+    from supplier_payments where business_id = ${businessId} and shift_id = ${shiftId}
+  `);
   // Payments are stored at the amount that counts towards the bill, so change given back is already left out.
   const cashSales = byMethod.filter((row) => row.tender_kind === "cash").reduce((total, row) => total + Number(row.amount), 0);
   const cashIn = Number(moves.cash_in);
@@ -72,6 +77,8 @@ async function summarise(executor: Executor, businessId: string, shiftId: string
     returnCount: Number(refunds.returns),
     returnsPaisa: Number(refunds.returned),
     refundsCashPaisa: Number(refunds.cash),
+    supplierPaymentsPaisa: Number(supplierPaid.total),
+    supplierPaymentsCashPaisa: Number(supplierPaid.cash),
     taxPaisa: Number(sales.tax),
     discountPaisa: Number(sales.discount),
     roundingPaisa: Number(sales.rounding),
@@ -79,7 +86,7 @@ async function summarise(executor: Executor, businessId: string, shiftId: string
     cashSalesPaisa: cashSales,
     cashInPaisa: cashIn,
     cashOutPaisa: cashOut,
-    expectedCashPaisa: openingFloatPaisa + cashSales + Number(received.cash) + cashIn - cashOut - Number(refunds.cash),
+    expectedCashPaisa: openingFloatPaisa + cashSales + Number(received.cash) + cashIn - cashOut - Number(refunds.cash) - Number(supplierPaid.cash),
   };
 }
 

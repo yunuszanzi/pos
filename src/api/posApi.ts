@@ -80,6 +80,8 @@ export type ShiftReport = {
   creditSalesPaisa: number;
   /** Money taken from customers against their khata during the shift, and the cash part of it. */
   customerPaymentsPaisa: number; customerPaymentsCashPaisa: number;
+  /** Money paid to suppliers during the shift, and the cash part of it (which comes out of the drawer). */
+  supplierPaymentsPaisa: number; supplierPaymentsCashPaisa: number;
   byMethod: Array<{ code: string; name: string; payments: number; amountPaisa: number }>;
   cashSalesPaisa: number; cashInPaisa: number; cashOutPaisa: number;
   expectedCashPaisa?: number;

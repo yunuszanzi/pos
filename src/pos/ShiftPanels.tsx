@@ -83,6 +83,7 @@ function ReportLines({ report }: { report: ShiftReport }) {
     {report.byMethod.map((method) => <tr key={method.code}><td>{method.name}</td><td>{method.payments} payments</td><td className="num">{formatPkr(method.amountPaisa)}</td></tr>)}
     {report.creditSalesPaisa > 0 && <tr><td>Sold on credit</td><td>to khata</td><td className="num">{formatPkr(report.creditSalesPaisa)}</td></tr>}
     {report.customerPaymentsPaisa > 0 && <tr><td>Received from customers</td><td>{formatPkr(report.customerPaymentsCashPaisa)} cash</td><td className="num">{formatPkr(report.customerPaymentsPaisa)}</td></tr>}
+    {report.supplierPaymentsPaisa > 0 && <tr><td>Paid to suppliers</td><td>{formatPkr(report.supplierPaymentsCashPaisa)} cash</td><td className="num">{formatPkr(report.supplierPaymentsPaisa)}</td></tr>}
     <tr><td>Cash in</td><td /><td className="num">{formatPkr(report.cashInPaisa)}</td></tr>
     <tr><td>Cash out</td><td /><td className="num">{formatPkr(report.cashOutPaisa)}</td></tr>
     <tr><td>Tax in sales</td><td /><td className="num">{formatPkr(report.taxPaisa)}</td></tr>
