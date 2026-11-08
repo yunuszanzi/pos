@@ -51,6 +51,9 @@ export const permissionDefinitions = [
   ["suppliers.view", "View suppliers (name, contact, terms)"],
   ["suppliers.manage", "Add, edit and archive suppliers; load opening payables"],
   ["suppliers.ledger", "View what the shop owes a supplier: balance, ledger and ageing"],
+  ["purchasing.view", "View purchase orders and goods receipts"],
+  ["purchasing.order", "Write, send, cancel and close purchase orders (prices need the cost permission)"],
+  ["purchasing.receive", "Receive goods against an order or without one"],
 ] as const;
 
 export type PermissionKey = (typeof permissionDefinitions)[number][0];
@@ -71,6 +74,7 @@ export const managerPermissionKeys: PermissionKey[] = [
   "customers.view", "customers.create", "customers.manage", "customers.ledger", "customers.receive_payment", "sales.credit_override",
   "sales.return", "sales.return_override", "customers.cheques",
   "suppliers.view", "suppliers.manage", "suppliers.ledger",
+  "purchasing.view", "purchasing.order", "purchasing.receive",
 ];
 
 export const cashierPermissionKeys: PermissionKey[] = [

@@ -6,6 +6,7 @@ import { auditRoutes } from "./modules/audit/routes";
 import { authRoutes } from "./modules/auth/routes";
 import { catalogueRoutes } from "./modules/catalogue/routes";
 import { chequeRoutes } from "./modules/customers/cheques";
+import { purchasingRoutes } from "./modules/purchasing/routes";
 import { suppliersRoutes } from "./modules/suppliers/routes";
 import { customerLedgerRoutes } from "./modules/customers/ledger";
 import { returnRoutes } from "./modules/returns/routes";
@@ -40,6 +41,7 @@ app.route("/api/v1", customersRoutes);
 app.route("/api/v1", customerLedgerRoutes);
 app.route("/api/v1", chequeRoutes);
 app.route("/api/v1", suppliersRoutes);
+app.route("/api/v1", purchasingRoutes);
 app.route("/api/v1", returnRoutes);
 
 app.notFound((context) => apiError(context, 404, "NOT_FOUND", "API route not found"));
