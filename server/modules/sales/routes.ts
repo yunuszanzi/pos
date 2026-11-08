@@ -1,6 +1,7 @@
 import { and, eq, ilike, inArray, sql } from "drizzle-orm";
 import { Hono } from "hono";
-import { appUsers, businessSettings, locations, rolePermissions, roles, terminals, userBranches } from "../../../db/schema";
+import { z } from "zod";
+import { appUsers, auditLog, businessSettings, locations, rolePermissions, roles, terminals, userBranches } from "../../../db/schema";
 import { PaymentError, settleTenders, type Tender } from "../../../shared/payments";
 import { discountsOverLimit, priceCart, PricingError, type PricingInput } from "../../../shared/pricing";
 import { postSaleSchema } from "../../../shared/schemas/sales";
@@ -256,4 +257,53 @@ salesRoutes.get("/sales/:id", requirePermission("sales.create"), async (context)
   const principal = getPrincipal(context);
   const invoice = await loadInvoice(principal.businessId!, paramId(context), canSeeCost(principal));
   return invoice ? context.json(invoice) : apiError(context, 404, "NOT_FOUND", "Sale not found");
+});
+
+const pageOf = (query: (name: string) => string | undefined) => ({
+  page: Math.max(1, Math.trunc(Number(query("page") ?? 1)) || 1),
+  pageSize: Math.min(100, Math.max(1, Math.trunc(Number(query("pageSize") ?? 25)) || 25)),
+});
+const uuidParam = (value: string | undefined) => (value && /^[0-9a-f-]{36}$/i.test(value) ? value : undefined);
+const dateParam = (value: string | undefined) => (value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : undefined);
+
+/** Posted sales, newest first. Without reports.sales.view a person sees only the sales they rang up. */
+salesRoutes.get("/sales", requirePermission("sales.create"), async (context) => {
+  const principal = getPrincipal(context);
+  const { page, pageSize } = pageOf((name) => context.req.query(name));
+  const search = context.req.query("q")?.trim();
+  const shiftId = uuidParam(context.req.query("shiftId"));
+  const from = dateParam(context.req.query("from"));
+  const to = dateParam(context.req.query("to"));
+  const rows = await db.execute(sql`
+    select i.id, i.number, i.posted_at, i.total_paisa, i.paid_paisa, i.shift_id, u.display_name as cashier_name, count(*) over () as total
+    from sales_invoices i left join users u on u.id = i.cashier_id
+    where i.business_id = ${principal.businessId!}
+      ${hasPermission(principal, "reports.sales.view") ? sql`` : sql`and i.cashier_id = ${getActorId(principal)}`}
+      ${search ? sql`and i.number ilike ${`%${search.replace(/[\%_]/g, "\$&")}%`}` : sql``}
+      ${shiftId ? sql`and i.shift_id = ${shiftId}` : sql``}
+      ${from ? sql`and i.posted_at >= (${from}::date)::timestamp at time zone 'Asia/Karachi'` : sql``}
+      ${to ? sql`and i.posted_at < (${to}::date + 1)::timestamp at time zone 'Asia/Karachi'` : sql``}
+    order by i.posted_at desc, i.id limit ${pageSize} offset ${(page - 1) * pageSize}
+  `);
+  return context.json({
+    data: rows.map((row) => ({
+      id: row.id, number: row.number, postedAt: row.posted_at, totalPaisa: Number(row.total_paisa), paidPaisa: Number(row.paid_paisa),
+      shiftId: row.shift_id, cashierName: row.cashier_name,
+    })),
+    page, pageSize, total: rows.length ? Number(rows[0].total) : 0,
+  });
+});
+
+const reprintSchema = z.object({ format: z.enum(["pos80", "pos58", "a4", "a5"]) });
+
+/** A reprint is never the original: it is logged, counted, and the response says to print DUPLICATE on it (FR-PRT). */
+salesRoutes.post("/sales/:id/reprint", requirePermission("sales.reprint"), validateJson(reprintSchema), async (context) => {
+  const principal = getPrincipal(context);
+  const invoice = await loadInvoice(principal.businessId!, paramId(context), canSeeCost(principal));
+  if (!invoice) return apiError(context, 404, "NOT_FOUND", "Sale not found");
+  const { format } = context.req.valid("json");
+  const [{ before }] = await db.select({ before: sql<number>`count(*)::int` }).from(auditLog)
+    .where(and(eq(auditLog.businessId, principal.businessId!), eq(auditLog.entity, "sales_invoice"), eq(auditLog.entityId, invoice.id), eq(auditLog.action, "reprint")));
+  await auditPrincipal(context, principal, "sales_invoice", invoice.id, "reprint", null, { format, number: invoice.number });
+  return context.json({ invoice, format, duplicate: true, reprintNumber: before + 1 });
 });

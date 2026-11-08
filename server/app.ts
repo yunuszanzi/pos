@@ -10,6 +10,7 @@ import { orgRoutes } from "./modules/org/routes";
 import { posRoutes } from "./modules/pos/routes";
 import { productsRoutes } from "./modules/products/routes";
 import { settingsRoutes } from "./modules/settings/routes";
+import { reportsRoutes } from "./modules/reports/routes";
 import { salesRoutes } from "./modules/sales/routes";
 import { shiftsRoutes } from "./modules/shifts/routes";
 import { usersRoutes } from "./modules/users/routes";
@@ -29,6 +30,7 @@ app.route("/api/v1", inventoryRoutes);
 app.route("/api/v1", shiftsRoutes);
 app.route("/api/v1", salesRoutes);
 app.route("/api/v1", posRoutes);
+app.route("/api/v1", reportsRoutes);
 
 app.notFound((context) => apiError(context, 404, "NOT_FOUND", "API route not found"));
 app.onError((error, context) => {
