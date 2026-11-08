@@ -1,3 +1,4 @@
+import type { SupplierPaymentInput } from "../../shared/schemas/supplierPayments";
 import type { SupplierInput } from "../../shared/schemas/suppliers";
 import { deleteJson, postJson, putJson, requestApi } from "./client";
 import type { ImportIssue } from "./productsApi";
@@ -57,3 +58,24 @@ export function getSupplierAgeing(filter: { q?: string; overdue?: boolean; page?
 export const previewOpeningPayables = (csv: string) => postJson<PayablesPreview>("/suppliers-opening-balances/preview", { csv });
 export const importOpeningPayables = (csv: string, idempotencyKey: string) =>
   postJson<PayablesResult>("/suppliers-opening-balances", { csv }, { "Idempotency-Key": idempotencyKey });
+
+export type OpenSupplierBill = { billId: string; number: string; supplierInvoiceNo: string; billDate: string; dueDate: string; totalPaisa: number; outstandingPaisa: number; overdue: boolean };
+export type SupplierPayment = {
+  id: string; number: string; postedAt: string; supplierId: string; supplierName: string; branchName: string; paidBy: string | null; methodCode: string; methodName: string;
+  amountPaisa: number; reference: string; note: string;
+  /** What the shop owes the supplier now (negative: the supplier holds an advance). */
+  supplierBalancePaisa: number;
+  allocations: Array<{ billId: string; number: string; supplierInvoiceNo: string; amountPaisa: number }>;
+};
+export type SupplierPaymentSummary = { id: string; number: string; postedAt: string; methodName: string; amountPaisa: number; reference: string; supplierName: string };
+export type SupplierPaymentPage = { data: SupplierPaymentSummary[]; page: number; pageSize: number; total: number };
+
+export const getSupplierOpenBills = (id: string, signal?: AbortSignal) => requestApi<OpenSupplierBill[]>(`/suppliers/${id}/open-bills`, { signal });
+/** The idempotency key identifies one payment: retrying with the same key can never pay twice. */
+export const postSupplierPayment = (input: SupplierPaymentInput, idempotencyKey: string) => postJson<SupplierPayment>("/supplier-payments", input, { "Idempotency-Key": idempotencyKey });
+export function getAllSupplierPayments(filter: { supplierId?: string; q?: string; page?: number; pageSize?: number } = {}, signal?: AbortSignal) {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(filter)) if (value !== undefined && value !== "") query.set(key, String(value));
+  return requestApi<SupplierPaymentPage>(`/supplier-payments?${query}`, { signal });
+}
+export const getSupplierPaymentById = (id: string) => requestApi<SupplierPayment>(`/supplier-payments/${id}`);

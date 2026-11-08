@@ -40,6 +40,10 @@ const GoodsReceiptPage = lazy(() => import("../features/purchasing/GoodsReceiptP
 const PurchaseBillsPage = lazy(() => import("../features/purchasing/PurchaseBillsPage").then(({ PurchaseBillsPage: Page }) => ({ default: Page })));
 const PurchaseBillFormPage = lazy(() => import("../features/purchasing/PurchaseBillFormPage").then(({ PurchaseBillFormPage: Page }) => ({ default: Page })));
 const PurchaseBillPage = lazy(() => import("../features/purchasing/PurchaseBillPage").then(({ PurchaseBillPage: Page }) => ({ default: Page })));
+const PurchaseReturnsPage = lazy(() => import("../features/purchasing/PurchaseReturnsPage").then(({ PurchaseReturnsPage: Page }) => ({ default: Page })));
+const PurchaseReturnFormPage = lazy(() => import("../features/purchasing/PurchaseReturnFormPage").then(({ PurchaseReturnFormPage: Page }) => ({ default: Page })));
+const PurchaseReturnPage = lazy(() => import("../features/purchasing/PurchaseReturnPage").then(({ PurchaseReturnPage: Page }) => ({ default: Page })));
+const SupplierPaymentsPage = lazy(() => import("../features/suppliers/SupplierPaymentsPage").then(({ SupplierPaymentsPage: Page }) => ({ default: Page })));
 const SuppliersPage = lazy(() => import("../features/suppliers/SuppliersPage").then(({ SuppliersPage: Page }) => ({ default: Page })));
 const SupplierFormPage = lazy(() => import("../features/suppliers/SupplierFormPage").then(({ SupplierFormPage: Page }) => ({ default: Page })));
 const SupplierLedgerPage = lazy(() => import("../features/suppliers/SupplierLedgerPage").then(({ SupplierLedgerPage: Page }) => ({ default: Page })));
@@ -100,6 +104,10 @@ const appRoutes: AppRoute[] = [
   { path: "/purchase-bills", label: "Supplier bills", permission: "purchasing.bill", element: <PurchaseBillsPage /> },
   { path: "/purchase-bills/new", label: "Enter a supplier bill", permission: "purchasing.bill", element: <PurchaseBillFormPage />, nav: false },
   { path: "/purchase-bills/:id", label: "Supplier bill", permission: "purchasing.bill", element: <PurchaseBillPage />, nav: false },
+  { path: "/purchase-returns", label: "Purchase returns", permission: "purchasing.view", element: <PurchaseReturnsPage /> },
+  { path: "/purchase-returns/new", label: "Return goods to a supplier", permission: "purchasing.return", element: <PurchaseReturnFormPage />, nav: false },
+  { path: "/purchase-returns/:id", label: "Purchase return", permission: "purchasing.view", element: <PurchaseReturnPage />, nav: false },
+  { path: "/supplier-payments", label: "Payments made", permission: "suppliers.ledger", element: <SupplierPaymentsPage /> },
   { path: "/supplier-ageing", label: "Payables ageing", permission: "suppliers.ledger", element: <SupplierAgeingPage /> },
   { path: "/cheques", label: "Cheques", permission: "customers.ledger", element: <ChequesPage /> },
   { path: "/customer-ageing", label: "Customer ageing", permission: "customers.ledger", element: <CustomerAgeingPage /> },

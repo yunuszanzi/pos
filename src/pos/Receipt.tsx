@@ -1,8 +1,8 @@
 import { createPortal } from "react-dom";
 import { useEffect } from "react";
 import {
-  buildCreditNoteReceipt, buildGoodsReceiptReceipt, buildPaymentReceipt, buildPurchaseBillReceipt, buildPurchaseOrderReceipt, buildReceipt, buildStatementReceipt, receiptPageCss, type PrintFormat, type ReceiptBusiness,
-  type ReceiptCreditNote, type ReceiptGoodsReceipt, type ReceiptInvoice, type ReceiptModel, type ReceiptPayment, type ReceiptPurchaseBill, type ReceiptPurchaseOrder, type ReceiptStatement,
+  buildCreditNoteReceipt, buildGoodsReceiptReceipt, buildPaymentReceipt, buildPurchaseBillReceipt, buildPurchaseOrderReceipt, buildPurchaseReturnReceipt, buildReceipt, buildStatementReceipt, buildSupplierPaymentReceipt, receiptPageCss, type PrintFormat, type ReceiptBusiness,
+  type ReceiptCreditNote, type ReceiptGoodsReceipt, type ReceiptInvoice, type ReceiptModel, type ReceiptPayment, type ReceiptPurchaseBill, type ReceiptPurchaseOrder, type ReceiptPurchaseReturn, type ReceiptStatement, type ReceiptSupplierPayment,
 } from "../../shared/receipt";
 
 type JobBase = {
@@ -17,6 +17,7 @@ type JobBase = {
 type Documents = {
   invoice: ReceiptInvoice; payment: ReceiptPayment; creditNote: ReceiptCreditNote; statement: ReceiptStatement;
   purchaseOrder: ReceiptPurchaseOrder; goodsReceipt: ReceiptGoodsReceipt; purchaseBill: ReceiptPurchaseBill;
+  supplierPayment: ReceiptSupplierPayment; purchaseReturn: ReceiptPurchaseReturn;
 };
 type OneDocument<K extends keyof Documents> = { [P in K]: Documents[P] } & { [P in Exclude<keyof Documents, K>]?: undefined };
 /** A sale, money received, a credit note, a customer statement, a purchase order or a goods receipt: exactly one of them. */
@@ -29,6 +30,8 @@ const modelOf = (job: PrintJob) => {
   if (job.purchaseOrder) return buildPurchaseOrderReceipt(job.purchaseOrder, options);
   if (job.goodsReceipt) return buildGoodsReceiptReceipt(job.goodsReceipt, options);
   if (job.purchaseBill) return buildPurchaseBillReceipt(job.purchaseBill, options);
+  if (job.supplierPayment) return buildSupplierPaymentReceipt(job.supplierPayment, options);
+  if (job.purchaseReturn) return buildPurchaseReturnReceipt(job.purchaseReturn, options);
   return job.payment ? buildPaymentReceipt(job.payment, options) : buildReceipt(job.invoice, job.format, options);
 };
 

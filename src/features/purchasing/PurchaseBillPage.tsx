@@ -42,8 +42,11 @@ export function PurchaseBillPage() {
         <div><dt>Items</dt><dd>{formatPkr(data.subtotalPaisa)}</dd></div>
         {data.charges.map((charge) => <div key={charge.id}><dt>{charge.description}</dt><dd>{formatPkr(charge.amountPaisa)}</dd></div>)}
         {data.taxPaisa > 0 && <div><dt>Input tax</dt><dd>{formatPkr(data.taxPaisa)}</dd></div>}
-        <div className="grand"><dt>We owe</dt><dd data-testid="bill-total">{formatPkr(data.totalPaisa)}</dd></div>
+        <div className="grand"><dt>Bill total</dt><dd data-testid="bill-total">{formatPkr(data.totalPaisa)}</dd></div>
+        {data.settledPaisa > 0 && <div><dt>Paid or credited</dt><dd>{formatPkr(data.settledPaisa)}</dd></div>}
+        <div><dt>Still owing</dt><dd data-testid="bill-outstanding">{formatPkr(data.outstandingPaisa)}</dd></div>
       </dl>
+      {data.settlements.length > 0 && <p className="muted">Settled by: {data.settlements.map((row) => `${row.number} (${formatPkr(row.amountPaisa)})`).join(", ")}.</p>}
       {data.note && <p className="muted">{data.note}</p>}
       {setup && <div className="pay-row">
         <SelectInput aria-label="Print format" value={format || setup.defaultFormat} onChange={(event) => setFormat(event.target.value as PrintFormat)}>

@@ -527,3 +527,102 @@ export function buildPurchaseBillReceipt(bill: ReceiptPurchaseBill, options: Rec
     footer: bill.note ? [bill.note] : [],
   };
 }
+
+export type ReceiptSupplierPayment = {
+  number: string;
+  postedAt: string;
+  paidBy: string | null;
+  branchName: string;
+  supplierName: string;
+  methodName: string;
+  amountPaisa: number;
+  reference: string;
+  note: string;
+  /** The bills it settled. Whatever is left over is an advance with the supplier. */
+  allocations: Array<{ number: string; supplierInvoiceNo: string; amountPaisa: number }>;
+  /** What the shop owes the supplier now (negative: the supplier holds the shop's advance). */
+  supplierBalancePaisa: number;
+};
+
+/** The voucher for money paid to a supplier. */
+export function buildSupplierPaymentReceipt(payment: ReceiptSupplierPayment, options: ReceiptOptions): ReceiptModel {
+  const { business } = options;
+  const dateText = formatDocumentDate(payment.postedAt, options.dateFormat, options.timezone);
+  const allocated = payment.allocations.reduce((sum, row) => sum + row.amountPaisa, 0);
+  const rows: ReceiptRow[] = payment.allocations.map((row) => ({ label: `Against ${row.supplierInvoiceNo} (${row.number})`, value: formatPkr(row.amountPaisa) }));
+  if (payment.amountPaisa > allocated) rows.push({ label: "Advance (not against a bill)", value: formatPkr(payment.amountPaisa - allocated) });
+  rows.push(payment.supplierBalancePaisa < 0
+    ? { label: "Advance held with supplier", value: formatPkr(-payment.supplierBalancePaisa), strong: true }
+    : { label: "Still owed to supplier", value: formatPkr(payment.supplierBalancePaisa), strong: true });
+  return {
+    title: "PAYMENT VOUCHER",
+    duplicateBanner: duplicateBanner(options),
+    businessName: business.tradeName,
+    headerLines: headerLinesOf(business, payment.branchName),
+    number: payment.number,
+    dateText,
+    cashier: payment.paidBy ?? "",
+    terminal: "",
+    customer: null,
+    meta: [
+      { label: "No.", value: payment.number }, { label: "Date", value: dateText }, { label: "Paid to", value: payment.supplierName },
+      ...(payment.paidBy ? [{ label: "Paid by", value: payment.paidBy }] : []),
+    ],
+    lines: [],
+    totals: [
+      { label: payment.reference ? `${payment.methodName} (${payment.reference})` : payment.methodName, value: formatPkr(payment.amountPaisa) },
+      { label: "PAID", value: formatPkr(payment.amountPaisa), strong: true },
+    ],
+    taxRows: [],
+    payments: rows,
+    footer: payment.note ? [payment.note] : [],
+  };
+}
+
+export type ReceiptPurchaseReturn = {
+  number: string;
+  postedAt: string;
+  supplierName: string;
+  branchName: string;
+  receiptNumber: string;
+  reason: string;
+  subtotalPaisa: number;
+  taxPaisa: number;
+  totalPaisa: number;
+  settledBillsPaisa: number;
+  onAccountPaisa: number;
+  lines: Array<{ productName: string; variantName: string; sku: string; unitName: string; quantity: string; unitCostPaisa: number; lineValuePaisa: number }>;
+};
+
+/** The debit note for goods sent back to a supplier. */
+export function buildPurchaseReturnReceipt(note: ReceiptPurchaseReturn, options: ReceiptOptions): ReceiptModel {
+  const { business } = options;
+  const dateText = formatDocumentDate(note.postedAt, options.dateFormat, options.timezone);
+  return {
+    title: "DEBIT NOTE",
+    duplicateBanner: duplicateBanner(options),
+    businessName: business.tradeName,
+    headerLines: headerLinesOf(business, note.branchName),
+    number: note.number,
+    dateText,
+    cashier: "",
+    terminal: "",
+    customer: null,
+    meta: [
+      { label: "No.", value: note.number }, { label: "Date", value: dateText }, { label: "To", value: note.supplierName }, { label: "Goods receipt", value: note.receiptNumber },
+      ...(note.reason ? [{ label: "Reason", value: note.reason }] : []),
+    ],
+    lines: purchaseLineRows(note.lines.map((line) => ({ ...line, lineTotalPaisa: line.lineValuePaisa }))),
+    totals: [
+      { label: "Goods returned", value: formatPkr(note.subtotalPaisa) },
+      ...(note.taxPaisa ? [{ label: "Input tax reversed", value: formatPkr(note.taxPaisa) }] : []),
+      { label: "DEBIT TOTAL", value: formatPkr(note.totalPaisa), strong: true },
+    ],
+    taxRows: [],
+    payments: [
+      ...(note.settledBillsPaisa ? [{ label: "Taken off bills", value: formatPkr(note.settledBillsPaisa) }] : []),
+      ...(note.onAccountPaisa ? [{ label: "Credit on account", value: formatPkr(note.onAccountPaisa) }] : []),
+    ],
+    footer: [],
+  };
+}

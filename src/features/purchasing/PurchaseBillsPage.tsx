@@ -33,14 +33,15 @@ export function PurchaseBillsPage() {
       <div className="button-row"><Link className="button primary" to="/purchase-bills/new">Enter a supplier bill</Link></div>
       {list.isError && <ErrorMessage>{list.error.message}</ErrorMessage>}
       <div className="table-scroll"><table aria-label="Supplier bills">
-        <thead><tr><th>Bill</th><th>Supplier</th><th>Their invoice</th><th>Date</th><th>Due</th><th className="num">Input tax</th><th className="num">Total</th></tr></thead>
+        <thead><tr><th>Bill</th><th>Supplier</th><th>Their invoice</th><th>Date</th><th>Due</th><th className="num">Input tax</th><th className="num">Total</th><th className="num">Owing</th></tr></thead>
         <tbody>
           {rows.map((row) => <tr key={row.id}>
             <td><Link className="text-button" to={`/purchase-bills/${row.id}`}>{row.number}</Link></td>
             <td>{row.supplierName}</td><td>{row.supplierInvoiceNo}</td><td>{dayText(row.billDate)}</td><td>{dayText(row.dueDate)}</td>
             <td className="num">{row.taxPaisa ? formatPkr(row.taxPaisa) : ""}</td><td className="num">{formatPkr(row.totalPaisa)}</td>
+            <td className="num">{row.outstandingPaisa ? formatPkr(row.outstandingPaisa) : <span className="muted">paid</span>}</td>
           </tr>)}
-          {list.isSuccess && rows.length === 0 && <tr><td colSpan={7} className="muted">No bills have been entered yet.</td></tr>}
+          {list.isSuccess && rows.length === 0 && <tr><td colSpan={8} className="muted">No bills have been entered yet.</td></tr>}
         </tbody>
       </table></div>
       <div className="button-row">

@@ -1,5 +1,6 @@
 import type { PoStatus } from "../../shared/purchasing";
 import type { GoodsReceiptInput, PurchaseOrderInput } from "../../shared/schemas/purchasing";
+import type { PurchaseReturnInput } from "../../shared/schemas/supplierPayments";
 import { postJson, putJson, requestApi } from "./client";
 
 // Prices and totals are left out of every response for people who may not see costs, so they are optional here.
@@ -58,3 +59,31 @@ export const getAllGoodsReceipts = (filter: { supplierId?: string; orderId?: str
 export const getGoodsReceiptById = (id: string) => requestApi<GoodsReceipt>(`/goods-receipts/${id}`);
 /** The idempotency key identifies one receipt: retrying with the same key can never receive the goods twice. */
 export const postGoodsReceipt = (input: GoodsReceiptInput, idempotencyKey: string) => postJson<PostedReceipt>("/goods-receipts", input, { "Idempotency-Key": idempotencyKey });
+
+/** What can still go back from a goods receipt, with the credit each line would carry by default. */
+export type ReturnableReceipt = {
+  receipt: { id: string; number: string; supplierId: string; supplierName: string };
+  lines: Array<{
+    id: string; lineNo: number; productName: string; variantName: string; sku: string; unitName: string; quantity: string; factorToBase: string; returnedBase: string; onHandBase: string;
+    /** Left to return, in the unit it was received in. */
+    returnableQuantity: string; defaultUnitCostPaisa: number; defaultTaxRateBps: number;
+  }>;
+};
+export type PurchaseReturn = {
+  id: string; number: string; postedAt: string; supplierId: string; supplierName: string; branchName: string; locationName: string; receiptId: string; receiptNumber: string; reason: string;
+  subtotalPaisa: number; taxPaisa: number; totalPaisa: number; supplierBalancePaisa: number; settledBillsPaisa: number; onAccountPaisa: number;
+  allocations: Array<{ billId: string; number: string; supplierInvoiceNo: string; amountPaisa: number }>;
+  lines: Array<{
+    id: string; lineNo: number; receiptLineId: string; productName: string; variantName: string; sku: string; unitName: string; quantity: string; qtyBase: string;
+    unitCostPaisa: number; lineValuePaisa: number; taxRateBps: number; taxPaisa: number;
+  }>;
+};
+export type PurchaseReturnSummary = { id: string; number: string; postedAt: string; totalPaisa: number; reason: string; supplierName: string; receiptNumber: string };
+export type PurchaseReturnPage = { data: PurchaseReturnSummary[]; page: number; pageSize: number; total: number };
+
+export const getReturnableReceiptLines = (receiptId: string) => requestApi<ReturnableReceipt>(`/goods-receipts/${receiptId}/returnable`);
+/** The idempotency key identifies one return: retrying with the same key can never send the goods back twice. */
+export const postPurchaseReturn = (input: PurchaseReturnInput, idempotencyKey: string) => postJson<PurchaseReturn>("/purchase-returns", input, { "Idempotency-Key": idempotencyKey });
+export const getAllPurchaseReturns = (filter: { supplierId?: string; q?: string; page?: number; pageSize?: number } = {}, signal?: AbortSignal) =>
+  requestApi<PurchaseReturnPage>(`/purchase-returns?${query(filter)}`, { signal });
+export const getPurchaseReturnById = (id: string) => requestApi<PurchaseReturn>(`/purchase-returns/${id}`);

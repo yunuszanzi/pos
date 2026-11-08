@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCreditNoteReceipt, buildGoodsReceiptReceipt, buildPaymentReceipt, buildPurchaseBillReceipt, buildPurchaseOrderReceipt, buildReceipt, buildStatementReceipt, formatDay, formatDocumentDate, receiptPageCss, type ReceiptBusiness, type ReceiptCreditNote, type ReceiptInvoice, type ReceiptPayment } from "../../shared/receipt";
+import { buildCreditNoteReceipt, buildGoodsReceiptReceipt, buildPaymentReceipt, buildPurchaseBillReceipt, buildPurchaseOrderReceipt, buildPurchaseReturnReceipt, buildSupplierPaymentReceipt, buildReceipt, buildStatementReceipt, formatDay, formatDocumentDate, receiptPageCss, type ReceiptBusiness, type ReceiptCreditNote, type ReceiptInvoice, type ReceiptPayment } from "../../shared/receipt";
 
 const business: ReceiptBusiness = {
   tradeName: "SGA Balloons", legalName: "SGA Balloons (Pvt) Ltd", address: "Shop 4, Saddar, Karachi", phone: "021-111", ntn: "1234567-8", strn: null, receiptFooter: "",
@@ -266,5 +266,37 @@ describe("purchase documents", () => {
     expect(model.totals).toEqual([
       { label: "Items", value: "Rs 6,400.00" }, { label: "Freight", value: "Rs 400.00" }, { label: "Input tax", value: "Rs 1,152.00" }, { label: "BILL TOTAL", value: "Rs 7,952.00", strong: true },
     ]);
+  });
+
+it("prints a payment voucher with the bills it settled and what is still owed, or the advance held", () => {
+    const payment = {
+      number: "SPY-KHI-000004", postedAt: "2026-11-09T09:30:00Z", paidBy: "Owner", branchName: "Karachi", supplierName: "Karachi Balloon Mills", methodName: "Bank transfer",
+      amountPaisa: 60_000, reference: "TRF-9001", note: "", supplierBalancePaisa: 20_000,
+      allocations: [{ number: "BILL-KHI-000001", supplierInvoiceNo: "KBM-1001", amountPaisa: 50_000 }, { number: "BILL-KHI-000002", supplierInvoiceNo: "KBM-1002", amountPaisa: 10_000 }],
+    };
+    const owing = buildSupplierPaymentReceipt(payment, options);
+    expect(owing.title).toBe("PAYMENT VOUCHER");
+    expect(owing.totals).toEqual([{ label: "Bank transfer (TRF-9001)", value: "Rs 600.00" }, { label: "PAID", value: "Rs 600.00", strong: true }]);
+    expect(owing.payments).toEqual([
+      { label: "Against KBM-1001 (BILL-KHI-000001)", value: "Rs 500.00" }, { label: "Against KBM-1002 (BILL-KHI-000002)", value: "Rs 100.00" },
+      { label: "Still owed to supplier", value: "Rs 200.00", strong: true },
+    ]);
+    const advance = buildSupplierPaymentReceipt({ ...payment, allocations: [{ number: "BILL-KHI-000001", supplierInvoiceNo: "KBM-1001", amountPaisa: 50_000 }], supplierBalancePaisa: -10_000 }, options);
+    expect(advance.payments).toEqual([
+      { label: "Against KBM-1001 (BILL-KHI-000001)", value: "Rs 500.00" }, { label: "Advance (not against a bill)", value: "Rs 100.00" },
+      { label: "Advance held with supplier", value: "Rs 100.00", strong: true },
+    ]);
+  });
+
+  it("prints a debit note with the tax reversed and where the credit went", () => {
+    const model = buildPurchaseReturnReceipt({
+      number: "PRT-KHI-000001", postedAt: "2026-11-09T09:30:00Z", supplierName: "Karachi Balloon Mills", branchName: "Karachi", receiptNumber: "GRN-KHI-000003", reason: "Damaged in transit",
+      subtotalPaisa: 36_000, taxPaisa: 6_480, totalPaisa: 42_480, settledBillsPaisa: 30_000, onAccountPaisa: 12_480,
+      lines: [{ productName: "Latex Balloon", variantName: "Red", sku: "BAL-RED", unitName: "Piece", quantity: "30", unitCostPaisa: 1_200, lineValuePaisa: 36_000 }],
+    }, options);
+    expect(model.title).toBe("DEBIT NOTE");
+    expect(model.meta).toEqual(expect.arrayContaining([{ label: "Goods receipt", value: "GRN-KHI-000003" }, { label: "Reason", value: "Damaged in transit" }]));
+    expect(model.totals).toEqual([{ label: "Goods returned", value: "Rs 360.00" }, { label: "Input tax reversed", value: "Rs 64.80" }, { label: "DEBIT TOTAL", value: "Rs 424.80", strong: true }]);
+    expect(model.payments).toEqual([{ label: "Taken off bills", value: "Rs 300.00" }, { label: "Credit on account", value: "Rs 124.80" }]);
   });
 });

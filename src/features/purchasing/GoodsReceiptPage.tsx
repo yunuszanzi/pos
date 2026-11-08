@@ -5,6 +5,7 @@ import { formatPkr } from "../../../shared/money";
 import { printFormatLabels, printFormats, type PrintFormat } from "../../../shared/receipt";
 import { getGoodsReceiptById } from "../../api/purchasingApi";
 import { ErrorMessage, PageTitle, SelectInput } from "../../app/FormElements";
+import { useCan } from "../../app/permissions";
 import { ReceiptPrinter, type PrintJob } from "../../pos/Receipt";
 import { momentDayText } from "./dayText";
 import { usePrintSetup } from "./usePrintSetup";
@@ -13,6 +14,9 @@ import { usePrintSetup } from "./usePrintSetup";
 export function GoodsReceiptPage() {
   const { id = "" } = useParams();
   const setup = usePrintSetup();
+  const mayReturnGoods = useCan("purchasing.return");
+  const seesCosts = useCan("products.cost.view");
+  const mayReturn = mayReturnGoods && seesCosts;
   const [format, setFormat] = useState<PrintFormat | "">("");
   const [job, setJob] = useState<PrintJob | null>(null);
   const receipt = useQuery({ queryKey: ["goods-receipt", id], queryFn: () => getGoodsReceiptById(id) });
@@ -50,6 +54,7 @@ export function GoodsReceiptPage() {
         {showCost && <div className="grand"><dt>Value received</dt><dd data-testid="receipt-total">{formatPkr(data.totalPaisa!)}</dd></div>}
       </dl>
       {data.note && <p className="muted">{data.note}</p>}
+      {mayReturn && <div className="button-row"><Link className="button secondary" to={`/purchase-returns/new?receipt=${data.id}`}>Return goods</Link></div>}
       {setup && <div className="pay-row">
         <SelectInput aria-label="Print format" value={format || setup.defaultFormat} onChange={(event) => setFormat(event.target.value as PrintFormat)}>
           {printFormats.map((value) => <option key={value} value={value}>{printFormatLabels[value]}</option>)}
