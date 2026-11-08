@@ -1,6 +1,8 @@
 import type { CustomerPaymentInput } from "../../shared/schemas/customerPayments";
 import type { CustomerInput } from "../../shared/schemas/customers";
+import type { StatementSummary } from "../../shared/khata";
 import { deleteJson, postJson, putJson, requestApi } from "./client";
+import type { ImportIssue } from "./productsApi";
 
 export type Customer = {
   id: string;
@@ -82,7 +84,7 @@ export type LedgerEntry = {
   id: string; docType: string; docId: string; docNumber: string; memo: string; debitPaisa: number; creditPaisa: number; at: string; balanceAfterPaisa: number;
 };
 export type CustomerLedger = {
-  customer: { id: string; name: string; balancePaisa: number; creditLimitPaisa: number; termsDays: number };
+  customer: { id: string; name: string; phone: string; whatsapp: string; balancePaisa: number; creditLimitPaisa: number; termsDays: number };
   openInvoices: OpenInvoice[];
   entries: LedgerEntry[];
   page: number; pageSize: number; total: number;
@@ -97,3 +99,32 @@ export const getCustomerLedger = (id: string, page = 1, signal?: AbortSignal) =>
 /** Receives money from a customer; the oldest invoices are settled first unless `allocations` names the ones to settle. */
 export const postCustomerPayment = (input: CustomerPaymentInput, idempotencyKey: string) =>
   postJson<CustomerPayment>("/customer-payments", input, { "Idempotency-Key": idempotencyKey });
+
+export type CustomerStatement = {
+  customer: { id: string; name: string; businessName: string; phone: string; whatsapp: string; address: string; balancePaisa: number };
+  period: { from: string; to: string };
+  entries: Array<{ id: string; docType: string; docNumber: string; memo: string; debitPaisa: number; creditPaisa: number; at: string; balanceAfterPaisa: number }>;
+  summary: StatementSummary;
+};
+export type AgeingRow = {
+  customerId: string; name: string; businessName: string; phone: string; whatsapp: string; termsDays: number; balancePaisa: number;
+  bandsPaisa: [number, number, number, number]; owedPaisa: number; creditPaisa: number; oldestDays: number; overdue: boolean;
+};
+export type AgeingReport = { data: AgeingRow[]; totals: { bandsPaisa: [number, number, number, number]; owedPaisa: number }; page: number; pageSize: number; total: number };
+export type OpeningBalancePreview = { canImport: boolean; issues: ImportIssue[]; summary: { customers: number; owedPaisa: number; creditPaisa: number } };
+export type OpeningBalanceResult = { customers: number; owedPaisa: number; creditPaisa: number };
+
+/** A statement for a period of days written yyyy-mm-dd. The period defaults to this month so far. */
+export function getCustomerStatement(id: string, period: { from?: string; to?: string } = {}, signal?: AbortSignal) {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(period)) if (value) query.set(key, value);
+  return requestApi<CustomerStatement>(`/customers/${id}/statement?${query}`, { signal });
+}
+export function getCustomerAgeing(filter: { q?: string; areaId?: string; overdue?: boolean; page?: number; pageSize?: number } = {}, signal?: AbortSignal) {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(filter)) if (value !== undefined && value !== "" && value !== false) query.set(key, String(value));
+  return requestApi<AgeingReport>(`/customer-ageing?${query}`, { signal });
+}
+export const previewOpeningBalances = (csv: string) => postJson<OpeningBalancePreview>("/customers-opening-balances/preview", { csv });
+export const importOpeningBalances = (csv: string, idempotencyKey: string) =>
+  postJson<OpeningBalanceResult>("/customers-opening-balances", { csv }, { "Idempotency-Key": idempotencyKey });

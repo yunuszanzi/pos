@@ -1,4 +1,5 @@
 import { formatBps, formatPkr } from "./money";
+import type { StatementSummary } from "./khata";
 import { formatQuantity, parseQuantity } from "./units";
 
 // What goes on a printed sales document (FR-PRT). One model feeds every format; the format only decides the paper and the layout.
@@ -63,6 +64,7 @@ export type ReceiptOptions = {
 
 export type ReceiptLine = { name: string; detail: string; quantity: string; unitPrice: string; discount: string | null; total: string };
 export type ReceiptRow = { label: string; value: string; strong?: boolean };
+export type ReceiptStatementRow = { date: string; document: string; memo: string; debit: string; credit: string; balance: string };
 
 export type ReceiptModel = {
   title: string;
@@ -78,6 +80,8 @@ export type ReceiptModel = {
   /** The small facts under the heading (number, date, who, where), in the order they print. */
   meta: ReceiptRow[];
   lines: ReceiptLine[];
+  /** A statement of account lists ledger entries instead of items. */
+  statementRows?: ReceiptStatementRow[];
   totals: ReceiptRow[];
   /** Tax by rate, for the buyer and the tax office. */
   taxRows: Array<{ rate: string; taxable: string; tax: string }>;
@@ -305,5 +309,66 @@ export function buildCreditNoteReceipt(note: ReceiptCreditNote, options: Receipt
     taxRows: taxRowsOf(note.lines),
     payments,
     footer: business.receiptFooter ? business.receiptFooter.split(/\r?\n/).filter(Boolean) : ["Thank you."],
+  };
+}
+
+// ---------------------------------------------------------------- customer statement
+
+export type ReceiptStatement = {
+  customerName: string;
+  customerPhone: string;
+  customerAddress: string;
+  /** yyyy-mm-dd, the first and last day on the statement. */
+  from: string;
+  to: string;
+  summary: StatementSummary;
+  entries: Array<{ at: string; docNumber: string; memo: string; debitPaisa: number; creditPaisa: number; balanceAfterPaisa: number }>;
+};
+
+/** A balance as a statement shows it: what is owed, or "Cr" when the customer holds credit. */
+const balanceText = (paisa: number) => (paisa < 0 ? `${formatPkr(-paisa)} Cr` : formatPkr(paisa));
+
+export function buildStatementReceipt(statement: ReceiptStatement, options: ReceiptOptions): ReceiptModel {
+  const { business } = options;
+  const { summary } = statement;
+  const period = `${statement.from} to ${statement.to}`;
+  const rows: ReceiptRow[] = [
+    { label: "Opening balance", value: balanceText(summary.openingPaisa) },
+    { label: "Invoices", value: formatPkr(summary.invoicesPaisa) },
+    { label: "Payments received", value: negative(summary.paymentsPaisa) },
+    { label: "Returns", value: negative(summary.returnsPaisa) },
+  ];
+  if (summary.refundsPaisa) rows.push({ label: "Refunds paid out", value: formatPkr(summary.refundsPaisa) });
+  if (summary.otherPaisa) rows.push({ label: "Opening balance / adjustments", value: summary.otherPaisa < 0 ? negative(-summary.otherPaisa) : formatPkr(summary.otherPaisa) });
+  rows.push({ label: summary.closingPaisa < 0 ? "CREDIT WITH US" : "BALANCE DUE", value: formatPkr(Math.abs(summary.closingPaisa)), strong: true });
+  return {
+    title: "STATEMENT OF ACCOUNT",
+    duplicateBanner: duplicateBanner(options),
+    businessName: business.tradeName,
+    headerLines: headerLinesOf(business, business.tradeName),
+    number: period,
+    dateText: period,
+    cashier: "",
+    terminal: "",
+    customer: statement.customerName,
+    meta: [
+      { label: "Customer", value: statement.customerName },
+      ...(statement.customerPhone ? [{ label: "Phone", value: statement.customerPhone }] : []),
+      ...(statement.customerAddress ? [{ label: "Address", value: statement.customerAddress }] : []),
+      { label: "Period", value: period },
+    ],
+    lines: [],
+    statementRows: statement.entries.map((entry) => ({
+      date: formatDocumentDate(entry.at, options.dateFormat, options.timezone).split(" ")[0],
+      document: entry.docNumber,
+      memo: entry.memo,
+      debit: entry.debitPaisa ? formatPkr(entry.debitPaisa) : "",
+      credit: entry.creditPaisa ? formatPkr(entry.creditPaisa) : "",
+      balance: balanceText(entry.balanceAfterPaisa),
+    })),
+    totals: rows,
+    taxRows: [],
+    payments: [],
+    footer: business.receiptFooter ? [business.receiptFooter] : ["Please tell us if anything on this statement looks wrong."],
   };
 }

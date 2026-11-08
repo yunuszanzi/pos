@@ -1,7 +1,7 @@
 import { createPortal } from "react-dom";
 import { useEffect } from "react";
 import {
-  buildCreditNoteReceipt, buildPaymentReceipt, buildReceipt, receiptPageCss, type PrintFormat, type ReceiptBusiness, type ReceiptCreditNote, type ReceiptInvoice, type ReceiptModel, type ReceiptPayment,
+  buildCreditNoteReceipt, buildPaymentReceipt, buildReceipt, buildStatementReceipt, receiptPageCss, type PrintFormat, type ReceiptBusiness, type ReceiptCreditNote, type ReceiptInvoice, type ReceiptModel, type ReceiptPayment, type ReceiptStatement,
 } from "../../shared/receipt";
 
 type JobBase = {
@@ -12,16 +12,18 @@ type JobBase = {
   /** Present on a reprint. */
   duplicate?: { copyNumber: number };
 };
-/** A sale, money received from a customer, or a credit note for goods taken back. */
+/** A sale, money received from a customer, a credit note for goods taken back, or a customer statement. */
 export type PrintJob = JobBase & (
-  { invoice: ReceiptInvoice; payment?: undefined; creditNote?: undefined }
-  | { payment: ReceiptPayment; invoice?: undefined; creditNote?: undefined }
-  | { creditNote: ReceiptCreditNote; invoice?: undefined; payment?: undefined }
+  { invoice: ReceiptInvoice; payment?: undefined; creditNote?: undefined; statement?: undefined }
+  | { payment: ReceiptPayment; invoice?: undefined; creditNote?: undefined; statement?: undefined }
+  | { creditNote: ReceiptCreditNote; invoice?: undefined; payment?: undefined; statement?: undefined }
+  | { statement: ReceiptStatement; invoice?: undefined; payment?: undefined; creditNote?: undefined }
 );
 
 const modelOf = (job: PrintJob) => {
   const options = { business: job.business, dateFormat: job.dateFormat, timezone: job.timezone, duplicate: job.duplicate };
   if (job.creditNote) return buildCreditNoteReceipt(job.creditNote, options);
+  if (job.statement) return buildStatementReceipt(job.statement, options);
   return job.payment ? buildPaymentReceipt(job.payment, options) : buildReceipt(job.invoice, job.format, options);
 };
 
@@ -55,6 +57,17 @@ export function Receipt({ model, format }: { model: ReceiptModel; format: PrintF
         <span className="item-figures"><span>{line.quantity} × {line.unitPrice}</span><span>{line.total}</span></span>
         {line.discount && <span className="item-figures"><span>discount</span><span>{line.discount}</span></span>}
         <small>{line.detail}</small>
+      </li>)}</ul>)}
+    {model.statementRows && model.statementRows.length > 0 && (sheet
+      ? <table className="receipt-lines">
+        <thead><tr><th>Date</th><th>Document</th><th className="num">Debit</th><th className="num">Credit</th><th className="num">Balance</th></tr></thead>
+        <tbody>{model.statementRows.map((row, index) => <tr key={index}>
+          <td>{row.date}</td><td>{row.document}<small>{row.memo}</small></td><td className="num">{row.debit}</td><td className="num">{row.credit}</td><td className="num">{row.balance}</td>
+        </tr>)}</tbody>
+      </table>
+      : <ul className="receipt-lines">{model.statementRows.map((row, index) => <li key={index}>
+        <span className="item-name">{row.date} · {row.document}</span>
+        <span className="item-figures"><span>{row.memo} {row.debit ? `+${row.debit}` : `-${row.credit}`}</span><span>{row.balance}</span></span>
       </li>)}</ul>)}
     <Rows rows={model.totals} />
     <Rows rows={model.payments} />

@@ -73,6 +73,7 @@ export function CustomersPage() {
       {canManage && <div className="button-row">
         <Link className="button primary" to="/customers/new">New customer</Link>
         <Link className="button secondary" to="/customers/setup">Groups &amp; areas</Link>
+        {canLedger && <Link className="button secondary" to="/customers/opening-balances">Opening balances</Link>}
       </div>}
       {customers.isError && <ErrorMessage>{customers.error.message}</ErrorMessage>}
       <div className="table-scroll"><table aria-label="Customers">
@@ -88,6 +89,7 @@ export function CustomersPage() {
             <td>{customer.termsDays > 0 ? `${customer.termsDays} days` : ""}</td>
             <td className="action-cell">
               {canLedger && <Link className="text-button" to={`/customers/${customer.id}/ledger`}>Khata</Link>}
+              {canLedger && <Link className="text-button" to={`/customers/${customer.id}/statement`}>Statement</Link>}
               {canManage && <Link className="text-button" to={`/customers/${customer.id}`}>Edit</Link>}
               {canManage && customer.active && <button className="text-button" onClick={() => void archive(customer)}>Archive</button>}
             </td>

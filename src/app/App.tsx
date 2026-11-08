@@ -31,6 +31,9 @@ const OpeningStockPage = lazy(() => import("../features/stock/OpeningStockPage")
 const CustomersPage = lazy(() => import("../features/customers/CustomersPage").then(({ CustomersPage: Page }) => ({ default: Page })));
 const CustomerFormPage = lazy(() => import("../features/customers/CustomerFormPage").then(({ CustomerFormPage: Page }) => ({ default: Page })));
 const CustomerLedgerPage = lazy(() => import("../features/customers/CustomerLedgerPage").then(({ CustomerLedgerPage: Page }) => ({ default: Page })));
+const CustomerStatementPage = lazy(() => import("../features/customers/CustomerStatementPage").then(({ CustomerStatementPage: Page }) => ({ default: Page })));
+const CustomerAgeingPage = lazy(() => import("../features/customers/CustomerAgeingPage").then(({ CustomerAgeingPage: Page }) => ({ default: Page })));
+const OpeningBalancesPage = lazy(() => import("../features/customers/OpeningBalancesPage").then(({ OpeningBalancesPage: Page }) => ({ default: Page })));
 const CustomerSetupPage = lazy(() => import("../features/customers/CustomerSetupPage").then(({ CustomerSetupPage: Page }) => ({ default: Page })));
 const ReturnsPage = lazy(() => import("../features/returns/ReturnsPage").then(({ ReturnsPage: Page }) => ({ default: Page })));
 const DailySalesPage = lazy(() => import("../features/reports/DailySalesPage").then(({ DailySalesPage: Page }) => ({ default: Page })));
@@ -66,6 +69,9 @@ const appRoutes: AppRoute[] = [
   { path: "/customers/new", label: "New customer", permission: "customers.manage", element: <CustomerFormPage />, nav: false },
   { path: "/customers/setup", label: "Customer groups and areas", permission: "customers.view", element: <CustomerSetupPage />, nav: false },
   { path: "/customers/:id/ledger", label: "Customer khata", permission: "customers.ledger", element: <CustomerLedgerPage />, nav: false },
+  { path: "/customers/:id/statement", label: "Customer statement", permission: "customers.ledger", element: <CustomerStatementPage />, nav: false },
+  { path: "/customer-ageing", label: "Customer ageing", permission: "customers.ledger", element: <CustomerAgeingPage /> },
+  { path: "/customers/opening-balances", label: "Customer opening balances", permission: "customers.manage", element: <OpeningBalancesPage />, nav: false },
   { path: "/customers/:id", label: "Edit customer", permission: "customers.manage", element: <CustomerFormPage />, nav: false },
   { path: "/returns", label: "Returns", permission: "sales.return", element: <ReturnsPage /> },
   { path: "/reports/daily-sales", label: "Daily sales", permission: "reports.sales.view", element: <DailySalesPage /> },

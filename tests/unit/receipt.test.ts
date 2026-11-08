@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCreditNoteReceipt, buildPaymentReceipt, buildReceipt, formatDocumentDate, receiptPageCss, type ReceiptBusiness, type ReceiptCreditNote, type ReceiptInvoice, type ReceiptPayment } from "../../shared/receipt";
+import { buildCreditNoteReceipt, buildPaymentReceipt, buildReceipt, buildStatementReceipt, formatDocumentDate, receiptPageCss, type ReceiptBusiness, type ReceiptCreditNote, type ReceiptInvoice, type ReceiptPayment } from "../../shared/receipt";
 
 const business: ReceiptBusiness = {
   tradeName: "SGA Balloons", legalName: "SGA Balloons (Pvt) Ltd", address: "Shop 4, Saddar, Karachi", phone: "021-111", ntn: "1234567-8", strn: null, receiptFooter: "",
@@ -171,5 +171,37 @@ describe("credit note", () => {
     expect(model.meta).toContainEqual({ label: "Invoice", value: "none (no receipt)" });
     expect(model.meta.some((row) => row.label === "Reason")).toBe(false);
     expect(model.payments).toEqual([{ label: "Credited to account", value: "Rs 29.00", strong: true }, { label: "Credit on account", value: "Rs 20.00" }]);
+  });
+});
+
+describe("customer statement", () => {
+  const summary = { openingPaisa: 10_000, invoicesPaisa: 50_000, paymentsPaisa: 30_000, returnsPaisa: 10_000, refundsPaisa: 0, otherPaisa: 0, closingPaisa: 20_000 };
+  const statement = {
+    customerName: "Ali Traders", customerPhone: "0300-5551234", customerAddress: "", from: "2026-11-01", to: "2026-11-30", summary,
+    entries: [
+      { at: "2026-11-02T08:00:00Z", docNumber: "INV-KHI-000001", memo: "Invoice", debitPaisa: 50_000, creditPaisa: 0, balanceAfterPaisa: 60_000 },
+      { at: "2026-11-09T08:00:00Z", docNumber: "RCT-KHI-000001", memo: "Cash", debitPaisa: 0, creditPaisa: 30_000, balanceAfterPaisa: 30_000 },
+    ],
+  };
+
+  it("lists the entries and ends on the balance due", () => {
+    const model = buildStatementReceipt(statement, options);
+    expect(model.title).toBe("STATEMENT OF ACCOUNT");
+    expect(model.meta).toContainEqual({ label: "Period", value: "2026-11-01 to 2026-11-30" });
+    expect(model.statementRows).toEqual([
+      { date: "02/11/2026", document: "INV-KHI-000001", memo: "Invoice", debit: "Rs 500.00", credit: "", balance: "Rs 600.00" },
+      { date: "09/11/2026", document: "RCT-KHI-000001", memo: "Cash", debit: "", credit: "Rs 300.00", balance: "Rs 300.00" },
+    ]);
+    expect(model.totals).toEqual([
+      { label: "Opening balance", value: "Rs 100.00" }, { label: "Invoices", value: "Rs 500.00" }, { label: "Payments received", value: "-Rs 300.00" },
+      { label: "Returns", value: "-Rs 100.00" }, { label: "BALANCE DUE", value: "Rs 200.00", strong: true },
+    ]);
+  });
+
+  it("shows credit the customer holds as Cr, and refunds and adjustments only when there are some", () => {
+    const model = buildStatementReceipt({ ...statement, entries: [], summary: { ...summary, openingPaisa: -500, refundsPaisa: 400, otherPaisa: -100, closingPaisa: -9_000 } }, options);
+    expect(model.totals[0]).toEqual({ label: "Opening balance", value: "Rs 5.00 Cr" });
+    expect(model.totals.map((row) => row.label)).toEqual(["Opening balance", "Invoices", "Payments received", "Returns", "Refunds paid out", "Opening balance / adjustments", "CREDIT WITH US"]);
+    expect(model.totals.at(-1)).toEqual({ label: "CREDIT WITH US", value: "Rs 90.00", strong: true });
   });
 });

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
+import { reminderMessage, whatsappLink } from "../../../shared/khata";
 import { formatPkr } from "../../../shared/money";
 import { formatDocumentDate } from "../../../shared/receipt";
 import { getCustomerLedger } from "../../api/customersApi";
@@ -30,6 +31,10 @@ export function CustomerLedgerPage() {
   const dateOf = (iso: string) => formatDocumentDate(iso, settings?.dateFormat ?? "dd/MM/yyyy", settings?.timezone ?? "Asia/Karachi");
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
   const overdue = openInvoices.some((invoice) => invoice.overdue);
+  // A reminder only makes sense while they owe something. The person sends it from WhatsApp; nothing is sent by the system.
+  const reminder = customer.balancePaisa > 0 && (customer.whatsapp || customer.phone)
+    ? whatsappLink(customer.whatsapp || customer.phone, reminderMessage({ customerName: customer.name, businessName: setup.data?.business.tradeName ?? "us", balancePaisa: customer.balancePaisa }))
+    : null;
 
   return <div className="content">
     <PageTitle title={`${customer.name} — khata`} description="Invoices add to what the customer owes; payments and returns take it down." />
@@ -41,9 +46,11 @@ export function CustomerLedgerPage() {
         {customer.termsDays > 0 && <div><dt>Payment terms</dt><dd>{customer.termsDays} days</dd></div>}
       </dl>
       {overdue && <p className="notice error" role="status">This customer has invoices past their payment terms.</p>}
-      {canReceive && setup.data && <div className="button-row">
-        <button className="button primary" onClick={() => setReceiving(true)}>Receive payment</button>
-      </div>}
+      <div className="button-row">
+        {canReceive && setup.data && <button className="button primary" onClick={() => setReceiving(true)}>Receive payment</button>}
+        <Link className="button secondary" to={`/customers/${customer.id}/statement`}>Statement</Link>
+        {reminder && <a className="button secondary" href={reminder} target="_blank" rel="noreferrer">Remind on WhatsApp</a>}
+      </div>
     </section>
 
     <section className="panel stack">

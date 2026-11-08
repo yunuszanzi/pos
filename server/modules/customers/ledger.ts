@@ -22,7 +22,10 @@ const viewLedger = requirePermission("customers.ledger");
 const paisa = (value: unknown) => Number(value);
 
 async function loadCustomer(businessId: string, id: string) {
-  const [row] = await db.select({ id: customers.id, name: customers.name, balancePaisa: customers.balancePaisa, creditLimitPaisa: customers.creditLimitPaisa, termsDays: customers.termsDays })
+  const [row] = await db.select({
+    id: customers.id, name: customers.name, phone: customers.phone, whatsapp: customers.whatsapp, balancePaisa: customers.balancePaisa,
+    creditLimitPaisa: customers.creditLimitPaisa, termsDays: customers.termsDays,
+  })
     .from(customers).where(and(eq(customers.id, id), eq(customers.businessId, businessId))).limit(1);
   return row ?? null;
 }
@@ -57,7 +60,7 @@ customerLedgerRoutes.get("/customers/:id/ledger", viewLedger, async (context) =>
     ) x order by seq desc limit ${pageSize} offset ${(page - 1) * pageSize}
   `);
   return context.json({
-    customer: { id: customer.id, name: customer.name, balancePaisa: customer.balancePaisa, creditLimitPaisa: customer.creditLimitPaisa, termsDays: customer.termsDays },
+    customer: { id: customer.id, name: customer.name, phone: customer.phone, whatsapp: customer.whatsapp, balancePaisa: customer.balancePaisa, creditLimitPaisa: customer.creditLimitPaisa, termsDays: customer.termsDays },
     openInvoices: await openInvoices(businessId, customer.id, customer.termsDays),
     entries: entries.map((row) => ({
       id: String(row.id), docType: String(row.doc_type), docId: String(row.doc_id), docNumber: String(row.doc_number), memo: String(row.memo),
