@@ -1,7 +1,7 @@
 import { createPortal } from "react-dom";
 import { useEffect } from "react";
 import {
-  buildPaymentReceipt, buildReceipt, receiptPageCss, type PrintFormat, type ReceiptBusiness, type ReceiptInvoice, type ReceiptModel, type ReceiptPayment,
+  buildCreditNoteReceipt, buildPaymentReceipt, buildReceipt, receiptPageCss, type PrintFormat, type ReceiptBusiness, type ReceiptCreditNote, type ReceiptInvoice, type ReceiptModel, type ReceiptPayment,
 } from "../../shared/receipt";
 
 type JobBase = {
@@ -12,11 +12,16 @@ type JobBase = {
   /** Present on a reprint. */
   duplicate?: { copyNumber: number };
 };
-/** A sale, or money received from a customer. */
-export type PrintJob = JobBase & ({ invoice: ReceiptInvoice; payment?: undefined } | { payment: ReceiptPayment; invoice?: undefined });
+/** A sale, money received from a customer, or a credit note for goods taken back. */
+export type PrintJob = JobBase & (
+  { invoice: ReceiptInvoice; payment?: undefined; creditNote?: undefined }
+  | { payment: ReceiptPayment; invoice?: undefined; creditNote?: undefined }
+  | { creditNote: ReceiptCreditNote; invoice?: undefined; payment?: undefined }
+);
 
 const modelOf = (job: PrintJob) => {
   const options = { business: job.business, dateFormat: job.dateFormat, timezone: job.timezone, duplicate: job.duplicate };
+  if (job.creditNote) return buildCreditNoteReceipt(job.creditNote, options);
   return job.payment ? buildPaymentReceipt(job.payment, options) : buildReceipt(job.invoice, job.format, options);
 };
 

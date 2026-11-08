@@ -32,6 +32,7 @@ const CustomersPage = lazy(() => import("../features/customers/CustomersPage").t
 const CustomerFormPage = lazy(() => import("../features/customers/CustomerFormPage").then(({ CustomerFormPage: Page }) => ({ default: Page })));
 const CustomerLedgerPage = lazy(() => import("../features/customers/CustomerLedgerPage").then(({ CustomerLedgerPage: Page }) => ({ default: Page })));
 const CustomerSetupPage = lazy(() => import("../features/customers/CustomerSetupPage").then(({ CustomerSetupPage: Page }) => ({ default: Page })));
+const ReturnsPage = lazy(() => import("../features/returns/ReturnsPage").then(({ ReturnsPage: Page }) => ({ default: Page })));
 const DailySalesPage = lazy(() => import("../features/reports/DailySalesPage").then(({ DailySalesPage: Page }) => ({ default: Page })));
 const PosPage = lazy(() => import("../pos/PosPage").then(({ PosPage: Page }) => ({ default: Page })));
 const ValuationPage = lazy(() => import("../features/stock/ValuationPage").then(({ ValuationPage: Page }) => ({ default: Page })));
@@ -66,6 +67,7 @@ const appRoutes: AppRoute[] = [
   { path: "/customers/setup", label: "Customer groups and areas", permission: "customers.view", element: <CustomerSetupPage />, nav: false },
   { path: "/customers/:id/ledger", label: "Customer khata", permission: "customers.ledger", element: <CustomerLedgerPage />, nav: false },
   { path: "/customers/:id", label: "Edit customer", permission: "customers.manage", element: <CustomerFormPage />, nav: false },
+  { path: "/returns", label: "Returns", permission: "sales.return", element: <ReturnsPage /> },
   { path: "/reports/daily-sales", label: "Daily sales", permission: "reports.sales.view", element: <DailySalesPage /> },
   { path: "/users", label: "Users", permission: "users.view", element: <UsersPage /> },
   { path: "/roles", label: "Roles & permissions", permission: "roles.view", element: <RolesPage /> },

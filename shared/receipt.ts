@@ -105,19 +105,39 @@ function headerLinesOf(business: ReceiptBusiness, branchName: string): string[] 
   return [branchName !== business.tradeName ? branchName : "", business.address, business.phone && `Tel ${business.phone}`, registration].filter((line): line is string => Boolean(line));
 }
 
-export function buildReceipt(invoice: ReceiptInvoice, format: PrintFormat, options: ReceiptOptions): ReceiptModel {
-  const { business } = options;
-  const sheet = format === "a4" || format === "a5";
-  const lineDiscount = invoice.lineDiscountPaisa;
-  const billDiscount = invoice.invoiceDiscountPaisa;
+type DocumentLine = ReceiptInvoice["lines"][number];
 
+/** Tax by rate, for the buyer and the tax office. */
+function taxRowsOf(lines: DocumentLine[]): ReceiptModel["taxRows"] {
   const taxByRate = new Map<number, { taxable: number; tax: number }>();
-  for (const line of invoice.lines) {
+  for (const line of lines) {
     const entry = taxByRate.get(line.taxRateBps) ?? { taxable: 0, tax: 0 };
     entry.taxable += line.totalPaisa - line.taxPaisa;
     entry.tax += line.taxPaisa;
     taxByRate.set(line.taxRateBps, entry);
   }
+  return [...taxByRate.entries()].sort(([a], [b]) => a - b).map(([rate, entry]) => ({ rate: `${formatBps(rate)}%`, taxable: formatPkr(entry.taxable), tax: formatPkr(entry.tax) }));
+}
+
+function lineRowsOf<T extends DocumentLine>(lines: T[], detailExtra: (line: T) => string = () => ""): ReceiptLine[] {
+  return lines.map((line) => {
+    const discount = line.lineDiscountPaisa + line.invoiceDiscountSharePaisa;
+    return {
+      name: line.variantName ? `${line.productName} — ${line.variantName}` : line.productName,
+      detail: `${line.sku} · ${line.unitName}${line.taxRateBps ? ` · tax ${formatBps(line.taxRateBps)}%` : ""}${detailExtra(line)}`,
+      quantity: formatQuantity(parseQuantity(line.quantity)),
+      unitPrice: formatPkr(line.unitPricePaisa),
+      discount: discount > 0 ? negative(discount) : null,
+      total: formatPkr(line.totalPaisa),
+    };
+  });
+}
+
+export function buildReceipt(invoice: ReceiptInvoice, format: PrintFormat, options: ReceiptOptions): ReceiptModel {
+  const { business } = options;
+  const sheet = format === "a4" || format === "a5";
+  const lineDiscount = invoice.lineDiscountPaisa;
+  const billDiscount = invoice.invoiceDiscountPaisa;
 
   const totals: ReceiptRow[] = [{ label: "Subtotal", value: formatPkr(invoice.grossPaisa) }];
   if (lineDiscount > 0) totals.push({ label: "Item discounts", value: negative(lineDiscount) });
@@ -154,19 +174,9 @@ export function buildReceipt(invoice: ReceiptInvoice, format: PrintFormat, optio
       { label: "No.", value: invoice.number }, { label: "Date", value: dateText }, { label: "Cashier", value: invoice.cashierName ?? "" },
       { label: "Till", value: invoice.terminalName }, ...(invoice.customerName ? [{ label: "Customer", value: invoice.customerName }] : []),
     ],
-    lines: invoice.lines.map((line) => {
-      const discount = line.lineDiscountPaisa + line.invoiceDiscountSharePaisa;
-      return {
-        name: line.variantName ? `${line.productName} — ${line.variantName}` : line.productName,
-        detail: `${line.sku} · ${line.unitName}${line.taxRateBps ? ` · tax ${formatBps(line.taxRateBps)}%` : ""}`,
-        quantity: formatQuantity(parseQuantity(line.quantity)),
-        unitPrice: formatPkr(line.unitPricePaisa),
-        discount: discount > 0 ? negative(discount) : null,
-        total: formatPkr(line.totalPaisa),
-      };
-    }),
+    lines: lineRowsOf(invoice.lines),
     totals,
-    taxRows: [...taxByRate.entries()].sort(([a], [b]) => a - b).map(([rate, entry]) => ({ rate: `${formatBps(rate)}%`, taxable: formatPkr(entry.taxable), tax: formatPkr(entry.tax) })),
+    taxRows: taxRowsOf(invoice.lines),
     payments,
     footer: business.receiptFooter ? business.receiptFooter.split(/\r?\n/).filter(Boolean) : ["Thank you for shopping with us."],
   };
@@ -220,5 +230,80 @@ export function buildPaymentReceipt(payment: ReceiptPayment, options: ReceiptOpt
     taxRows: [],
     payments: rows,
     footer: payment.note ? [payment.note, "Thank you."] : ["Thank you."],
+  };
+}
+
+/** Goods taken back against an invoice (or, with approval, without one). */
+export type ReceiptCreditNote = {
+  number: string;
+  postedAt: string;
+  cashierName: string | null;
+  terminalName: string;
+  branchName: string;
+  taxMode: "inclusive" | "exclusive";
+  invoiceNumber: string | null;
+  customerName: string | null;
+  /** What the customer owed straight after this return (negative: they hold store credit). */
+  customerBalancePaisa: number | null;
+  reason: string;
+  grossPaisa: number;
+  lineDiscountPaisa: number;
+  invoiceDiscountPaisa: number;
+  taxPaisa: number;
+  roundingPaisa: number;
+  totalPaisa: number;
+  refundMethodName: string | null;
+  refundPaisa: number;
+  refundReference: string;
+  accountCreditPaisa: number;
+  lines: Array<DocumentLine & { restockTo: "sellable" | "damaged" | "write_off" }>;
+};
+
+const restockNotes = { sellable: "", damaged: " · damaged", write_off: " · written off" } as const;
+
+export function buildCreditNoteReceipt(note: ReceiptCreditNote, options: ReceiptOptions): ReceiptModel {
+  const { business } = options;
+  const totals: ReceiptRow[] = [{ label: "Subtotal", value: formatPkr(note.grossPaisa) }];
+  if (note.lineDiscountPaisa > 0) totals.push({ label: "Item discounts", value: negative(note.lineDiscountPaisa) });
+  if (note.invoiceDiscountPaisa > 0) totals.push({ label: "Bill discount", value: negative(note.invoiceDiscountPaisa) });
+  totals.push({ label: note.taxMode === "inclusive" ? "Tax (included)" : "Tax", value: formatPkr(note.taxPaisa) });
+  if (note.roundingPaisa !== 0) totals.push({ label: "Rounding", value: note.roundingPaisa < 0 ? negative(-note.roundingPaisa) : formatPkr(note.roundingPaisa) });
+  totals.push({ label: "CREDIT TOTAL", value: formatPkr(note.totalPaisa), strong: true });
+
+  const payments: ReceiptRow[] = [];
+  if (note.refundPaisa > 0) {
+    const how = note.refundMethodName ? `Refunded — ${note.refundMethodName}${note.refundReference ? ` (${note.refundReference})` : ""}` : "Refunded";
+    payments.push({ label: how, value: formatPkr(note.refundPaisa), strong: true });
+  }
+  if (note.accountCreditPaisa > 0) payments.push({ label: "Credited to account", value: formatPkr(note.accountCreditPaisa), strong: true });
+  if (note.customerName && typeof note.customerBalancePaisa === "number") {
+    payments.push(note.customerBalancePaisa < 0
+      ? { label: "Credit on account", value: formatPkr(-note.customerBalancePaisa) }
+      : { label: "Account balance (khata)", value: formatPkr(note.customerBalancePaisa) });
+  }
+
+  const dateText = formatDocumentDate(note.postedAt, options.dateFormat, options.timezone);
+  return {
+    title: "CREDIT NOTE",
+    duplicateBanner: duplicateBanner(options),
+    businessName: business.tradeName,
+    headerLines: headerLinesOf(business, note.branchName),
+    number: note.number,
+    dateText,
+    cashier: note.cashierName ?? "",
+    terminal: note.terminalName,
+    customer: note.customerName || null,
+    meta: [
+      { label: "No.", value: note.number }, { label: "Date", value: dateText },
+      { label: "Invoice", value: note.invoiceNumber ?? "none (no receipt)" },
+      { label: "Cashier", value: note.cashierName ?? "" }, { label: "Till", value: note.terminalName },
+      ...(note.customerName ? [{ label: "Customer", value: note.customerName }] : []),
+      ...(note.reason ? [{ label: "Reason", value: note.reason }] : []),
+    ],
+    lines: lineRowsOf(note.lines, (line) => restockNotes[line.restockTo]),
+    totals,
+    taxRows: taxRowsOf(note.lines),
+    payments,
+    footer: business.receiptFooter ? business.receiptFooter.split(/\r?\n/).filter(Boolean) : ["Thank you."],
   };
 }

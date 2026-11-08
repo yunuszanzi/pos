@@ -20,12 +20,13 @@ import type { CatalogueEntry } from "./catalogueIndex";
 import { Dialog } from "./Dialog";
 import { PaymentDialog } from "./PaymentDialog";
 import { ReceiptPrinter, type PrintJob } from "./Receipt";
+import { ReturnDialog } from "./ReturnDialog";
 import { SalesHistoryDialog } from "./SalesHistoryDialog";
 import { PosProvider } from "./PosProvider";
 import { usePos } from "./pos-context";
 import { CashMovementDialog, CloseShiftDialog, OpenShiftForm } from "./ShiftPanels";
 
-type Modal = "customer" | "receive" | "pay" | "discount" | "held" | "cash" | "close" | "history" | { line: string } | null;
+type Modal = "customer" | "receive" | "pay" | "discount" | "held" | "cash" | "close" | "history" | "return" | { line: string } | null;
 
 export function PosPage() {
   const terminalId = useTerminalStore((state) => state.terminalId);
@@ -186,6 +187,7 @@ function PosScreen() {
       {pos.catalogueStatus !== "ready" && <span className="status" role="status">{pos.catalogueStatus === "error" ? "Products not loaded" : "Updating products…"}</span>}
       <button className="button secondary" onClick={() => setModal("history")}>Recent sales</button>
       <button className="button secondary" onClick={() => setModal("held")}>Held (F7)</button>
+      {can("sales.return") && <button className="button secondary" onClick={() => setModal("return")}>Return</button>}
       {can("customers.receive_payment") && <button className="button secondary" onClick={() => setModal("receive")}>Customer payment</button>}
       {can("cash.movement") && <button className="button secondary" onClick={() => setModal("cash")}>Cash in/out</button>}
       {can("shifts.close") && <button className="button secondary" onClick={() => setModal("close")}>Close shift</button>}
@@ -274,6 +276,7 @@ function PosScreen() {
     {editing && <LineDialog line={editing} tier={tier} onClose={() => setModal(null)}
       onApply={(change) => { cart.update(editing.key, change); setModal(null); focusSearch(); }}
       onRemove={() => { cart.remove(editing.key); setModal(null); focusSearch(); }} />}
+    {modal === "return" && <ReturnDialog onClose={() => { setModal(null); focusSearch(); }} />}
     {modal === "history" && <SalesHistoryDialog onClose={() => setModal(null)} onReprint={printDuplicate} />}
     {done && <SaleDone sale={done} onNext={() => { setDone(null); focusSearch(); }} onPrintOriginal={printOriginal} onPrintDuplicate={printDuplicate} />}
     <ReceiptPrinter job={job} onDone={() => setJob(null)} />

@@ -2,7 +2,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import { auditLog, businessSettings, customers, terminals } from "../../../db/schema";
-import { isOutsideReturnWindow, priceReturn, ReturnError, type SoldLine } from "../../../shared/returns";
+import { isOutsideReturnWindow, priceReturn, remainingToReturn, returnedBaseQuantity, ReturnError, type SoldLine } from "../../../shared/returns";
 import { priceCart, PricingError } from "../../../shared/pricing";
 import { postReturnSchema } from "../../../shared/schemas/returns";
 import { formatQuantity, parseQuantity, toBaseQuantity } from "../../../shared/units";
@@ -61,18 +61,6 @@ async function loadSoldInvoice(businessId: string, invoiceId: string) {
 
 const milli = (text: string) => parseQuantity(quantityText(text));
 
-/** What is left of a line, in the unit it was sold in. Floors, so a screen never offers a fraction that is not there. */
-function remainingEntered(line: InvoiceLine): number {
-  const remainingBase = milli(line.qty_base) - milli(line.returned_qty_base);
-  return Math.floor((remainingBase * 1000) / milli(line.factor_to_base));
-}
-
-/** The quantity in base units. Asking for everything that is left gives back exactly what is left, with no dust. */
-function baseQuantityOf(line: InvoiceLine, enteredMilli: number): number {
-  if (enteredMilli === remainingEntered(line)) return milli(line.qty_base) - milli(line.returned_qty_base);
-  return toBaseQuantity(enteredMilli, milli(line.factor_to_base));
-}
-
 const soldLineOf = (line: InvoiceLine): SoldLine => ({
   id: line.id, qtyBase: milli(line.qty_base), returnedBase: milli(line.returned_qty_base), grossPaisa: paisa(line.gross_paisa),
   lineDiscountPaisa: paisa(line.line_discount_paisa), invoiceDiscountSharePaisa: paisa(line.invoice_discount_share_paisa),
@@ -95,7 +83,7 @@ returnRoutes.get("/sales/:id/returnable", useReturns, async (context) => {
     ? await db.execute<{ outstanding: string }>(sql`select coalesce(max(outstanding_paisa), 0)::text as outstanding from customer_open_invoices(${businessId}::uuid, ${invoice.customer_id}::uuid) where invoice_id = ${invoice.id}`)
     : [{ outstanding: "0" }];
   return context.json({
-    invoice: { id: invoice.id, number: invoice.number, postedAt: invoice.posted_at, customerId: invoice.customer_id, customerName: invoice.customer_name, taxMode: invoice.tax_mode },
+    invoice: { id: invoice.id, number: invoice.number, postedAt: invoice.posted_at, customerId: invoice.customer_id, customerName: invoice.customer_name, taxMode: invoice.tax_mode, roundingPaisa: paisa(invoice.rounding_paisa) },
     windowDays: days,
     outsideWindow: isOutsideReturnWindow(new Date(invoice.posted_at), new Date(), days),
     // What the customer still owes on this invoice: the return pays that off before anything is handed back.
@@ -103,9 +91,11 @@ returnRoutes.get("/sales/:id/returnable", useReturns, async (context) => {
     lines: lines.map((line) => ({
       lineId: line.id, lineNo: line.line_no, productName: line.product_name, variantName: line.variant_name, sku: line.sku, unitName: line.unit_name,
       quantity: quantityText(line.qty_entered), returnedQuantity: formatQuantity(Math.round((milli(line.returned_qty_base) * 1000) / milli(line.factor_to_base))),
-      remainingQuantity: formatQuantity(remainingEntered(line)), unitPricePaisa: paisa(line.unit_price_paisa), totalPaisa: paisa(line.total_paisa),
-      // For showing what a part-return is worth before it is posted.
-      soldQuantity: quantityText(line.qty_entered),
+      remainingQuantity: formatQuantity(remainingToReturn(soldLineOf(line), milli(line.factor_to_base))), unitPricePaisa: paisa(line.unit_price_paisa), totalPaisa: paisa(line.total_paisa),
+      // What the screen needs to show what a part-return is worth before it is posted (shared/returns.ts does the sums).
+      factorToBase: quantityText(line.factor_to_base), qtyBase: quantityText(line.qty_base), returnedBase: quantityText(line.returned_qty_base),
+      grossPaisa: paisa(line.gross_paisa), lineDiscountPaisa: paisa(line.line_discount_paisa), invoiceDiscountSharePaisa: paisa(line.invoice_discount_share_paisa),
+      taxPaisa: paisa(line.tax_paisa), taxIncluded: line.tax_included,
     })),
   });
 });
@@ -144,7 +134,7 @@ returnRoutes.post("/returns", useReturns, idempotent(), validateJson(postReturnS
     for (const [index, line] of input.lines.entries()) {
       const original = invoiceLines.find((candidate) => candidate.id === line.originalLineId);
       if (!original) return apiError(context, 422, "INVALID_LINE", `Line ${index + 1} is not on invoice ${invoice.number}`);
-      returning.push({ lineId: original.id, qtyBase: baseQuantityOf(original, parseQuantity(line.quantity)) });
+      returning.push({ lineId: original.id, qtyBase: returnedBaseQuantity(soldLineOf(original), milli(original.factor_to_base), parseQuantity(line.quantity)) });
     }
     let priced;
     try {

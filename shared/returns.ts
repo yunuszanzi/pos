@@ -1,5 +1,5 @@
 import { divideRounded, type Paisa } from "./money";
-import type { Milli } from "./units";
+import { toBaseQuantity, type Milli } from "./units";
 
 // What a return gives back. A return of part of a sold line gives back the same share of everything on that line:
 // price, line discount, share of the bill discount and tax. Each amount is rounded on the running total returned, not
@@ -121,6 +121,20 @@ export function priceReturn(input: { lines: SoldLine[]; roundingPaisa: Paisa; re
     roundingPaisa,
     totalPaisa: sum((line) => line.totalPaisa) + roundingPaisa,
   };
+}
+
+/** How much of a sold line is left to return, in the unit it was sold in. Rounds down, so a screen never offers a fraction that is not there. */
+export function remainingToReturn(line: { qtyBase: Milli; returnedBase: Milli }, factorToBase: Milli): Milli {
+  return Math.floor(((line.qtyBase - line.returnedBase) * 1000) / factorToBase);
+}
+
+/**
+ * A returned quantity, entered in the unit it was sold in, as base units. Asking for everything that is left gives back exactly
+ * what is left, so the last return of a line never leaves a thousandth behind.
+ */
+export function returnedBaseQuantity(line: { qtyBase: Milli; returnedBase: Milli }, factorToBase: Milli, enteredMilli: Milli): Milli {
+  if (enteredMilli === remainingToReturn(line, factorToBase)) return line.qtyBase - line.returnedBase;
+  return toBaseQuantity(enteredMilli, factorToBase);
 }
 
 /** Whether the bill is older than the shop takes returns for. The window is elapsed time, 24 hours to a day. */
