@@ -49,3 +49,13 @@ export const goodsReceiptSchema = z.object({
   lines: z.array(receiptLineSchema).min(1, "Add at least one item").max(200),
 });
 export type GoodsReceiptInput = z.input<typeof goodsReceiptSchema>;
+
+/**
+ * Reorder lines turned into draft orders, one per supplier. Each line is a quantity in the SKU's base unit and the supplier to buy it
+ * from; `remember` also sets that supplier as the one the SKU is normally bought from.
+ */
+export const reorderDraftSchema = z.object({
+  locationId: uuid,
+  lines: z.array(z.object({ variantId: uuid, supplierId: uuid, quantity, remember: z.boolean().default(false) })).min(1, "Choose at least one item").max(200),
+});
+export type ReorderDraftInput = z.input<typeof reorderDraftSchema>;

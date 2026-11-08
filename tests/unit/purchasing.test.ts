@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { averageAfterReceipt, costPerBaseUnit, orderTotal, purchaseLineValue, remainingToReceive, statusAfterReceipt, unitCostFromBase } from "../../shared/purchasing";
+import { averageAfterReceipt, costPerBaseUnit, orderTotal, purchaseLineValue, remainingToReceive, statusAfterReceipt, suggestReorder, unitCostFromBase } from "../../shared/purchasing";
 
 describe("purchase line value and cost per base unit", () => {
   it("values a line as quantity times the price of the unit it was bought in", () => {
@@ -72,5 +72,34 @@ describe("suggesting the price of a bought unit", () => {
     expect(unitCostFromBase(1_600, 200_000)).toBe(320_000);
     expect(unitCostFromBase(333, 10_000)).toBe(3_330);
     expect(unitCostFromBase(1_001, 500)).toBe(501); // half a piece in the unit: 500.5 rounds up
+  });
+});
+
+describe("what to reorder", () => {
+  const base = { onHandMilli: 0, onOrderMilli: 0, levelMilli: 50_000, reorderQuantityMilli: 0 };
+
+  it("suggests nothing for stock above its level, or for an item with no level", () => {
+    expect(suggestReorder({ ...base, onHandMilli: 51_000 })).toBeNull();
+    expect(suggestReorder({ ...base, onHandMilli: 0, levelMilli: 0 })).toBeNull();
+  });
+
+  it("suggests the SKU's reorder quantity when stock is at or below its level", () => {
+    expect(suggestReorder({ ...base, onHandMilli: 50_000, reorderQuantityMilli: 200_000 })).toBe(200_000);
+    expect(suggestReorder({ ...base, onHandMilli: 10_000, reorderQuantityMilli: 200_000 })).toBe(200_000);
+  });
+
+  it("suggests getting back up to the level when there is no reorder quantity", () => {
+    expect(suggestReorder({ ...base, onHandMilli: 20_000 })).toBe(30_000);
+    expect(suggestReorder({ ...base, onHandMilli: 50_000 })).toBe(1); // at the level: the smallest quantity there is
+  });
+
+  it("counts what is already on order, so an order on its way is not suggested again", () => {
+    expect(suggestReorder({ ...base, onHandMilli: 10_000, onOrderMilli: 100_000 })).toBeNull();
+    expect(suggestReorder({ ...base, onHandMilli: 10_000, onOrderMilli: 20_000, reorderQuantityMilli: 200_000 })).toBe(200_000);
+    expect(suggestReorder({ ...base, onHandMilli: 10_000, onOrderMilli: 20_000 })).toBe(20_000);
+  });
+
+  it("treats overselling as stock of nothing it can lean on: negative stock asks for more", () => {
+    expect(suggestReorder({ ...base, onHandMilli: -5_000 })).toBe(55_000);
   });
 });

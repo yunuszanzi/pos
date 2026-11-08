@@ -53,3 +53,19 @@ export const orderTotal = (lines: Array<{ valuePaisa: Paisa }>): Paisa => lines.
 export function unitCostFromBase(costPerBasePaisa: Paisa, factorToBaseMilli: Milli): Paisa {
   return Number(divideRounded(BigInt(costPerBasePaisa) * BigInt(factorToBaseMilli), 1000n));
 }
+
+// ---------------------------------------------------------------- reordering
+
+/**
+ * Whether stock needs reordering, and how much to order, in base units (thousandths). Stock counts what is on hand plus what is
+ * already ordered and still to come, so an item with an order on its way is not suggested again. An item with no reorder level
+ * (0) is never suggested. When it is: the SKU's reorder quantity if it has one, else what it takes to get back up to the level.
+ * Returns null when nothing needs ordering.
+ */
+export function suggestReorder(input: { onHandMilli: Milli; onOrderMilli: Milli; levelMilli: Milli; reorderQuantityMilli: Milli }): Milli | null {
+  if (input.levelMilli <= 0) return null;
+  const covered = input.onHandMilli + input.onOrderMilli;
+  if (covered > input.levelMilli) return null;
+  if (input.reorderQuantityMilli > 0) return input.reorderQuantityMilli;
+  return Math.max(input.levelMilli - covered, 1);
+}

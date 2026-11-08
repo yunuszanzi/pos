@@ -39,7 +39,7 @@ const functionErrors: Array<[prefix: string, status: 404 | 409 | 422, code: stri
   ["INVALID_TRANSITION", 409, "INVALID_TRANSITION"],
   ["RECEIPT_EXCEEDS_ORDER", 409, "RECEIPT_EXCEEDS_ORDER"],
 ];
-function mapFunctionError(context: Context, error: unknown): Response | null {
+export function mapFunctionError(context: Context, error: unknown): Response | null {
   const message = dbErrorMessage(error);
   const known = functionErrors.find(([prefix]) => message.includes(prefix));
   return known ? apiError(context, known[1], known[2], message.replace(/^[A-Z_]+:?\s*/, "") || message) : null;
@@ -48,7 +48,7 @@ function mapFunctionError(context: Context, error: unknown): Response | null {
 type Fact = { variant_id: string; unit_id: string; product_name: string; variant_name: string; sku: string; unit_name: string; factor_to_base: string };
 
 /** Names, SKU and unit factors for the variants and units a document uses. Only active stocked SKUs come back. */
-async function factsFor(businessId: string, pairs: Array<{ variantId: string; unitId: string }>): Promise<Map<string, Fact>> {
+export async function factsFor(businessId: string, pairs: Array<{ variantId: string; unitId: string }>): Promise<Map<string, Fact>> {
   if (!pairs.length) return new Map();
   const rows = await db.execute<Fact>(sql`
     select v.id as variant_id, u.id as unit_id, p.name as product_name, v.variant_name, v.sku, u.name as unit_name, pu.factor_to_base::text as factor_to_base
@@ -63,7 +63,7 @@ async function factsFor(businessId: string, pairs: Array<{ variantId: string; un
 }
 
 /** One line of a function payload: the entered quantity and unit, the factor now, and the quantity in base units. */
-function payloadLine(fact: Fact, quantity: string, unitCostPaisa: number, orderLineId?: string) {
+export function payloadLine(fact: Fact, quantity: string, unitCostPaisa: number, orderLineId?: string) {
   const entered = parseQuantity(quantity);
   const factor = parseQuantity(fact.factor_to_base);
   return {
