@@ -1,15 +1,7 @@
 import { forwardRef, useState, type FocusEvent, type InputHTMLAttributes } from "react";
 import { normaliseMoneyText } from "../../shared/money";
 import { TextInput } from "./FormElements";
-
-/**
- * React only notices a value change that comes through its own input events, and React Hook Form listens to the same
- * events. Setting the value the way the browser does, then firing "input", updates the screen and the form together.
- */
-function setValueLikeTheBrowser(input: HTMLInputElement, value: string) {
-  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(input, value);
-  input.dispatchEvent(new Event("input", { bubbles: true }));
-}
+import { setInputValueLikeTheBrowser } from "./setInputValue";
 
 /**
  * A box for an amount in rupees. When the person leaves it, "3.2" becomes "3.20" and "1,234.5" becomes "1234.50", so every
@@ -22,7 +14,7 @@ export const MoneyInput = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLI
     const input = event.currentTarget;
     const shown = normaliseMoneyText(input.value);
     setInvalid(shown === null);
-    if (shown !== null && shown !== input.value) setValueLikeTheBrowser(input, shown);
+    if (shown !== null && shown !== input.value) setInputValueLikeTheBrowser(input, shown);
     onBlur?.(event);
   }
 

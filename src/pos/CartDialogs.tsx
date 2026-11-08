@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatBps, formatPkr, parsePercentToBps, toPlainRupees } from "../../shared/money";
 import type { Discount } from "../../shared/pricing";
 import { formatQuantity, parseQuantity } from "../../shared/units";
+import { QuantityInput } from "../app/QuantityInput";
 import { discardHeldSale, getAllHeldSales, recallHeldSale } from "../api/posApi";
 import { ErrorMessage, Field, SelectInput, TextInput } from "../app/FormElements";
 import { MoneyInput } from "../app/MoneyInput";
@@ -94,7 +95,7 @@ export function LineDialog({ line, tier, onClose, onApply, onRemove }: {
 
   return <Dialog title={entry ? `${entry.productName}${entry.variantName ? ` — ${entry.variantName}` : ""}` : "Item"} onClose={onClose}><form className="stack" onSubmit={submit}>
     <div className="form-grid">
-      <Field label="Quantity"><TextInput value={quantity} inputMode="decimal" autoFocus onFocus={(event) => event.currentTarget.select()} onChange={(event) => setQuantity(event.target.value)} /></Field>
+      <Field label="Quantity"><QuantityInput value={quantity} autoFocus onFocus={(event) => event.currentTarget.select()} onChange={(event) => setQuantity(event.target.value)} /></Field>
       <Field label="Unit"><SelectInput value={unitId} onChange={(event) => {
         setUnitId(event.target.value);
         const next = catalogue.get(line.variantId, event.target.value);

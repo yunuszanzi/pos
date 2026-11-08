@@ -11,6 +11,7 @@ import { getReturnableLinesForInvoice, postSalesReturn, reprintReturn, type Cred
 import { ErrorMessage, Field, SelectInput, TextInput } from "../app/FormElements";
 import type { CatalogueEntry } from "./catalogueIndex";
 import { Dialog } from "./Dialog";
+import { QuantityInput } from "../app/QuantityInput";
 import { usePos } from "./pos-context";
 import { ReceiptPrinter, type PrintJob } from "./Receipt";
 
@@ -169,7 +170,7 @@ function ReturnItems({ chosen, onBack, onClose, onPosted }: { chosen: NonNullabl
               return <tr key={line.lineId}>
                 <td>{line.productName}{line.variantName ? ` — ${line.variantName}` : ""}<small className="block muted">{line.sku} · {line.unitName} · {formatPkr(line.unitPricePaisa)}</small></td>
                 <td className="num">{line.quantity}</td><td className="num">{line.remainingQuantity}</td>
-                <td><TextInput aria-label={`Quantity of ${line.productName} to return`} inputMode="decimal" value={quantities[line.lineId] ?? ""} disabled={left <= 0}
+                <td><QuantityInput aria-label={`Quantity of ${line.productName} to return`} value={quantities[line.lineId] ?? ""} disabled={left <= 0}
                   onChange={(event) => setQuantities({ ...quantities, [line.lineId]: event.target.value })} />{tooMany && <small className="short">only {line.remainingQuantity} left</small>}</td>
                 <td><SelectInput aria-label={`Where ${line.productName} goes`} value={restocks[line.lineId] ?? "sellable"} onChange={(event) => setRestocks({ ...restocks, [line.lineId]: event.target.value as RestockChoice })}>
                   {restockChoices.map((choice) => <option key={choice} value={choice}>{restockLabels[choice]}</option>)}
@@ -189,7 +190,7 @@ function ReturnItems({ chosen, onBack, onClose, onPosted }: { chosen: NonNullabl
         {picked.length > 0 && <table className="report-table" aria-label="Items coming back">
           <tbody>{picked.map((row, index) => <tr key={index}>
             <td>{row.entry.productName}<small className="block muted">{row.entry.sku} · {row.entry.unitName} · {formatPkr(row.entry.pricePaisa)}</small></td>
-            <td><TextInput aria-label={`Quantity of ${row.entry.productName} to return`} inputMode="decimal" value={row.quantity} onChange={(event) => setPicked(picked.map((item, at) => (at === index ? { ...item, quantity: event.target.value } : item)))} /></td>
+            <td><QuantityInput aria-label={`Quantity of ${row.entry.productName} to return`} value={row.quantity} onChange={(event) => setPicked(picked.map((item, at) => (at === index ? { ...item, quantity: event.target.value } : item)))} /></td>
             <td><SelectInput aria-label={`Where ${row.entry.productName} goes`} value={row.restockTo} onChange={(event) => setPicked(picked.map((item, at) => (at === index ? { ...item, restockTo: event.target.value as RestockChoice } : item)))}>
               {restockChoices.map((choice) => <option key={choice} value={choice}>{restockLabels[choice]}</option>)}
             </SelectInput></td>

@@ -6,7 +6,8 @@ import { expandLabels, labelFormats, labelPageCss, labelsPerPage, layoutLabels, 
 import { formatPkr } from "../../../shared/money";
 import { getAllUnits } from "../../api/catalogueApi";
 import type { Product, ProductVariant } from "../../api/productsApi";
-import { ErrorMessage, Field, PageTitle, SelectInput, TextInput } from "../../app/FormElements";
+import { ErrorMessage, Field, PageTitle, SelectInput } from "../../app/FormElements";
+import { QuantityInput } from "../../app/QuantityInput";
 import { ProductPicker } from "../products/ProductPicker";
 import { barcodeImageUrl } from "./barcodeImage";
 
@@ -82,7 +83,7 @@ export function LabelsPage() {
               {item.variant.units.map((unit) => <option key={unit.unitId} value={unit.unitId}>{unitName(unit.unitId)}{unit.barcode ? "" : " (no barcode)"}</option>)}
             </SelectInput>
           </Field>
-          <Field label="Copies"><TextInput value={item.copies} onChange={(event) => change(index, { copies: event.target.value })} inputMode="numeric" /></Field>
+          <Field label="Copies"><QuantityInput decimals={0} value={item.copies} onChange={(event) => change(index, { copies: event.target.value })} /></Field>
           <button className="text-button" type="button" onClick={() => setItems(items.filter((_, position) => position !== index))}>Remove</button>
         </div>)}
         {!items.length && <p className="muted">No products added yet.</p>}
@@ -95,7 +96,7 @@ export function LabelsPage() {
         <h2>2. Label stock</h2>
         <Field label="Label format"><SelectInput value={formatId} onChange={(event) => setFormatId(event.target.value)}>{labelFormats.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.name}</option>)}</SelectInput></Field>
         {format.kind === "sheet" && <Field label={`Start at position (1 to ${labelsPerPage(format)})`}>
-          <TextInput value={startPosition} onChange={(event) => setStartPosition(event.target.value)} inputMode="numeric" />
+          <QuantityInput decimals={0} value={startPosition} onChange={(event) => setStartPosition(event.target.value)} />
         </Field>}
         <label className="checkbox-row"><input type="checkbox" checked={showPrice} onChange={(event) => setShowPrice(event.target.checked)} /><span><strong>Show price</strong></span></label>
         <label className="checkbox-row"><input type="checkbox" checked={showSku} onChange={(event) => setShowSku(event.target.checked)} /><span><strong>Show SKU</strong></span></label>

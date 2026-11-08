@@ -33,6 +33,7 @@ DB: Supabase Postgres via Drizzle; posting logic in SQL functions. Auth: Supabas
 - Stock changes only through SQL functions that write stock_ledger. stock_balances is maintained by
   a trigger; never write it. Hide costs (lists, ledger, valuation, exports, imports) from roles
   without products.cost.view.
+- Quantity and count fields use <QuantityInput> (digits and one decimal point only, never letters); money fields use <MoneyInput>.
 - Path ids go through paramId() so a malformed id is a 404, not a 500. Every list is paginated;
   searches are debounced and abort stale requests.
 

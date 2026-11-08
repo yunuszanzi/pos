@@ -42,7 +42,12 @@ test("3. goods come back against a bill, then with no bill under a manager's PIN
   await page.getByRole("button", { name: "Return", exact: true }).click();
   await page.getByLabel("Find the bill").fill(number);
   await page.getByRole("button", { name: "Return from this bill" }).click();
-  await page.getByLabel("Quantity of Product Q-1 to return").fill("4");
+  // A quantity box takes digits and one decimal point only, whether typed key by key or pasted.
+  const quantityBox = page.getByLabel("Quantity of Product Q-1 to return");
+  await quantityBox.pressSequentially("a1b-2.c3.4567e");
+  await expect(quantityBox).toHaveValue("12.345");
+  await quantityBox.fill("x4 pieces");
+  await expect(quantityBox).toHaveValue("4");
   await expect(page.getByTestId("return-total")).toHaveText("Rs 20.00");
   await expect(page.getByTestId("return-pay-off")).toContainText("Rs 20.00 of this pays off what Ali Traders owes on the bill");
   await page.getByRole("button", { name: /^Take back Rs 20.00/ }).click();

@@ -70,3 +70,25 @@ export function parseSignedQuantity(input: string): Milli {
   const trimmed = input.trim();
   return trimmed.startsWith("-") ? -parseQuantity(trimmed.slice(1)) : parseQuantity(trimmed);
 }
+
+/**
+ * What a quantity box lets through while someone types or pastes: digits and one decimal point, at most `decimals` places
+ * (3 by default, the database's precision; 0 for counts such as copies) and the 11 whole digits parseQuantity accepts.
+ * Letters, signs, spaces and a second point are dropped. It never rounds: a fourth decimal is simply not accepted.
+ */
+export function sanitiseQuantityText(text: string, decimals = 3): string {
+  let whole = "";
+  let fraction = "";
+  let seenPoint = false;
+  for (const char of text) {
+    if (char >= "0" && char <= "9") {
+      if (seenPoint) fraction += char;
+      else whole += char;
+    } else if (char === "." && !seenPoint && decimals > 0) {
+      seenPoint = true;
+    }
+  }
+  whole = whole.slice(0, 11);
+  fraction = fraction.slice(0, decimals);
+  return seenPoint ? `${whole}.${fraction}` : whole;
+}

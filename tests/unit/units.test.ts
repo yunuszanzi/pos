@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { breakDownQuantity, formatQuantity, parseQuantity, parseSignedQuantity, toBaseQuantity } from "../../shared/units";
+import { breakDownQuantity, formatQuantity, parseQuantity, parseSignedQuantity, sanitiseQuantityText, toBaseQuantity } from "../../shared/units";
 
 describe("parseQuantity and formatQuantity", () => {
   it.each([
@@ -89,5 +89,36 @@ describe("parseSignedQuantity", () => {
     expect(() => parseSignedQuantity("--1")).toThrow(RangeError);
     expect(() => parseSignedQuantity("abc")).toThrow(RangeError);
     expect(() => parseSignedQuantity("-")).toThrow(RangeError);
+  });
+});
+
+describe("sanitiseQuantityText", () => {
+  it("drops letters, signs, spaces and commas", () => {
+    expect(sanitiseQuantityText("abc")).toBe("");
+    expect(sanitiseQuantityText("12ab3")).toBe("123");
+    expect(sanitiseQuantityText("-5")).toBe("5");
+    expect(sanitiseQuantityText(" 1 000,5 ")).toBe("10005");
+    expect(sanitiseQuantityText("1e3")).toBe("13");
+  });
+
+  it("keeps one decimal point and at most three places", () => {
+    expect(sanitiseQuantityText("2.5")).toBe("2.5");
+    expect(sanitiseQuantityText("2.")).toBe("2.");
+    expect(sanitiseQuantityText(".5")).toBe(".5");
+    expect(sanitiseQuantityText("1.2.3")).toBe("1.23");
+    expect(sanitiseQuantityText("1.23456")).toBe("1.234");
+  });
+
+  it("takes whole numbers only when no decimals are allowed", () => {
+    expect(sanitiseQuantityText("12.5", 0)).toBe("125");
+    expect(sanitiseQuantityText("3", 0)).toBe("3");
+  });
+
+  it("stops at the 11 whole digits a quantity can hold", () => {
+    expect(sanitiseQuantityText("123456789012345")).toBe("12345678901");
+  });
+
+  it("leaves a typed quantity that parseQuantity accepts unchanged", () => {
+    for (const text of ["0", "10", "2.5", "0.001", "99999999999.999"]) expect(sanitiseQuantityText(text)).toBe(text);
   });
 });
