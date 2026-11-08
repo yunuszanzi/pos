@@ -22,7 +22,11 @@ export async function requestApi<T>(path: string, init: RequestInit = {}): Promi
   if (terminalId) headers.set("X-Terminal-Id", terminalId);
   if (pinSession) headers.set("X-PIN-Session", pinSession);
   const response = await fetch(`/api/v1${path}`, { ...init, headers });
-  const result = await response.json() as T & ApiError;
+  // A dead or restarting API answers with an empty or non-JSON body (the dev proxy returns an empty 500); say what is wrong instead of a parser error.
+  const result = await response.json().catch(() => null) as (T & ApiError) | null;
+  if (result === null) {
+    throw new ApiRequestError(response.ok ? "The server sent an unreadable answer. Try again." : "The server could not be reached. If you are running it yourself, start the API (npm run dev:api) and try again.", response.status);
+  }
   if (!response.ok) {
     if (response.status === 401 && result.error?.code === "SESSION_INACTIVE") {
       sessionStorage.removeItem("pos.pinSession");

@@ -67,7 +67,7 @@ export function App() {
 }
 
 function AppRoutes() {
-  const { session, currentUser, loading, authError, refreshCurrentUser } = useAuth();
+  const { session, currentUser, loading, authError, refreshCurrentUser, signOut } = useAuth();
   const location = useLocation();
 
   if (loading) return <div className="full-message">Loading your secure session…</div>;
@@ -81,7 +81,10 @@ function AppRoutes() {
     return <main className="auth-page"><section className="auth-card">
       <h1>Unable to load your profile</h1>
       <ErrorMessage>{authError || "Your profile could not be loaded."}</ErrorMessage>
-      <button className="button primary" onClick={() => void refreshCurrentUser()}>Try again</button>
+      <div className="button-row">
+        <button className="button primary" onClick={() => void refreshCurrentUser()}>Try again</button>
+        <button className="button secondary" onClick={() => void signOut()}>Sign out</button>
+      </div>
     </section></main>;
   }
   if (!currentUser.businessId && location.pathname !== "/setup") return <Navigate to="/setup" replace />;
