@@ -10,6 +10,7 @@ import { apiError, paramId } from "../../lib/http";
 import { getActorId, getPrincipal, requirePermission } from "../../lib/permissions";
 import { validateJson } from "../../lib/validate";
 import { canSeeCost, loadProductViews } from "../products/service";
+import { resolveSalesLocationId } from "../sales/location";
 
 export const posRoutes = new Hono();
 
@@ -37,6 +38,7 @@ posRoutes.get("/pos/bootstrap", use, async (context) => {
   const [terminal] = principal.terminalId
     ? await db.select().from(terminals).where(and(eq(terminals.id, principal.terminalId), eq(terminals.businessId, businessId))).limit(1)
     : [];
+  const salesLocationId = terminal ? await resolveSalesLocationId(terminal) : null;
   const [branch] = terminal ? await db.select().from(branches).where(eq(branches.id, terminal.branchId)).limit(1) : [];
   const [role] = await db.select({ name: roles.name, maxDiscountBps: roles.maxDiscountBps }).from(roles).where(eq(roles.id, principal.roleId!)).limit(1);
   const [openShift] = terminal
@@ -66,7 +68,7 @@ posRoutes.get("/pos/bootstrap", use, async (context) => {
     },
     branch: branch && { id: branch.id, name: branch.name, code: branch.code },
     terminal: terminal && {
-      id: terminal.id, name: terminal.name, defaultPrintFormat: terminal.defaultPrintFormat, salesLocationId: terminal.salesLocationId,
+      id: terminal.id, name: terminal.name, defaultPrintFormat: terminal.defaultPrintFormat, salesLocationId,
     },
     settings: settings && {
       currency: settings.currency, timezone: settings.timezone, dateFormat: settings.dateFormat, taxMode: settings.taxMode,

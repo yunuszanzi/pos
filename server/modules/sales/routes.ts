@@ -1,7 +1,7 @@
 import { and, eq, ilike, inArray, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
-import { appUsers, auditLog, businessSettings, locations, rolePermissions, roles, terminals, userBranches } from "../../../db/schema";
+import { appUsers, auditLog, businessSettings, rolePermissions, roles, terminals, userBranches } from "../../../db/schema";
 import { PaymentError, settleTenders, type Tender } from "../../../shared/payments";
 import { discountsOverLimit, priceCart, PricingError, type PricingInput } from "../../../shared/pricing";
 import { postSaleSchema } from "../../../shared/schemas/sales";
@@ -16,6 +16,7 @@ import { getActorId, getPrincipal, hasPermission, requirePermission } from "../.
 import { validateJson } from "../../lib/validate";
 import { verifyPin } from "../auth/pin";
 import { clearPinAttempts, registerPinAttempt } from "../auth/pinRateLimit";
+import { resolveSalesLocationId } from "./location";
 import { canSeeCost, escapeLike, quantityText } from "../products/service";
 
 export const salesRoutes = new Hono();
@@ -43,6 +44,16 @@ async function approveByManager(businessId: string, terminalBranchId: string, em
   return branchGrant && grant ? manager.id : "not-allowed" as const;
 }
 
+/** The database says which SKU ran short by id; the cashier needs its name and the numbers. */
+async function describeShortage(businessId: string, message: string): Promise<string> {
+  const found = /variant ([0-9a-f-]{36}) has (-?[\d.]+) on hand, needs ([\d.]+)/i.exec(message);
+  if (!found) return "Not enough stock to complete this sale";
+  const [row] = await db.execute<{ name: string; sku: string }>(sql`
+    select p.name, v.sku from product_variants v join products p on p.id = v.product_id where v.id = ${found[1]} and v.business_id = ${businessId}
+  `);
+  return `Not enough stock${row ? ` of ${row.name} (${row.sku})` : ""}: ${quantityText(found[2])} on hand, ${quantityText(found[3])} needed (counted in the base unit).`;
+}
+
 type LineFacts = {
   variant_id: string; unit_id: string; product_name: string; variant_name: string; sku: string; unit_name: string; hs_code: string | null;
   factor_to_base: string; sale_price_paisa: string; rate_bps: number | null; product_type: string;
@@ -59,12 +70,8 @@ salesRoutes.post("/sales", requirePermission("sales.create"), idempotent(), vali
     .where(and(eq(terminals.id, principal.terminalId), eq(terminals.businessId, businessId), eq(terminals.active, true))).limit(1);
   if (!terminal) return apiError(context, 400, "TERMINAL_REQUIRED", "Sales are rung up on a registered terminal");
 
-  const [location] = terminal.salesLocationId
-    ? [{ id: terminal.salesLocationId }]
-    : await db.select({ id: locations.id }).from(locations)
-      .where(and(eq(locations.businessId, businessId), eq(locations.branchId, terminal.branchId), eq(locations.type, "store"), eq(locations.active, true)))
-      .orderBy(locations.createdAt).limit(1);
-  if (!location) return apiError(context, 409, "NO_SALES_LOCATION", "This branch has no store location to sell from");
+  const locationId = await resolveSalesLocationId(terminal);
+  if (!locationId) return apiError(context, 409, "NO_SALES_LOCATION", "This branch has no store location to sell from");
 
   const [settings] = await db.select().from(businessSettings).where(eq(businessSettings.businessId, businessId)).limit(1);
   if (!settings) return apiError(context, 409, "SETTINGS_MISSING", "The business settings are missing");
@@ -158,7 +165,7 @@ salesRoutes.post("/sales", requirePermission("sales.create"), idempotent(), vali
   if (settlement.balancePaisa !== 0) return apiError(context, 422, "PAYMENT_MISMATCH", "The payments do not cover the bill");
 
   const payload = {
-    business_id: businessId, branch_id: terminal.branchId, terminal_id: terminal.id, shift_id: input.shiftId, location_id: location.id,
+    business_id: businessId, branch_id: terminal.branchId, terminal_id: terminal.id, shift_id: input.shiftId, location_id: locationId,
     allow_negative_stock: settings.allowNegativeStock, tax_mode: settings.taxMode,
     gross_paisa: priced.grossPaisa, line_discount_paisa: priced.lineDiscountPaisa, invoice_discount_paisa: priced.invoiceDiscountPaisa,
     taxable_paisa: priced.taxablePaisa, tax_paisa: priced.taxPaisa, rounding_paisa: priced.roundingPaisa, total_paisa: priced.totalPaisa,
@@ -192,6 +199,7 @@ salesRoutes.post("/sales", requirePermission("sales.create"), idempotent(), vali
   } catch (error) {
     const message = dbErrorMessage(error);
     const known = postingErrors.find(([prefix]) => message.includes(prefix));
+    if (known?.[2] === "STOCK_INSUFFICIENT") return apiError(context, 409, "STOCK_INSUFFICIENT", await describeShortage(businessId, message));
     if (known) return apiError(context, known[1], known[2], message.replace(/^[A-Z_]+:?\s*/, "") || message);
     throw error;
   }
@@ -201,7 +209,7 @@ salesRoutes.post("/sales", requirePermission("sales.create"), idempotent(), vali
   // The till updates its cached stock from this instead of asking again (technical-plan 5.7).
   const stock = await db.execute<{ variant_id: string; on_hand: string }>(sql`
     select variant_id, sum(on_hand)::text as on_hand from stock_balances
-    where business_id = ${businessId} and location_id = ${location.id} and variant_id in (${sql.join(input.lines.map((line) => sql`${line.variantId}::uuid`), sql`, `)})
+    where business_id = ${businessId} and location_id = ${locationId} and variant_id in (${sql.join(input.lines.map((line) => sql`${line.variantId}::uuid`), sql`, `)})
     group by variant_id
   `);
   return context.json({ invoice, stock: stock.map((row) => ({ variantId: row.variant_id, onHand: quantityText(row.on_hand) })) }, 201);

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { getAppBootstrapData, getDataVersions, getProductChangesSince, type AppBootstrapData, type DataVersions } from "../api/posApi";
+import { getAppBootstrapData, getDataVersions, getProductChangesSince, getStockLevelsForProducts, type AppBootstrapData, type DataVersions } from "../api/posApi";
 import type { Product } from "../api/productsApi";
 import { useTerminalStore } from "../app/terminalStore";
 import { PosCache, cacheScope } from "./catalogueCache";
@@ -39,8 +39,26 @@ function Loaded({ data, reloadBootstrap, children }: { data: AppBootstrapData; r
   const cacheRef = useRef<PosCache | null>(null);
   const versionsRef = useRef<DataVersions>(data.versions);
   const syncing = useRef(false);
+  const productsRef = useRef<Product[]>([]);
+  const stockLoaded = useRef(false);
 
   const scope = cacheScope(data.business.id, data.user.id);
+  const stockLocation = data.terminal.salesLocationId;
+  const mayReadStock = data.user.permissions.includes("*") || data.user.permissions.includes("inventory.view");
+
+  /** What is on the shelf, for up to 500 stocked SKUs in one call. A failure leaves the old figures; the server checks stock on posting anyway. */
+  const refreshStock = useCallback(async () => {
+    if (!stockLocation || !mayReadStock) return;
+    const ids = productsRef.current.filter((product) => product.productType === "stocked")
+      .flatMap((product) => product.variants.filter((variant) => variant.active).map((variant) => variant.id)).slice(0, 500);
+    if (!ids.length) return;
+    try {
+      const levels = await getStockLevelsForProducts(ids, stockLocation);
+      setStock(new Map(levels.map((level) => [level.variantId, level.onHand])));
+    } catch {
+      // Keep what is shown.
+    }
+  }, [stockLocation, mayReadStock]);
 
   const sync = useCallback(async () => {
     const cache = cacheRef.current;
@@ -97,6 +115,7 @@ function Loaded({ data, reloadBootstrap, children }: { data: AppBootstrapData; r
         const changed = whatChanged(versionsRef.current, current);
         versionsRef.current = current;
         if (changed.includes("catalogue")) await sync();
+        await refreshStock();
         if (changed.some((dataset) => dataset !== "catalogue")) await reloadBootstrap();
       } catch {
         // Offline or a hiccup: the next check tries again.
@@ -110,11 +129,20 @@ function Loaded({ data, reloadBootstrap, children }: { data: AppBootstrapData; r
       window.clearInterval(timer);
       window.removeEventListener("focus", check);
     };
-  }, [sync, reloadBootstrap]);
+  }, [sync, reloadBootstrap, refreshStock]);
 
   useEffect(() => {
     versionsRef.current = data.versions;
   }, [data]);
+
+  useEffect(() => {
+    productsRef.current = products;
+    // The first time the catalogue is ready, load stock once.
+    if (status === "ready" && !stockLoaded.current) {
+      stockLoaded.current = true;
+      void refreshStock();
+    }
+  }, [products, status, refreshStock]);
 
   const catalogue = useMemo(() => new CatalogueIndex(products, data), [products, data]);
   const permissions = data.user.permissions;

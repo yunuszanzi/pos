@@ -119,3 +119,8 @@ export const recallHeldSale = (id: string) => postJson<RecalledSale>(`/held-sale
 export const discardHeldSale = (id: string) => deleteJson<{ id: string }>(`/held-sales/${id}`);
 
 export const getDailySalesReport = (date?: string) => requestApi<DailySalesReport>(`/reports/daily-sales${date ? `?date=${date}` : ""}`);
+
+export type StockLevelNow = { variantId: string; onHand: string; reserved: string; available: string };
+/** Many SKUs in one call (at most 500), for the till to show what is on the shelf. */
+export const getStockLevelsForProducts = (variantIds: string[], locationId: string) =>
+  postJson<StockLevelNow[]>("/stock/levels", { variantIds, locationId });

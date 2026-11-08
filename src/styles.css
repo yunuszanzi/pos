@@ -243,3 +243,4 @@ fieldset { border: 1px solid #e0e6ef; border-radius: 8px; }
 .receipt-a4 table.receipt-lines td, .receipt-a5 table.receipt-lines td { padding: 4px; border-bottom: 1px solid #ccc; vertical-align: top; }
 .receipt-a4 .receipt-rows, .receipt-a5 .receipt-rows { width: 55%; margin-left: auto; }
 .receipt-a4 .receipt-foot p, .receipt-a5 .receipt-foot p { text-align: left; }
+.cart-table td small .short { color: #a3312c; font-weight: 700; }

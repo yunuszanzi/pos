@@ -15,7 +15,7 @@ integration("POS bootstrap, catalogue sync and held sales", { timeout: 180_000 }
     expect(boot.body).toMatchObject({
       business: { id: business.businessId, tradeName: "Example Traders" },
       branch: { id: business.branchId, code: "KHI" },
-      terminal: { id: business.terminalId, name: "Register 1", defaultPrintFormat: "pos80" },
+      terminal: { id: business.terminalId, name: "Register 1", defaultPrintFormat: "pos80", salesLocationId: expect.any(String) },
       settings: { taxMode: "inclusive", cashRoundingPaisa: 0, allowNegativeStock: false },
       user: { roleName: "Cashier", maxDiscountBps: 500 },
       shift: null,

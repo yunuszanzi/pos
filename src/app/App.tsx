@@ -26,6 +26,7 @@ const LedgerPage = lazy(() => import("../features/stock/LedgerPage").then(({ Led
 const AdjustmentsPage = lazy(() => import("../features/stock/AdjustmentsPage").then(({ AdjustmentsPage: Page }) => ({ default: Page })));
 const NewAdjustmentPage = lazy(() => import("../features/stock/NewAdjustmentPage").then(({ NewAdjustmentPage: Page }) => ({ default: Page })));
 const OpeningStockPage = lazy(() => import("../features/stock/OpeningStockPage").then(({ OpeningStockPage: Page }) => ({ default: Page })));
+const DailySalesPage = lazy(() => import("../features/reports/DailySalesPage").then(({ DailySalesPage: Page }) => ({ default: Page })));
 const PosPage = lazy(() => import("../pos/PosPage").then(({ PosPage: Page }) => ({ default: Page })));
 const ValuationPage = lazy(() => import("../features/stock/ValuationPage").then(({ ValuationPage: Page }) => ({ default: Page })));
 
@@ -54,6 +55,7 @@ const appRoutes: AppRoute[] = [
   { path: "/stock/adjustments/new", label: "New stock adjustment", permission: "inventory.adjust", element: <NewAdjustmentPage />, nav: false },
   { path: "/stock/opening", label: "Opening stock", permission: "inventory.opening_stock", element: <OpeningStockPage />, nav: false },
   { path: "/stock/valuation", label: "Stock valuation", permission: "products.cost.view", element: <ValuationPage />, nav: false },
+  { path: "/reports/daily-sales", label: "Daily sales", permission: "reports.sales.view", element: <DailySalesPage /> },
   { path: "/users", label: "Users", permission: "users.view", element: <UsersPage /> },
   { path: "/roles", label: "Roles & permissions", permission: "roles.view", element: <RolesPage /> },
   { path: "/settings", label: "Settings", permission: "settings.view", element: <SettingsPage /> },

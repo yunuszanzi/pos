@@ -20,6 +20,7 @@ async function openTill(page: Page, business: TestBusiness, float = "0.00") {
   await page.getByRole("button", { name: "Open shift" }).click();
   await expect(page.getByLabel("Scan or search")).toBeVisible();
   await expect(page.getByRole("button", { name: /Product / }).first()).toBeVisible(); // the catalogue has arrived
+  await page.waitForLoadState("networkidle"); // and the stock levels
 }
 
 async function scan(page: Page, code: string) {
@@ -217,4 +218,31 @@ test("the slip width follows the chosen format, and auto-print off waits for the
   const [slip] = await prints();
   expect(slip.css).toContain("58mm auto");
   expect(slip.text).not.toContain("DUPLICATE");
+});
+
+test("the till shows what is in stock, warns when a row asks for more, and the daily report adds up", async ({ page }) => {
+  const business = await stockedBusiness(["A", "B"]); // 100 of each
+  await openTill(page, business);
+  await page.waitForLoadState("networkidle");
+  await expect(page.getByRole("button", { name: /Product A/ })).toContainText("100 in stock");
+
+  await scan(page, "150*A-PC");
+  await expect(page.getByRole("row", { name: /Product A/ })).toContainText("only 100 in stock");
+  await page.getByRole("button", { name: /^Pay/ }).click();
+  await page.getByRole("button", { name: /^Pay Rs 750.00/ }).click();
+  await expect(page.getByRole("alert")).toContainText("Not enough stock of Product A (A): 100 on hand, 150 needed");
+  await page.keyboard.press("Escape");
+
+  await page.getByRole("button", { name: /^Clear/ }).click();
+  await scan(page, "4*A-PC");
+  await page.getByRole("button", { name: /^Pay/ }).click();
+  await page.getByRole("button", { name: /^Pay Rs 20.00/ }).click();
+  await page.getByRole("button", { name: "New sale" }).click();
+  await expect(page.getByRole("button", { name: /Product A/ })).toContainText("96 in stock");
+
+  await page.goto("/reports/daily-sales");
+  await expect(page.getByTestId("report-total")).toHaveText("Rs 20.00");
+  await expect(page.getByTestId("report-profit")).toHaveText("Rs 16.00"); // 4 x (5.00 - 1.00)
+  await expect(page.getByRole("table", { name: "Best sellers" })).toContainText("Product A");
+  await expect(page.getByRole("table", { name: "Payments by method" })).toContainText("Cash");
 });

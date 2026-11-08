@@ -70,7 +70,9 @@ integration("sales API", { timeout: 180_000 }, () => {
     });
     const results = await Promise.all([attempt(), attempt()]);
     expect(results.map((result) => result.status).sort()).toEqual([201, 409]);
-    expect(results.find((result) => result.status === 409)!.body.error.code).toBe("STOCK_INSUFFICIENT");
+    const refused = results.find((result) => result.status === 409)!.body.error;
+    expect(refused.code).toBe("STOCK_INSUFFICIENT");
+    expect(refused.message).toBe("Not enough stock of Product A (A): 0 on hand, 1 needed (counted in the base unit).");
   });
 
   it("refuses a changed price without permission, a stale total, and bad payments", async () => {

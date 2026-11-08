@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { formatPkr } from "../../shared/money";
-import { formatQuantity, parseQuantity } from "../../shared/units";
+import { formatQuantity, parseQuantity, parseSignedQuantity } from "../../shared/units";
 import { getAllTerminals } from "../api/orgApi";
 import { printFormatLabels, printFormats, type PrintFormat } from "../../shared/receipt";
 import { holdSale, reprintSale, type PostedSale } from "../api/posApi";
@@ -146,7 +146,14 @@ function PosScreen() {
   });
 
   const editing = typeof modal === "object" && modal ? cart.lines.find((line) => line.key === modal.line) : undefined;
-  const stockText = (line: CartLine) => stockOnHand.get(line.variantId);
+  /** Stock in base units for a cart row, and whether the row asks for more than is there while selling below zero is off. */
+  const stockNote = (line: CartLine, entry: CatalogueEntry) => {
+    const onHand = stockOnHand.get(line.variantId);
+    if (onHand === undefined || entry.productType !== "stocked") return { text: "", short: false };
+    const wanted = (line.quantityMilli * entry.factorToBaseMilli) / 1000;
+    const short = !data.settings.allowNegativeStock && wanted > parseSignedQuantity(onHand);
+    return { text: short ? ` · only ${onHand} in stock` : ` · ${onHand} in stock`, short };
+  };
 
   return <div className="pos">
     <header className="pos-bar">
@@ -173,7 +180,7 @@ function PosScreen() {
         <div className="pos-grid" aria-label={results ? "Search results" : "Items"}>
           {(results ?? grid).map((entry) => <button key={`${entry.variantId}|${entry.unitId}`} className="tile" onClick={() => addToCart(entry)}>
             <span className="tile-name">{entry.productName}{entry.variantName ? ` — ${entry.variantName}` : ""}</span>
-            <span className="tile-meta">{entry.sku} · {entry.unitName}</span>
+            <span className="tile-meta">{entry.sku} · {entry.unitName}{entry.isBaseUnit && entry.productType === "stocked" && stockOnHand.has(entry.variantId) ? ` · ${stockOnHand.get(entry.variantId)} in stock` : ""}</span>
             <strong>{formatPkr(entry.pricePaisa)}</strong>
           </button>)}
           {catalogue.size === 0 && pos.catalogueStatus === "ready" && <p className="muted">No products yet. Add products in the back office.</p>}
@@ -186,7 +193,7 @@ function PosScreen() {
             <thead><tr><th>Item</th><th className="num">Qty</th><th className="num">Price</th><th className="num">Total</th></tr></thead>
             <tbody>
               {totals?.lines.map(({ line, entry, unitPricePaisa }, index) => <tr key={line.key} onClick={() => setModal({ line: line.key })} className="cart-row">
-                <td><span>{entry.productName}{entry.variantName ? ` — ${entry.variantName}` : ""}</span><small>{entry.sku} · {entry.unitName}{line.discount ? " · discount" : ""}{stockText(line) !== undefined ? ` · ${stockText(line)} left` : ""}</small></td>
+                <td><span>{entry.productName}{entry.variantName ? ` — ${entry.variantName}` : ""}</span><small>{entry.sku} · {entry.unitName}{line.discount ? " · discount" : ""}<span className={stockNote(line, entry).short ? "short" : undefined}>{stockNote(line, entry).text}</span></small></td>
                 <td className="num">{formatQuantity(line.quantityMilli)}</td>
                 <td className="num">{formatPkr(unitPricePaisa)}</td>
                 <td className="num">{formatPkr(totals.priced.lines[index].totalPaisa)}</td>
