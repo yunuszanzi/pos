@@ -13,7 +13,8 @@
     "test:watch": "vitest",
     "e2e": "playwright test",
     "db:migrate": "tsx db/migrate.ts",
-    "db:seed": "tsx db/seed.ts"
+    "db:seed": "tsx db/seed.ts",
+    "db:seed-demo": "tsx db/seed-demo.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.6",

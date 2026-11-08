@@ -16,7 +16,7 @@ import { getActorId, getPrincipal, hasPermission, requirePermission } from "../.
 import { validateJson } from "../../lib/validate";
 import { verifyPin } from "../auth/pin";
 import { clearPinAttempts, registerPinAttempt } from "../auth/pinRateLimit";
-import { canSeeCost, quantityText } from "../products/service";
+import { canSeeCost, escapeLike, quantityText } from "../products/service";
 
 export const salesRoutes = new Hono();
 
@@ -279,7 +279,7 @@ salesRoutes.get("/sales", requirePermission("sales.create"), async (context) => 
     from sales_invoices i left join users u on u.id = i.cashier_id
     where i.business_id = ${principal.businessId!}
       ${hasPermission(principal, "reports.sales.view") ? sql`` : sql`and i.cashier_id = ${getActorId(principal)}`}
-      ${search ? sql`and i.number ilike ${`%${search.replace(/[\%_]/g, "\$&")}%`}` : sql``}
+      ${search ? sql`and i.number ilike ${`%${escapeLike(search)}%`}` : sql``}
       ${shiftId ? sql`and i.shift_id = ${shiftId}` : sql``}
       ${from ? sql`and i.posted_at >= (${from}::date)::timestamp at time zone 'Asia/Karachi'` : sql``}
       ${to ? sql`and i.posted_at < (${to}::date + 1)::timestamp at time zone 'Asia/Karachi'` : sql``}
