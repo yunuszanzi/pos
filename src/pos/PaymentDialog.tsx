@@ -18,7 +18,8 @@ type Row = { id: string; methodId: string; amount: string; reference: string };
  * Pressing Pay sends one request; the checkout key keeps a repeat press, or a retry after a lost reply, from posting a second bill.
  */
 export function PaymentDialog({ cart, totalPaisa, onClose, onPaid }: { cart: Cart; totalPaisa: number; onClose: () => void; onPaid: (sale: PostedSale) => void }) {
-  const { data, shift, applyStock, syncNow } = usePos();
+  const { data, shift, applyStock, syncNow, customers, rememberCustomer } = usePos();
+  const customer = cart.customerId ? customers.get(cart.customerId) : undefined;
   const methods = data.paymentMethods;
   const cash = methods.find((method) => method.kind === "cash") ?? methods[0];
   const [rows, setRows] = useState<Row[]>([{ id: crypto.randomUUID(), methodId: cash.id, amount: toPlainRupees(totalPaisa), reference: "" }]);
@@ -47,7 +48,9 @@ export function PaymentDialog({ cart, totalPaisa, onClose, onPaid }: { cart: Car
   } else {
     remaining = totalPaisa - amounts.reduce<number>((sum, amount) => sum + (amount ?? 0), 0);
   }
-  const canPay = complete && !problem && remaining === 0 && !busy;
+  // A named customer may leave the rest on their account (khata); a walk-in pays in full.
+  const onAccount = customer && complete && !problem && remaining > 0 ? remaining : 0;
+  const canPay = complete && !problem && (remaining === 0 || onAccount > 0) && !busy;
 
   function setRow(id: string, change: Partial<Row>) {
     setRows((current) => current.map((row) => (row.id === id ? { ...row, ...change } : row)));
@@ -73,10 +76,12 @@ export function PaymentDialog({ cart, totalPaisa, onClose, onPaid }: { cart: Car
       });
       const sale = await postSaleInvoice(request, key);
       applyStock(sale.stock);
+      // The response carries the customer's new balance, so the till does not ask for it again.
+      if (customer && sale.invoice.customerBalancePaisa !== null) rememberCustomer({ ...customer, balancePaisa: sale.invoice.customerBalancePaisa });
       onPaid(sale);
     } catch (caught) {
       if (caught instanceof ApiRequestError) {
-        if (caught.code === "DISCOUNT_APPROVAL_REQUIRED") setNeedsManager(true);
+        if (caught.code === "DISCOUNT_APPROVAL_REQUIRED" || caught.code === "CREDIT_LIMIT_EXCEEDED" || caught.code === "CUSTOMER_OVERDUE") setNeedsManager(true);
         // The same key with a different body is refused; the sale is different now, so give it a new key.
         if (caught.code === "IDEMPOTENCY_KEY_REUSED" || caught.code === "TOTAL_CHANGED") {
           useCartStore.getState().replace({ lines: cart.lines, invoiceDiscount: cart.invoiceDiscount, customerId: cart.customerId });
@@ -100,21 +105,28 @@ export function PaymentDialog({ cart, totalPaisa, onClose, onPaid }: { cart: Car
           onChange={(event) => setRow(row.id, { amount: event.target.value })} />
         {kindOf(row.methodId) !== "cash" && <TextInput aria-label={`Reference ${index + 1}`} placeholder="Reference" value={row.reference} maxLength={100}
           onChange={(event) => setRow(row.id, { reference: event.target.value })} />}
-        {rows.length > 1 && <button type="button" className="icon-button" aria-label={`Remove payment ${index + 1}`} onClick={() => setRows((current) => current.filter((r) => r.id !== row.id))}>×</button>}
+        {(rows.length > 1 || customer) && <button type="button" className="icon-button" aria-label={`Remove payment ${index + 1}`} onClick={() => setRows((current) => current.filter((r) => r.id !== row.id))}>×</button>}
       </div>)}
-      <button type="button" className="text-button" onClick={addRow}>+ Add another payment</button>
+      <div className="button-row">
+        <button type="button" className="text-button" onClick={addRow}>{rows.length ? "+ Add another payment" : "+ Add a payment"}</button>
+        {customer && rows.length > 0 && <button type="button" className="text-button" onClick={() => setRows([])}>Put it all on account</button>}
+      </div>
       <div className="pay-summary">
         <span>Still to pay</span><strong data-testid="pay-remaining">{formatPkr(Math.max(remaining, 0))}</strong>
         <span>Change to give</span><strong data-testid="pay-change">{formatPkr(change)}</strong>
       </div>
+      {customer && onAccount > 0 && <div className="notice" data-testid="pay-on-account" role="status">
+        <strong>{formatPkr(onAccount)} goes on {customer.name}'s account.</strong>
+        {" "}They owe {formatPkr(customer.balancePaisa)}{customer.creditLimitPaisa > 0 ? ` of a ${formatPkr(customer.creditLimitPaisa)} limit` : " and have no credit limit"}; after this sale {formatPkr(customer.balancePaisa + onAccount)}.
+      </div>}
       {problem && <ErrorMessage>{problem}</ErrorMessage>}
       {needsManager && <fieldset className="stack">
-        <legend>Manager approval for the discount</legend>
+        <legend>Manager approval</legend>
         <Field label="Manager email"><TextInput type="email" value={manager.email} onChange={(event) => setManager({ ...manager, email: event.target.value })} autoComplete="off" /></Field>
         <Field label="Manager PIN"><TextInput type="password" inputMode="numeric" value={manager.pin} maxLength={6} onChange={(event) => setManager({ ...manager, pin: event.target.value })} autoComplete="off" /></Field>
       </fieldset>}
       {error && <ErrorMessage>{error}</ErrorMessage>}
-      <button className="button primary pay-button" disabled={!canPay}>{busy ? "Posting…" : `Pay ${formatPkr(totalPaisa)}`}</button>
+      <button className="button primary pay-button" disabled={!canPay}>{busy ? "Posting…" : onAccount > 0 ? `Sell on account — ${formatPkr(onAccount)} owed` : `Pay ${formatPkr(totalPaisa)}`}</button>
     </form>
   </Dialog>;
 }

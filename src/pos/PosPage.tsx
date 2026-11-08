@@ -11,6 +11,7 @@ import { useTerminalStore } from "../app/terminalStore";
 import { parseQuantity as parseQty } from "../../shared/units";
 import type { PriceListItem } from "../../shared/priceLists";
 import { getPriceListItems } from "../api/customersApi";
+import { ReceivePaymentDialog } from "../features/customers/ReceivePaymentDialog";
 import { totalsOf, type CartLine } from "./cart";
 import { CustomerDialog } from "./CustomerDialog";
 import { useCartStore } from "./cartStore";
@@ -24,7 +25,7 @@ import { PosProvider } from "./PosProvider";
 import { usePos } from "./pos-context";
 import { CashMovementDialog, CloseShiftDialog, OpenShiftForm } from "./ShiftPanels";
 
-type Modal = "customer" | "pay" | "discount" | "held" | "cash" | "close" | "history" | { line: string } | null;
+type Modal = "customer" | "receive" | "pay" | "discount" | "held" | "cash" | "close" | "history" | { line: string } | null;
 
 export function PosPage() {
   const terminalId = useTerminalStore((state) => state.terminalId);
@@ -75,6 +76,8 @@ function PosScreen() {
   const [notice, setNotice] = useState("");
   const [done, setDone] = useState<PostedSale | null>(null);
   const [job, setJob] = useState<PrintJob | null>(null);
+  /** The customer whose payment is being received (the "Customer payment" button), once picked. */
+  const [receivingFrom, setReceivingFrom] = useState<string | null>(null);
 
   // A named customer buys at their tier. The list arrives once per customer and is kept until reference data changes.
   const customer = cart.customerId ? pos.customers.get(cart.customerId) : undefined;
@@ -183,6 +186,7 @@ function PosScreen() {
       {pos.catalogueStatus !== "ready" && <span className="status" role="status">{pos.catalogueStatus === "error" ? "Products not loaded" : "Updating products…"}</span>}
       <button className="button secondary" onClick={() => setModal("history")}>Recent sales</button>
       <button className="button secondary" onClick={() => setModal("held")}>Held (F7)</button>
+      {can("customers.receive_payment") && <button className="button secondary" onClick={() => setModal("receive")}>Customer payment</button>}
       {can("cash.movement") && <button className="button secondary" onClick={() => setModal("cash")}>Cash in/out</button>}
       {can("shifts.close") && <button className="button secondary" onClick={() => setModal("close")}>Close shift</button>}
       {can("catalog.view") && <Link className="button secondary" to="/">Back office</Link>}
@@ -208,7 +212,10 @@ function PosScreen() {
 
       <aside className="pos-right">
         <div className="customer-bar">
-          <div><small>Customer (F8)</small><strong data-testid="cart-customer">{customer ? customer.name : cart.customerId ? "Unknown customer" : "Walk-in"}</strong>{customer?.priceListId && <small>Tier: {data.priceLists.find((list) => list.id === customer.priceListId)?.name ?? "price list"}</small>}</div>
+          <div><small>Customer (F8)</small><strong data-testid="cart-customer">{customer ? customer.name : cart.customerId ? "Unknown customer" : "Walk-in"}</strong>{customer?.priceListId && <small>Tier: {data.priceLists.find((list) => list.id === customer.priceListId)?.name ?? "price list"}</small>}
+            {customer && (customer.balancePaisa !== 0 || customer.creditLimitPaisa > 0) && <small data-testid="cart-customer-account" className={customer.balancePaisa > customer.creditLimitPaisa ? "short" : undefined}>
+              {customer.balancePaisa < 0 ? `Credit ${formatPkr(-customer.balancePaisa)}` : `Owes ${formatPkr(customer.balancePaisa)}`}{customer.creditLimitPaisa > 0 ? ` · limit ${formatPkr(customer.creditLimitPaisa)}` : ""}
+            </small>}</div>
           <button className="button secondary" onClick={() => setModal("customer")}>{cart.customerId ? "Change" : "Select"}</button>
         </div>
         <div className="cart-scroll">
@@ -247,6 +254,11 @@ function PosScreen() {
     {modal === "pay" && totals && <PaymentDialog cart={cart} totalPaisa={totals.priced.totalPaisa} onClose={() => { setModal(null); focusSearch(); }}
       onPaid={(sale) => { cart.clear(); setModal(null); setDone(sale); }} />}
     {modal === "customer" && <CustomerDialog onClose={() => { setModal(null); focusSearch(); }} onPick={(customerId) => { cart.setCustomer(customerId); setModal(null); focusSearch(); }} />}
+    {modal === "receive" && !receivingFrom && <CustomerDialog onClose={() => { setModal(null); focusSearch(); }} onPick={(customerId) => { if (customerId) setReceivingFrom(customerId); else setModal(null); }} />}
+    {modal === "receive" && receivingFrom && <ReceivePaymentDialog customerId={receivingFrom} methods={data.paymentMethods}
+      print={{ ...jobBase, defaultFormat: data.terminal.defaultPrintFormat }}
+      onPosted={(payment) => { const held = pos.customers.get(payment.customerId); if (held) pos.rememberCustomer({ ...held, balancePaisa: payment.customerBalancePaisa }); }}
+      onClose={() => { setReceivingFrom(null); setModal(null); focusSearch(); }} />}
     {modal === "discount" && <BillDiscountDialog current={cart.invoiceDiscount} onClose={() => setModal(null)} onApply={(discount) => { cart.setInvoiceDiscount(discount); setModal(null); focusSearch(); }} />}
     {modal === "held" && <HeldSalesDialog onClose={() => setModal(null)} onRecalled={(recalled) => {
       // Whatever was in the cart goes on hold first, so recalling never loses a sale in progress.
@@ -306,6 +318,7 @@ function SaleDone({ sale, onNext, onPrintOriginal, onPrintDuplicate }: {
       <div className="grand"><dt>Total</dt><dd data-testid="done-total">{formatPkr(invoice.totalPaisa)}</dd></div>
       {invoice.payments.map((payment) => <div key={payment.methodCode + payment.reference}><dt>{payment.methodName}{payment.reference ? ` (${payment.reference})` : ""}</dt><dd>{formatPkr(payment.tenderedPaisa)}</dd></div>)}
       <div><dt>Change</dt><dd data-testid="done-change">{formatPkr(invoice.changePaisa)}</dd></div>
+      {invoice.balancePaisa > 0 && <div><dt>On {invoice.customerName}'s account</dt><dd data-testid="done-on-account">{formatPkr(invoice.balancePaisa)}</dd></div>}
     </dl>
     <div className="pay-row">
       <SelectInput aria-label="Print format" value={format} onChange={(event) => setFormat(event.target.value as PrintFormat)}>

@@ -1,9 +1,10 @@
 import { createPortal } from "react-dom";
 import { useEffect } from "react";
-import { buildReceipt, receiptPageCss, type PrintFormat, type ReceiptBusiness, type ReceiptInvoice, type ReceiptModel } from "../../shared/receipt";
+import {
+  buildPaymentReceipt, buildReceipt, receiptPageCss, type PrintFormat, type ReceiptBusiness, type ReceiptInvoice, type ReceiptModel, type ReceiptPayment,
+} from "../../shared/receipt";
 
-export type PrintJob = {
-  invoice: ReceiptInvoice;
+type JobBase = {
   format: PrintFormat;
   business: ReceiptBusiness;
   dateFormat: string;
@@ -11,8 +12,13 @@ export type PrintJob = {
   /** Present on a reprint. */
   duplicate?: { copyNumber: number };
 };
+/** A sale, or money received from a customer. */
+export type PrintJob = JobBase & ({ invoice: ReceiptInvoice; payment?: undefined } | { payment: ReceiptPayment; invoice?: undefined });
 
-const modelOf = (job: PrintJob) => buildReceipt(job.invoice, job.format, { business: job.business, dateFormat: job.dateFormat, timezone: job.timezone, duplicate: job.duplicate });
+const modelOf = (job: PrintJob) => {
+  const options = { business: job.business, dateFormat: job.dateFormat, timezone: job.timezone, duplicate: job.duplicate };
+  return job.payment ? buildPaymentReceipt(job.payment, options) : buildReceipt(job.invoice, job.format, options);
+};
 
 function Rows({ rows }: { rows: ReceiptModel["totals"] }) {
   return <dl className="receipt-rows">{rows.map((row) => <div key={row.label} className={row.strong ? "strong" : undefined}><dt>{row.label}</dt><dd>{row.value}</dd></div>)}</dl>;
@@ -29,12 +35,9 @@ export function Receipt({ model, format }: { model: ReceiptModel; format: PrintF
       <h2>{model.title}</h2>
     </header>
     <dl className="receipt-meta">
-      <div><dt>No.</dt><dd>{model.number}</dd></div>
-      <div><dt>Date</dt><dd>{model.dateText}</dd></div>
-      <div><dt>Cashier</dt><dd>{model.cashier}</dd></div>
-      <div><dt>Till</dt><dd>{model.terminal}</dd></div>
+      {model.meta.map((row) => <div key={row.label}><dt>{row.label}</dt><dd>{row.value}</dd></div>)}
     </dl>
-    {sheet
+    {model.lines.length > 0 && (sheet
       ? <table className="receipt-lines">
         <thead><tr><th>Item</th><th className="num">Qty</th><th className="num">Price</th><th className="num">Discount</th><th className="num">Amount</th></tr></thead>
         <tbody>{model.lines.map((line, index) => <tr key={index}>
@@ -47,7 +50,7 @@ export function Receipt({ model, format }: { model: ReceiptModel; format: PrintF
         <span className="item-figures"><span>{line.quantity} × {line.unitPrice}</span><span>{line.total}</span></span>
         {line.discount && <span className="item-figures"><span>discount</span><span>{line.discount}</span></span>}
         <small>{line.detail}</small>
-      </li>)}</ul>}
+      </li>)}</ul>)}
     <Rows rows={model.totals} />
     <Rows rows={model.payments} />
     {model.taxRows.length > 0 && <table className="receipt-tax">

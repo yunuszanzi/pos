@@ -32,6 +32,10 @@ export type SaleInvoice = {
   terminalName: string;
   cashierName: string | null;
   shiftId: string;
+  customerId: string | null;
+  customerName: string | null;
+  /** What the customer owed straight after this invoice (negative: they hold store credit). Null for a walk-in. */
+  customerBalancePaisa: number | null;
   taxMode: "inclusive" | "exclusive";
   grossPaisa: number;
   lineDiscountPaisa: number;
@@ -72,6 +76,10 @@ export type Shift = {
 };
 export type ShiftReport = {
   invoiceCount: number; totalPaisa: number; taxPaisa: number; discountPaisa: number; roundingPaisa: number;
+  /** Part of the sales left unpaid, now on customers' khata. */
+  creditSalesPaisa: number;
+  /** Money taken from customers against their khata during the shift, and the cash part of it. */
+  customerPaymentsPaisa: number; customerPaymentsCashPaisa: number;
   byMethod: Array<{ code: string; name: string; payments: number; amountPaisa: number }>;
   cashSalesPaisa: number; cashInPaisa: number; cashOutPaisa: number;
   expectedCashPaisa?: number;

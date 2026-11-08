@@ -1,3 +1,4 @@
+import type { CustomerPaymentInput } from "../../shared/schemas/customerPayments";
 import type { CustomerInput } from "../../shared/schemas/customers";
 import { deleteJson, postJson, putJson, requestApi } from "./client";
 
@@ -22,6 +23,8 @@ export type Customer = {
   termsDays: number;
   notes: string;
   active: boolean;
+  /** Only for people who may see the khata. */
+  balancePaisa?: number;
 };
 export type CustomerPage = { data: Customer[]; page: number; pageSize: number; total: number };
 export type CustomerFilter = { q?: string; active?: "true" | "false" | "all"; areaId?: string; groupId?: string; page?: number; pageSize?: number };
@@ -45,6 +48,8 @@ export type TillCustomer = {
   priceListId: string | null;
   creditLimitPaisa: number;
   termsDays: number;
+  /** What they owe at the last sync (negative: store credit). Updated from each sale and payment response. */
+  balancePaisa: number;
   active: boolean;
 };
 export type CustomerChanges = { version: number; hasMore: boolean; customers: TillCustomer[] };
@@ -71,3 +76,24 @@ export const updateCustomerGroup = (id: string, input: { name: string; priceList
 
 export const getCustomerChangesSince = (since: number, signal?: AbortSignal) => requestApi<CustomerChanges>(`/pos/customers/changes?since=${since}`, { signal });
 export const getPriceListItems = (id: string) => requestApi<PriceListItems>(`/pos/price-lists/${id}`);
+
+export type OpenInvoice = { invoiceId: string; number: string; postedAt: string; totalPaisa: number; outstandingPaisa: number; overdue: boolean };
+export type LedgerEntry = {
+  id: string; docType: string; docId: string; docNumber: string; memo: string; debitPaisa: number; creditPaisa: number; at: string; balanceAfterPaisa: number;
+};
+export type CustomerLedger = {
+  customer: { id: string; name: string; balancePaisa: number; creditLimitPaisa: number; termsDays: number };
+  openInvoices: OpenInvoice[];
+  entries: LedgerEntry[];
+  page: number; pageSize: number; total: number;
+};
+export type CustomerPayment = {
+  id: string; number: string; postedAt: string; customerId: string; customerName: string; branchName: string; receivedBy: string | null;
+  methodCode: string; methodName: string; amountPaisa: number; reference: string; note: string; customerBalancePaisa: number;
+  allocations: Array<{ invoiceId: string; number: string; amountPaisa: number }>;
+};
+
+export const getCustomerLedger = (id: string, page = 1, signal?: AbortSignal) => requestApi<CustomerLedger>(`/customers/${id}/ledger?page=${page}`, { signal });
+/** Receives money from a customer; the oldest invoices are settled first unless `allocations` names the ones to settle. */
+export const postCustomerPayment = (input: CustomerPaymentInput, idempotencyKey: string) =>
+  postJson<CustomerPayment>("/customer-payments", input, { "Idempotency-Key": idempotencyKey });

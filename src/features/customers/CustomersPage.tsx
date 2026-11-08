@@ -12,6 +12,7 @@ const staleTime = 5 * 60_000;
 export function CustomersPage() {
   const queryClient = useQueryClient();
   const canManage = useCan("customers.manage");
+  const canLedger = useCan("customers.ledger");
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
   const [status, setStatus] = useState<"true" | "false" | "all">("true");
@@ -75,7 +76,7 @@ export function CustomersPage() {
       </div>}
       {customers.isError && <ErrorMessage>{customers.error.message}</ErrorMessage>}
       <div className="table-scroll"><table aria-label="Customers">
-        <thead><tr><th>Name</th><th>Phone</th><th>Area</th><th>Group</th><th className="num">Credit limit</th><th>Terms</th><th /></tr></thead>
+        <thead><tr><th>Name</th><th>Phone</th><th>Area</th><th>Group</th><th className="num">Credit limit</th><th className="num">Balance</th><th>Terms</th><th /></tr></thead>
         <tbody>
           {rows.map((customer) => <tr key={customer.id}>
             <td><strong>{customer.name}</strong>{customer.businessName && <small className="block muted">{customer.businessName}</small>}{!customer.active && <span className="status">Archived</span>}</td>
@@ -83,13 +84,15 @@ export function CustomersPage() {
             <td>{(customer.areaId && areaName.get(customer.areaId)) || ""}</td>
             <td>{(customer.groupId && groupName.get(customer.groupId)) || ""}</td>
             <td className="num">{customer.creditLimitPaisa > 0 ? formatPkr(customer.creditLimitPaisa) : "No credit"}</td>
+            <td className="num">{customer.balancePaisa === undefined ? "" : customer.balancePaisa < 0 ? `${formatPkr(-customer.balancePaisa)} credit` : formatPkr(customer.balancePaisa)}</td>
             <td>{customer.termsDays > 0 ? `${customer.termsDays} days` : ""}</td>
             <td className="action-cell">
+              {canLedger && <Link className="text-button" to={`/customers/${customer.id}/ledger`}>Khata</Link>}
               {canManage && <Link className="text-button" to={`/customers/${customer.id}`}>Edit</Link>}
               {canManage && customer.active && <button className="text-button" onClick={() => void archive(customer)}>Archive</button>}
             </td>
           </tr>)}
-          {customers.isSuccess && rows.length === 0 && <tr><td colSpan={7} className="muted">No customers found.</td></tr>}
+          {customers.isSuccess && rows.length === 0 && <tr><td colSpan={8} className="muted">No customers found.</td></tr>}
         </tbody>
       </table></div>
       <div className="button-row">

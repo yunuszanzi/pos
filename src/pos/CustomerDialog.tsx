@@ -8,7 +8,7 @@ import { usePos } from "./pos-context";
 const toTillCustomer = (customer: Customer): TillCustomer => ({
   id: customer.id, name: customer.name, businessName: customer.businessName, phone: customer.phone, phone2: customer.phone2, whatsapp: customer.whatsapp,
   address: customer.address, areaId: customer.areaId, groupId: customer.groupId, registered: customer.registered, ntn: customer.ntn, strn: customer.strn,
-  priceListId: customer.priceListId, creditLimitPaisa: customer.creditLimitPaisa, termsDays: customer.termsDays, active: customer.active,
+  priceListId: customer.priceListId, creditLimitPaisa: customer.creditLimitPaisa, termsDays: customer.termsDays, balancePaisa: customer.balancePaisa ?? 0, active: customer.active,
 });
 
 /** Pick who the sale is for: search the local list by name or phone, add a new customer with just a name and phone, or go back to walk-in. */

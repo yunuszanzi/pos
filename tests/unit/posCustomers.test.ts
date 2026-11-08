@@ -10,7 +10,7 @@ import { CustomerIndex } from "../../src/pos/customerIndex";
 
 const customer = (id: string, name: string, extra: Partial<TillCustomer> = {}): TillCustomer => ({
   id, name, businessName: "", phone: "", phone2: "", whatsapp: "", address: "", areaId: null, groupId: null, registered: false, ntn: null, strn: null,
-  priceListId: null, creditLimitPaisa: 0, termsDays: 0, active: true, ...extra,
+  priceListId: null, creditLimitPaisa: 0, termsDays: 0, balancePaisa: 0, active: true, ...extra,
 });
 
 describe("CustomerIndex", () => {
