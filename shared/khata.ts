@@ -41,6 +41,10 @@ export function summariseStatement(openingPaisa: Paisa, entries: KhataEntry[]): 
       case "customer_payment":
         summary.paymentsPaisa += entry.creditPaisa;
         break;
+      case "cheque_bounce":
+        // A bounced cheque takes back a payment already counted, so payments received go down by it.
+        summary.paymentsPaisa -= entry.debitPaisa;
+        break;
       case "sales_return":
         summary.returnsPaisa += entry.creditPaisa;
         summary.refundsPaisa += entry.debitPaisa;

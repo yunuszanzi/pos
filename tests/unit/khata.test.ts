@@ -25,6 +25,15 @@ describe("statement summary", () => {
     expect(summary.closingPaisa).toBe(6_000);
   });
 
+  it("counts a bounced cheque as a payment taken back", () => {
+    const summary = summariseStatement(0, [
+      entry("sales_invoice", 10_000, 0, "2026-10-02T08:00:00Z"),
+      entry("customer_payment", 0, 10_000, "2026-10-03T08:00:00Z"),
+      entry("cheque_bounce", 10_000, 0, "2026-10-20T08:00:00Z"),
+    ]);
+    expect(summary).toMatchObject({ invoicesPaisa: 10_000, paymentsPaisa: 0, closingPaisa: 10_000 });
+  });
+
   it("is just the opening balance when nothing happened", () => {
     expect(summariseStatement(-300, []).closingPaisa).toBe(-300);
   });

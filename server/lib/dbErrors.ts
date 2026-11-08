@@ -26,6 +26,7 @@ const duplicateMessages: Record<string, (value: string) => [code: string, messag
   areas_name_uidx: () => ["NAME_EXISTS", "An area with this name already exists"],
   customer_groups_name_uidx: () => ["NAME_EXISTS", "A customer group with this name already exists"],
   customers_cnic_uidx: () => ["CNIC_EXISTS", "Another customer already has this CNIC"],
+  cheques_identity_idx: () => ["CHEQUE_EXISTS", "This cheque has already been entered"],
   price_lists_name_uidx: () => ["NAME_EXISTS", "A price list with this name already exists"],
 };
 
