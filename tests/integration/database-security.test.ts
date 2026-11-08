@@ -11,7 +11,7 @@ const foundationTables = [
   "idempotency_keys", "categories", "brands", "tax_categories", "units", "products", "product_variants", "product_units",
   "price_lists", "price_list_items", "stock_ledger", "stock_balances", "stock_adjustments", "stock_adjustment_lines",
   "payment_methods", "shifts", "cash_movements", "sales_invoices", "sales_invoice_lines", "payments", "held_sales", "data_versions",
-  "areas", "customer_groups", "customers", "party_ledger", "customer_payments", "payment_allocations", "sales_returns", "sales_return_lines", "cheques",
+  "areas", "customer_groups", "customers", "party_ledger", "customer_payments", "payment_allocations", "sales_returns", "sales_return_lines", "cheques", "suppliers",
 ];
 
 function supabaseAs(accessToken: string) {

@@ -48,6 +48,9 @@ export const permissionDefinitions = [
   ["sales.return", "Take back goods against an invoice and give a refund or credit note"],
   ["sales.return_override", "Approve a return without a receipt or after the return window (manager PIN)"],
   ["customers.cheques", "Deposit cheques and mark them cleared or bounced"],
+  ["suppliers.view", "View suppliers (name, contact, terms)"],
+  ["suppliers.manage", "Add, edit and archive suppliers; load opening payables"],
+  ["suppliers.ledger", "View what the shop owes a supplier: balance, ledger and ageing"],
 ] as const;
 
 export type PermissionKey = (typeof permissionDefinitions)[number][0];
@@ -67,6 +70,7 @@ export const managerPermissionKeys: PermissionKey[] = [
   "shifts.open", "shifts.close", "shifts.view_all", "cash.movement", "reports.sales.view",
   "customers.view", "customers.create", "customers.manage", "customers.ledger", "customers.receive_payment", "sales.credit_override",
   "sales.return", "sales.return_override", "customers.cheques",
+  "suppliers.view", "suppliers.manage", "suppliers.ledger",
 ];
 
 export const cashierPermissionKeys: PermissionKey[] = [
