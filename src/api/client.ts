@@ -35,8 +35,12 @@ export async function requestApi<T>(path: string, init: RequestInit = {}): Promi
   return result;
 }
 
-export function postJson<T>(path: string, body: unknown): Promise<T> {
-  return requestApi<T>(path, { method: "POST", body: JSON.stringify(body) });
+export function postJson<T>(path: string, body: unknown, headers?: Record<string, string>): Promise<T> {
+  return requestApi<T>(path, { method: "POST", body: JSON.stringify(body), headers });
+}
+
+export function deleteJson<T>(path: string): Promise<T> {
+  return requestApi<T>(path, { method: "DELETE" });
 }
 
 export function putJson<T>(path: string, body: unknown): Promise<T> {
