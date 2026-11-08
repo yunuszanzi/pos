@@ -25,6 +25,8 @@ DB: Supabase Postgres via Drizzle; posting logic in SQL functions. Auth: Supabas
 - Minimise API calls: shared data comes once from getAppBootstrapData into React Context
   + IndexedDB; catalogue and customers sync by delta; scans/search/pricing run locally;
   write responses update the cache instead of refetching. See technical-plan 5.7.
+- Menu: a module with no page yet is listed in src/app/plannedModules.ts, shown as "Under development" and not
+  linked. When a version ships a module, delete its entry there and add its route in the same commit.
 - Print: every document supports POS slip (80/58 mm) and A4/A5, user-selectable.
 - Quantities are exact: numeric(14,3) in the database, strings in the API, integer thousandths in
   code (shared/units.ts). Never parseFloat/Number them.

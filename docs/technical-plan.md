@@ -304,6 +304,8 @@ The shop can start selling on v0.3; every later version adds a module on top wit
 
 &#91;embedded content: release roadmap · 11 versions in 3 phases\]
 
+Menu rule for every version: a module whose page is not built yet appears in the menu as "Under development" and cannot be clicked (`src/app/plannedModules.ts`); the version that builds it removes that entry and adds the route.
+
 Definition of done for every version: migrations applied cleanly on a fresh and an existing database, unit + integration tests green, the listed Playwright end-to-end tests green, seed data updated, release notes written, docs updated.
 
 ### v0.1 Foundation

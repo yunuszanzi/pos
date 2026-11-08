@@ -7,6 +7,8 @@ import { useAuth } from "./useAuth";
 import { useTerminalStore } from "./terminalStore";
 import { ErrorMessage, Field, SelectInput, TextInput } from "./FormElements";
 import { hasPermission } from "./permissions";
+import { ErrorBoundary } from "./ErrorBoundary";
+import { plannedModules } from "./plannedModules";
 
 const AuditPage = lazy(() => import("../features/audit/AuditPage").then(({ AuditPage: Page }) => ({ default: Page })));
 const LoginPage = lazy(() => import("../features/auth/LoginPage").then(({ LoginPage: Page }) => ({ default: Page })));
@@ -92,9 +94,10 @@ function AppRoutes() {
   if (!currentUser.businessId) return <Routes><Route path="/setup" element={<SetupPage />} /><Route path="*" element={<Navigate to="/setup" replace />} /></Routes>;
 
   // The till is a full screen of its own, without the back-office menu.
-  if (location.pathname === "/pos") return <PosPage />;
+  if (location.pathname === "/pos") return <ErrorBoundary><PosPage /></ErrorBoundary>;
 
   return <Shell>
+    <ErrorBoundary key={location.pathname}>
     <Routes>
       {appRoutes.map((route) => <Route key={route.path} path={route.path} element={
         route.permission && !hasPermission(currentUser.permissions, route.permission)
@@ -103,6 +106,7 @@ function AppRoutes() {
       } />)}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </ErrorBoundary>
   </Shell>;
 }
 
@@ -166,6 +170,12 @@ function Shell({ children }: { children: ReactNode }) {
         {hasPermission(currentUser?.permissions ?? [], "sales.create") && <NavLink to="/pos" className="nav-link">Point of sale</NavLink>}
         {visibleRoutes.map((route) => <NavLink key={route.path} to={route.path} className={({ isActive }) => isActive ? "nav-link selected" : "nav-link"}>{route.label}</NavLink>)}
       </nav>
+      <nav className="planned-nav" aria-label="Coming soon">
+        <p className="eyebrow">Coming soon</p>
+        {plannedModules.map((module) => <span key={module.label} className="nav-link disabled" aria-disabled="true" title={`Planned for ${module.version}`}>
+          {module.label}<small className="badge">Under development</small>
+        </span>)}
+      </nav>
       <div className="sidebar-bottom">
         <span className="user-initial">{(currentUser?.activeUserName ?? currentUser?.email ?? "U").slice(0, 1).toUpperCase()}</span>
         <div className="user-summary"><strong>{currentUser?.activeUserName ?? currentUser?.activeUserEmail ?? "Signed in"}</strong><small>{currentUser?.activeUserEmail}</small></div>
@@ -197,14 +207,14 @@ function Dashboard() {
   const cards = appRoutes.filter((route) => route.path !== "/" && route.nav !== false && (!route.permission || hasPermission(currentUser?.permissions ?? [], route.permission)));
   return <div className="content">
     <div className="welcome-panel">
-      <p className="eyebrow">Foundation release · v0.1</p>
+      <p className="eyebrow">Release v0.3 · Point of sale</p>
       <h1>Welcome{currentUser?.activeUserName ? `, ${currentUser.activeUserName}` : ""}</h1>
-      <p>Business access, staff, roles and organisation setup are ready. Catalogue and sales features arrive in later releases.</p>
+      <p>Products, stock and selling at the till are ready. Modules marked “Under development” in the menu arrive in later releases.</p>
     </div>
     <div className="dashboard-grid">{cards.map((route) => <Link className="dashboard-card" key={route.path} to={route.path}>
       <span className="card-arrow">↗</span><strong>{route.label}</strong><small>Open workspace</small>
     </Link>)}</div>
-    <section className="foundation-note"><strong>v0.1 Foundation</strong><span>Next: catalogue and stock management · v0.2</span></section>
+    <section className="foundation-note"><strong>v0.3 Point of sale</strong><span>Next: customers, credit sales and returns · v0.4</span></section>
   </div>;
 }
 

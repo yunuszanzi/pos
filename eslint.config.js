@@ -9,7 +9,7 @@ export default tseslint.config(
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    files: ["**/*.{ts,tsx}"],
+    files: ["**/*.{ts,tsx,mjs}"],
     languageOptions: { globals: { ...globals.browser, ...globals.node } },
     plugins: { "react-hooks": reactHooks, "react-refresh": reactRefresh },
     rules: {
