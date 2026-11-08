@@ -31,6 +31,12 @@ const OpeningStockPage = lazy(() => import("../features/stock/OpeningStockPage")
 const CustomersPage = lazy(() => import("../features/customers/CustomersPage").then(({ CustomersPage: Page }) => ({ default: Page })));
 const CustomerFormPage = lazy(() => import("../features/customers/CustomerFormPage").then(({ CustomerFormPage: Page }) => ({ default: Page })));
 const CustomerLedgerPage = lazy(() => import("../features/customers/CustomerLedgerPage").then(({ CustomerLedgerPage: Page }) => ({ default: Page })));
+const PurchaseOrdersPage = lazy(() => import("../features/purchasing/PurchaseOrdersPage").then(({ PurchaseOrdersPage: Page }) => ({ default: Page })));
+const PurchaseOrderFormPage = lazy(() => import("../features/purchasing/PurchaseOrderFormPage").then(({ PurchaseOrderFormPage: Page }) => ({ default: Page })));
+const PurchaseOrderPage = lazy(() => import("../features/purchasing/PurchaseOrderPage").then(({ PurchaseOrderPage: Page }) => ({ default: Page })));
+const ReceiveGoodsPage = lazy(() => import("../features/purchasing/ReceiveGoodsPage").then(({ ReceiveGoodsPage: Page }) => ({ default: Page })));
+const GoodsReceiptsPage = lazy(() => import("../features/purchasing/GoodsReceiptsPage").then(({ GoodsReceiptsPage: Page }) => ({ default: Page })));
+const GoodsReceiptPage = lazy(() => import("../features/purchasing/GoodsReceiptPage").then(({ GoodsReceiptPage: Page }) => ({ default: Page })));
 const SuppliersPage = lazy(() => import("../features/suppliers/SuppliersPage").then(({ SuppliersPage: Page }) => ({ default: Page })));
 const SupplierFormPage = lazy(() => import("../features/suppliers/SupplierFormPage").then(({ SupplierFormPage: Page }) => ({ default: Page })));
 const SupplierLedgerPage = lazy(() => import("../features/suppliers/SupplierLedgerPage").then(({ SupplierLedgerPage: Page }) => ({ default: Page })));
@@ -81,6 +87,13 @@ const appRoutes: AppRoute[] = [
   { path: "/suppliers/opening-payables", label: "Opening payables", permission: "suppliers.manage", element: <OpeningPayablesPage />, nav: false },
   { path: "/suppliers/:id/ledger", label: "Supplier ledger", permission: "suppliers.ledger", element: <SupplierLedgerPage />, nav: false },
   { path: "/suppliers/:id", label: "Edit supplier", permission: "suppliers.manage", element: <SupplierFormPage />, nav: false },
+  { path: "/purchase-orders", label: "Purchase orders", permission: "purchasing.view", element: <PurchaseOrdersPage /> },
+  { path: "/purchase-orders/new", label: "New purchase order", permission: "purchasing.order", element: <PurchaseOrderFormPage />, nav: false },
+  { path: "/purchase-orders/:id/edit", label: "Change purchase order", permission: "purchasing.order", element: <PurchaseOrderFormPage />, nav: false },
+  { path: "/purchase-orders/:id", label: "Purchase order", permission: "purchasing.view", element: <PurchaseOrderPage />, nav: false },
+  { path: "/goods-receipts", label: "Goods receipts", permission: "purchasing.view", element: <GoodsReceiptsPage /> },
+  { path: "/goods-receipts/new", label: "Receive goods", permission: "purchasing.receive", element: <ReceiveGoodsPage />, nav: false },
+  { path: "/goods-receipts/:id", label: "Goods receipt", permission: "purchasing.view", element: <GoodsReceiptPage />, nav: false },
   { path: "/supplier-ageing", label: "Payables ageing", permission: "suppliers.ledger", element: <SupplierAgeingPage /> },
   { path: "/cheques", label: "Cheques", permission: "customers.ledger", element: <ChequesPage /> },
   { path: "/customer-ageing", label: "Customer ageing", permission: "customers.ledger", element: <CustomerAgeingPage /> },

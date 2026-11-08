@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { averageAfterReceipt, costPerBaseUnit, orderTotal, purchaseLineValue, remainingToReceive, statusAfterReceipt } from "../../shared/purchasing";
+import { averageAfterReceipt, costPerBaseUnit, orderTotal, purchaseLineValue, remainingToReceive, statusAfterReceipt, unitCostFromBase } from "../../shared/purchasing";
 
 describe("purchase line value and cost per base unit", () => {
   it("values a line as quantity times the price of the unit it was bought in", () => {
@@ -64,5 +64,13 @@ describe("receiving against an order", () => {
   it("adds up an order", () => {
     expect(orderTotal([{ valuePaisa: 3_200_000 }, { valuePaisa: 25_050 }])).toBe(3_225_050);
     expect(orderTotal([])).toBe(0);
+  });
+});
+
+describe("suggesting the price of a bought unit", () => {
+  it("is the cost of one piece times the pieces in the unit", () => {
+    expect(unitCostFromBase(1_600, 200_000)).toBe(320_000);
+    expect(unitCostFromBase(333, 10_000)).toBe(3_330);
+    expect(unitCostFromBase(1_001, 500)).toBe(501); // half a piece in the unit: 500.5 rounds up
   });
 });

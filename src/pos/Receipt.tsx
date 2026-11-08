@@ -1,7 +1,8 @@
 import { createPortal } from "react-dom";
 import { useEffect } from "react";
 import {
-  buildCreditNoteReceipt, buildPaymentReceipt, buildReceipt, buildStatementReceipt, receiptPageCss, type PrintFormat, type ReceiptBusiness, type ReceiptCreditNote, type ReceiptInvoice, type ReceiptModel, type ReceiptPayment, type ReceiptStatement,
+  buildCreditNoteReceipt, buildGoodsReceiptReceipt, buildPaymentReceipt, buildPurchaseOrderReceipt, buildReceipt, buildStatementReceipt, receiptPageCss, type PrintFormat, type ReceiptBusiness,
+  type ReceiptCreditNote, type ReceiptGoodsReceipt, type ReceiptInvoice, type ReceiptModel, type ReceiptPayment, type ReceiptPurchaseOrder, type ReceiptStatement,
 } from "../../shared/receipt";
 
 type JobBase = {
@@ -12,18 +13,21 @@ type JobBase = {
   /** Present on a reprint. */
   duplicate?: { copyNumber: number };
 };
-/** A sale, money received from a customer, a credit note for goods taken back, or a customer statement. */
-export type PrintJob = JobBase & (
-  { invoice: ReceiptInvoice; payment?: undefined; creditNote?: undefined; statement?: undefined }
-  | { payment: ReceiptPayment; invoice?: undefined; creditNote?: undefined; statement?: undefined }
-  | { creditNote: ReceiptCreditNote; invoice?: undefined; payment?: undefined; statement?: undefined }
-  | { statement: ReceiptStatement; invoice?: undefined; payment?: undefined; creditNote?: undefined }
-);
+/** The documents that print, by the name each goes under in a job. */
+type Documents = {
+  invoice: ReceiptInvoice; payment: ReceiptPayment; creditNote: ReceiptCreditNote; statement: ReceiptStatement;
+  purchaseOrder: ReceiptPurchaseOrder; goodsReceipt: ReceiptGoodsReceipt;
+};
+type OneDocument<K extends keyof Documents> = { [P in K]: Documents[P] } & { [P in Exclude<keyof Documents, K>]?: undefined };
+/** A sale, money received, a credit note, a customer statement, a purchase order or a goods receipt: exactly one of them. */
+export type PrintJob = JobBase & { [K in keyof Documents]: OneDocument<K> }[keyof Documents];
 
 const modelOf = (job: PrintJob) => {
   const options = { business: job.business, dateFormat: job.dateFormat, timezone: job.timezone, duplicate: job.duplicate };
   if (job.creditNote) return buildCreditNoteReceipt(job.creditNote, options);
   if (job.statement) return buildStatementReceipt(job.statement, options);
+  if (job.purchaseOrder) return buildPurchaseOrderReceipt(job.purchaseOrder, options);
+  if (job.goodsReceipt) return buildGoodsReceiptReceipt(job.goodsReceipt, options);
   return job.payment ? buildPaymentReceipt(job.payment, options) : buildReceipt(job.invoice, job.format, options);
 };
 
@@ -54,7 +58,7 @@ export function Receipt({ model, format }: { model: ReceiptModel; format: PrintF
       </table>
       : <ul className="receipt-lines">{model.lines.map((line, index) => <li key={index}>
         <span className="item-name">{line.name}</span>
-        <span className="item-figures"><span>{line.quantity} × {line.unitPrice}</span><span>{line.total}</span></span>
+        <span className="item-figures"><span>{line.unitPrice ? `${line.quantity} × ${line.unitPrice}` : line.quantity}</span><span>{line.total}</span></span>
         {line.discount && <span className="item-figures"><span>discount</span><span>{line.discount}</span></span>}
         <small>{line.detail}</small>
       </li>)}</ul>)}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCreditNoteReceipt, buildPaymentReceipt, buildReceipt, buildStatementReceipt, formatDocumentDate, receiptPageCss, type ReceiptBusiness, type ReceiptCreditNote, type ReceiptInvoice, type ReceiptPayment } from "../../shared/receipt";
+import { buildCreditNoteReceipt, buildGoodsReceiptReceipt, buildPaymentReceipt, buildPurchaseOrderReceipt, buildReceipt, buildStatementReceipt, formatDay, formatDocumentDate, receiptPageCss, type ReceiptBusiness, type ReceiptCreditNote, type ReceiptInvoice, type ReceiptPayment } from "../../shared/receipt";
 
 const business: ReceiptBusiness = {
   tradeName: "SGA Balloons", legalName: "SGA Balloons (Pvt) Ltd", address: "Shop 4, Saddar, Karachi", phone: "021-111", ntn: "1234567-8", strn: null, receiptFooter: "",
@@ -203,5 +203,53 @@ describe("customer statement", () => {
     expect(model.totals[0]).toEqual({ label: "Opening balance", value: "Rs 5.00 Cr" });
     expect(model.totals.map((row) => row.label)).toEqual(["Opening balance", "Invoices", "Payments received", "Returns", "Refunds paid out", "Opening balance / adjustments", "CREDIT WITH US"]);
     expect(model.totals.at(-1)).toEqual({ label: "CREDIT WITH US", value: "Rs 90.00", strong: true });
+  });
+});
+
+describe("purchase documents", () => {
+  const lines = [
+    { productName: "Latex Balloon", variantName: "Red", sku: "BAL-RED", unitName: "Carton", quantity: "2", unitCostPaisa: 320_000, lineTotalPaisa: 640_000 },
+    { productName: "Ribbon", variantName: "", sku: "RIB-1", unitName: "Piece", quantity: "12.500", unitCostPaisa: 2_500, lineTotalPaisa: 31_250 },
+  ];
+  const order = { number: "PO-KHI-000007", orderDate: "2026-11-09", expectedDate: "2026-11-20", supplierName: "Karachi Balloon Mills", branchName: "Karachi", locationName: "Main store", note: "Deliver before Eid", totalPaisa: 671_250, lines };
+
+  it("formats a day in the business's date style", () => {
+    expect(formatDay("2026-11-09", "dd/MM/yyyy")).toBe("09/11/2026");
+    expect(formatDay("2026-11-09", "MM/dd/yyyy")).toBe("11/09/2026");
+    expect(formatDay("2026-11-09", "yyyy-MM-dd")).toBe("2026-11-09");
+  });
+
+  it("prints a purchase order with its items, prices and total", () => {
+    const model = buildPurchaseOrderReceipt(order, options);
+    expect(model.title).toBe("PURCHASE ORDER");
+    expect(model.meta).toEqual([
+      { label: "No.", value: "PO-KHI-000007" }, { label: "Date", value: "09/11/2026" }, { label: "To", value: "Karachi Balloon Mills" },
+      { label: "Expected", value: "20/11/2026" }, { label: "Deliver to", value: "Main store" },
+    ]);
+    expect(model.lines).toEqual([
+      { name: "Latex Balloon — Red", detail: "BAL-RED · Carton", quantity: "2", unitPrice: "Rs 3,200.00", discount: null, total: "Rs 6,400.00" },
+      { name: "Ribbon", detail: "RIB-1 · Piece", quantity: "12.5", unitPrice: "Rs 25.00", discount: null, total: "Rs 312.50" },
+    ]);
+    expect(model.totals).toEqual([{ label: "ORDER TOTAL", value: "Rs 6,712.50", strong: true }]);
+    expect(model.footer).toEqual(["Deliver before Eid"]);
+  });
+
+  it("leaves prices and totals off when the reader may not see costs", () => {
+    const { totalPaisa, ...rest } = order;
+    void totalPaisa;
+    const model = buildPurchaseOrderReceipt({ ...rest, lines: lines.map(({ unitCostPaisa, lineTotalPaisa, ...line }) => { void unitCostPaisa; void lineTotalPaisa; return line; }) }, options);
+    expect(model.lines.every((line) => line.unitPrice === "" && line.total === "")).toBe(true);
+    expect(model.totals).toEqual([]);
+  });
+
+  it("prints a goods receipt with the order, the supplier's reference and who received it", () => {
+    const model = buildGoodsReceiptReceipt({
+      number: "GRN-KHI-000003", receivedAt: "2026-11-09T09:30:00Z", supplierName: "Karachi Balloon Mills", branchName: "Karachi", locationName: "Main store",
+      orderNumber: "PO-KHI-000007", supplierRef: "DC-4411", receivedBy: "Store Keeper", note: "", totalPaisa: 640_000, lines: [lines[0]],
+    }, { ...options, duplicate: { copyNumber: 2 } });
+    expect(model.title).toBe("GOODS RECEIVED");
+    expect(model.duplicateBanner).toBe("DUPLICATE — copy 2, not the original");
+    expect(model.meta).toEqual(expect.arrayContaining([{ label: "Order", value: "PO-KHI-000007" }, { label: "Supplier ref", value: "DC-4411" }, { label: "Received by", value: "Store Keeper" }]));
+    expect(model.totals).toEqual([{ label: "VALUE RECEIVED", value: "Rs 6,400.00", strong: true }]);
   });
 });

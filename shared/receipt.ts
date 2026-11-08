@@ -372,3 +372,109 @@ export function buildStatementReceipt(statement: ReceiptStatement, options: Rece
     footer: business.receiptFooter ? [business.receiptFooter] : ["Please tell us if anything on this statement looks wrong."],
   };
 }
+
+// ---------------------------------------------------------------- purchase documents
+
+/** "2026-11-09" in the business's date style. A day with no time of day, so no time zone applies. */
+export function formatDay(day: string, dateFormat: string): string {
+  const [year, month, date] = day.split("-");
+  return dateFormat === "MM/dd/yyyy" ? `${month}/${date}/${year}` : dateFormat === "yyyy-MM-dd" ? `${year}-${month}-${date}` : `${date}/${month}/${year}`;
+}
+
+type PurchaseLine = {
+  productName: string; variantName: string; sku: string; unitName: string; quantity: string;
+  /** Left out for people who may not see costs. */
+  unitCostPaisa?: number; lineTotalPaisa?: number;
+};
+
+export type ReceiptPurchaseOrder = {
+  number: string;
+  /** yyyy-mm-dd */
+  orderDate: string;
+  expectedDate: string | null;
+  supplierName: string;
+  branchName: string;
+  locationName: string;
+  note: string;
+  totalPaisa?: number;
+  lines: PurchaseLine[];
+};
+
+function purchaseLineRows(lines: PurchaseLine[]): ReceiptLine[] {
+  return lines.map((line) => ({
+    name: line.variantName ? `${line.productName} — ${line.variantName}` : line.productName,
+    detail: `${line.sku} · ${line.unitName}`,
+    quantity: formatQuantity(parseQuantity(line.quantity)),
+    unitPrice: line.unitCostPaisa === undefined ? "" : formatPkr(line.unitCostPaisa),
+    discount: null,
+    total: line.lineTotalPaisa === undefined ? "" : formatPkr(line.lineTotalPaisa),
+  }));
+}
+
+export function buildPurchaseOrderReceipt(order: ReceiptPurchaseOrder, options: ReceiptOptions): ReceiptModel {
+  const { business } = options;
+  const dateText = formatDay(order.orderDate, options.dateFormat);
+  return {
+    title: "PURCHASE ORDER",
+    duplicateBanner: duplicateBanner(options),
+    businessName: business.tradeName,
+    headerLines: headerLinesOf(business, order.branchName),
+    number: order.number,
+    dateText,
+    cashier: "",
+    terminal: "",
+    customer: null,
+    meta: [
+      { label: "No.", value: order.number }, { label: "Date", value: dateText }, { label: "To", value: order.supplierName },
+      ...(order.expectedDate ? [{ label: "Expected", value: formatDay(order.expectedDate, options.dateFormat) }] : []),
+      { label: "Deliver to", value: order.locationName },
+    ],
+    lines: purchaseLineRows(order.lines),
+    totals: order.totalPaisa === undefined ? [] : [{ label: "ORDER TOTAL", value: formatPkr(order.totalPaisa), strong: true }],
+    taxRows: [],
+    payments: [],
+    footer: order.note ? [order.note] : [],
+  };
+}
+
+export type ReceiptGoodsReceipt = {
+  number: string;
+  receivedAt: string;
+  supplierName: string;
+  branchName: string;
+  locationName: string;
+  orderNumber: string | null;
+  supplierRef: string;
+  receivedBy: string | null;
+  note: string;
+  totalPaisa?: number;
+  lines: PurchaseLine[];
+};
+
+export function buildGoodsReceiptReceipt(receipt: ReceiptGoodsReceipt, options: ReceiptOptions): ReceiptModel {
+  const { business } = options;
+  const dateText = formatDocumentDate(receipt.receivedAt, options.dateFormat, options.timezone);
+  return {
+    title: "GOODS RECEIVED",
+    duplicateBanner: duplicateBanner(options),
+    businessName: business.tradeName,
+    headerLines: headerLinesOf(business, receipt.branchName),
+    number: receipt.number,
+    dateText,
+    cashier: receipt.receivedBy ?? "",
+    terminal: "",
+    customer: null,
+    meta: [
+      { label: "No.", value: receipt.number }, { label: "Date", value: dateText }, { label: "From", value: receipt.supplierName },
+      ...(receipt.orderNumber ? [{ label: "Order", value: receipt.orderNumber }] : []),
+      ...(receipt.supplierRef ? [{ label: "Supplier ref", value: receipt.supplierRef }] : []),
+      { label: "Into", value: receipt.locationName },
+      ...(receipt.receivedBy ? [{ label: "Received by", value: receipt.receivedBy }] : []),
+    ],
+    lines: purchaseLineRows(receipt.lines),
+    totals: receipt.totalPaisa === undefined ? [] : [{ label: "VALUE RECEIVED", value: formatPkr(receipt.totalPaisa), strong: true }],
+    taxRows: [],
+    payments: [],
+    footer: receipt.note ? [receipt.note] : [],
+  };
+}

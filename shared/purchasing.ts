@@ -48,3 +48,8 @@ export function statusAfterReceipt(lines: Array<{ qtyBase: Milli; receivedBase: 
 }
 
 export const orderTotal = (lines: Array<{ valuePaisa: Paisa }>): Paisa => lines.reduce((sum, line) => sum + line.valuePaisa, 0);
+
+/** The price of one bought unit (a carton) suggested from the cost of one base unit (a piece): the other way round from costPerBaseUnit. */
+export function unitCostFromBase(costPerBasePaisa: Paisa, factorToBaseMilli: Milli): Paisa {
+  return Number(divideRounded(BigInt(costPerBasePaisa) * BigInt(factorToBaseMilli), 1000n));
+}
