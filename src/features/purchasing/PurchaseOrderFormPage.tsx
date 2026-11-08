@@ -8,13 +8,14 @@ import { parseQuantity } from "../../../shared/units";
 import { getAllUnits } from "../../api/catalogueApi";
 import { getAllLocations } from "../../api/orgApi";
 import type { Product, ProductVariant } from "../../api/productsApi";
-import { createPurchaseOrder, getPurchaseOrderById, updatePurchaseOrder, type PurchaseOrder } from "../../api/purchasingApi";
+import { createPurchaseOrder, getPurchaseHistory, getPurchaseOrderById, updatePurchaseOrder, type PurchaseHistory, type PurchaseOrder } from "../../api/purchasingApi";
 import { ErrorMessage, Field, PageTitle, SelectInput, TextInput } from "../../app/FormElements";
 import { MoneyInput } from "../../app/MoneyInput";
 import { QuantityInput } from "../../app/QuantityInput";
 import { amountOf } from "../../pos/amounts";
 import { ProductPicker } from "../products/ProductPicker";
 import { SupplierPicker, type PickedSupplier } from "../suppliers/SupplierPicker";
+import { momentDayText } from "./dayText";
 
 type UnitChoice = { unitId: string; name: string; factorMilli: number };
 type Line = {
@@ -23,6 +24,8 @@ type Line = {
   /** What the price box held when it was last filled in for the unit, so a changed unit only replaces a suggestion, never a typed price. */
   suggested: string;
   costPerBasePaisa: number;
+  /** What the SKU cost the last few times it was bought, once it has loaded. */
+  history?: PurchaseHistory;
 };
 
 /** Writes a purchase order, or changes one that is still a draft. */
@@ -66,6 +69,14 @@ function OrderForm({ order }: { order?: PurchaseOrder }) {
     const first = choices.find((choice) => variant.units.find((unit) => unit.unitId === choice.unitId)?.isBase) ?? choices[0];
     const suggested = priceFor(variant.costPaisa ?? 0, first.factorMilli);
     setLines([...lines, { variantId: variant.id, sku: variant.sku, productName: product.name, variantName: variant.variantName, unitId: first.unitId, units: choices, quantity: "", cost: suggested, suggested, costPerBasePaisa: variant.costPaisa ?? 0 }]);
+    // What it cost last time (the billed price when billed) is a better price to start from than the SKU's cost. A price already typed is kept.
+    void getPurchaseHistory(variant.id).then((history) => setLines((current) => current.map((line) => {
+      if (line.variantId !== variant.id) return line;
+      if (history.lastCostPerBasePaisa === null) return { ...line, history };
+      const factor = line.units.find((unit) => unit.unitId === line.unitId)?.factorMilli ?? 1000;
+      const better = priceFor(history.lastCostPerBasePaisa, factor);
+      return { ...line, history, costPerBasePaisa: history.lastCostPerBasePaisa, suggested: better, cost: line.cost === line.suggested ? better : line.cost };
+    }))).catch(() => undefined);
   }
   const change = (index: number, patch: Partial<Line>) => setLines(lines.map((line, position) => (position === index ? { ...line, ...patch } : line)));
   function changeUnit(index: number, unitId: string) {
@@ -128,7 +139,9 @@ function OrderForm({ order }: { order?: PurchaseOrder }) {
         <h2>Items</h2>
         <ProductPicker stockedOnly isPicked={(variantId) => lines.some((line) => line.variantId === variantId)} onPick={addLine} />
         {lines.map((line, index) => <div className="form-grid" key={line.variantId} role="group" aria-label={`Line ${line.sku}`}>
-          <div><strong>{line.productName}{line.variantName ? ` — ${line.variantName}` : ""}</strong><br /><span className="mono">{line.sku}</span></div>
+          <div><strong>{line.productName}{line.variantName ? ` — ${line.variantName}` : ""}</strong><br /><span className="mono">{line.sku}</span>
+            {line.history?.entries[0] && <small className="block muted" data-testid={`last-bought-${line.sku}`}>Last bought {formatPkr(line.history.entries[0].unitCostPaisa)} a {line.history.entries[0].unitName.toLowerCase()} from {line.history.entries[0].supplierName} ({momentDayText(line.history.entries[0].receivedAt)}{line.history.entries[0].billed ? ", as billed" : ""})</small>}
+            {line.history && line.history.entries.length > 1 && <small className="block muted">Before that: {line.history.entries.slice(1).map((entry) => `${formatPkr(entry.unitCostPaisa)} a ${entry.unitName.toLowerCase()}`).join(", ")}</small>}</div>
           <Field label="Quantity"><QuantityInput value={line.quantity} onChange={(event) => change(index, { quantity: event.target.value })} placeholder="0" required /></Field>
           <Field label="Unit"><SelectInput value={line.unitId} onChange={(event) => changeUnit(index, event.target.value)}>{line.units.map((unit) => <option key={unit.unitId} value={unit.unitId}>{unit.name}</option>)}</SelectInput></Field>
           <Field label="Price of one unit (Rs)"><MoneyInput value={line.cost} onChange={(event) => change(index, { cost: event.target.value })} /></Field>

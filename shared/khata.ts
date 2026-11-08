@@ -130,6 +130,9 @@ export function whatsappLink(phone: string, message: string): string | null {
   return number ? `https://wa.me/${number}?text=${encodeURIComponent(message)}` : null;
 }
 
+/** A wa.me link that opens WhatsApp with the message ready and lets the person choose who to send it to. */
+export const whatsappShareLink = (message: string): string => `https://wa.me/?text=${encodeURIComponent(message)}`;
+
 export function reminderMessage(input: { customerName: string; businessName: string; balancePaisa: Paisa; overdueDays?: number }): string {
   const overdue = input.overdueDays && input.overdueDays > 0 ? ` Your oldest unpaid bill is ${input.overdueDays} days old.` : "";
   return `Assalam o Alaikum ${input.customerName}, this is a reminder from ${input.businessName}. Your balance with us is ${formatPkr(input.balancePaisa)}.${overdue} Please pay at your earliest convenience. Thank you.`;

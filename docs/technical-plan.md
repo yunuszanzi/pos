@@ -425,7 +425,7 @@ Acceptance tests:
 2. Receipt at a new cost updates average cost exactly per the formula; next sale's profit uses it.
 3. Supplier ledger and payables ageing match bills minus payments and returns.
 
-#### As built in v0.5 so far (suppliers, purchase orders, goods receipts, supplier bills, supplier payments and purchase returns; the reorder list is still to come)
+#### As built in v0.5 (suppliers, purchase orders, goods receipts, supplier bills, supplier payments, purchase returns and the reorder list)
 
 - **Suppliers** (migration 0011). `suppliers` mirror customers: name (unique per business), contact, phone, WhatsApp, email, address, NTN/STRN, registration, payment terms in days (0 = due on receipt), notes, archive instead of delete. Permissions: `suppliers.view`, `suppliers.manage`, `suppliers.ledger` (Owner and Manager; cashiers hold none). Without `suppliers.ledger` a person sees no balances.
 - **Supplier ledger.** Suppliers use the same append-only `party_ledger` as customers (party type `supplier`), with the debit/credit sense kept: **credit = the shop owes the supplier more** (a bill, an opening payable), **debit = it owes less** (a payment, a return). `suppliers.balance_paisa` is the amount WE owe (positive) or what they owe us (negative, credit held), written only by the ledger trigger (a guard trigger refuses anything else), the reverse sign of a customer's balance. The ledger page shows what the shop owes after each entry.
@@ -448,6 +448,14 @@ Acceptance tests:
 - **Payables reconcile.** The supplier's balance, the payables ageing total and the sum of open bills' outstanding amounts agree, and equal bills − payments − returns (acceptance test 3; opening payables, which are not bills, appear in the first two only).
 - **Bills show what settled them:** `outstandingPaisa`, `settledPaisa` and the settling payments/returns.
 - **Pages:** the supplier ledger page (open bills, "Pay supplier"), `/supplier-payments` (menu: Payments made), `/purchase-returns`, `/purchase-returns/new?receipt=`, `/purchase-returns/:id`; "Return goods" on a goods receipt.
+
+- **Reorder list** (migration 0015, `GET /reorder-list`, paginated, `purchasing.view`). A SKU is listed when it is active, stocked, has a reorder level above 0 and **on hand + still to come on sent or partly-received orders** is at or below that level (`suggestReorder` in `shared/purchasing.ts`), most short first. The suggestion is the SKU's reorder quantity, else what it takes to get back to the level, in the base unit. Each row carries the supplier it is normally bought from: the one set in `preferred_suppliers`, else the one it last came from. A draft order does not count as ordered until it is sent. Reorder levels are per SKU (per-location levels, FR-PRD-08, are not built); `?locationId=` counts one location's stock only.
+- **Draft orders from the list** (`POST /reorder-list/draft-orders`, `purchasing.order` + the cost permission, Idempotency-Key). Chosen lines become one **draft** purchase order per supplier (all or nothing), each line in the SKU's base unit at what it last cost (the billed price when billed, else the receipt's, else the SKU's own cost), to be changed and sent from the orders page. A line can also set its supplier as the usual one (`remember`).
+- **What it cost last time** (`GET /purchase-history/:variantId`, FR-PUR-08, cost permission). The last five receipts of the SKU with the price each carried (**the billed price when it was billed**), newest first, and the last cost per base unit. The purchase order form shows it under each item and starts the price from it (a price already typed is kept).
+- **Sharing.** The list can be shared on WhatsApp with `wa.me/?text=`, the person choosing who gets it. Low-stock alerts on the dashboard come with the dashboard in v0.7; email is not built.
+- **Not built in v0.5:** per-location reorder levels, a purchase return without a goods receipt, a cash refund from a supplier, bounce-style supplier credit notes outside a return, and approval levels on purchase orders.
+
+Acceptance tests (automated): 1 - `purchasing-api.test.ts` (60 then 40 of 100: partly received, received, stock +100) and `purchasing.spec.ts`; 2 - the same file (average cost per the formula, next sale's cost 1,100) and `stockLedger.test.ts`; 3 - `payables-api.test.ts` (ledger = ageing = open bills = bills − payments − returns).
 
 ### v0.6 Quotations, orders and delivery
 

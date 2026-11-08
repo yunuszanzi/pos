@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ageLedger, reminderMessage, summariseStatement, whatsappLink, whatsappNumber, type KhataEntry } from "../../shared/khata";
+import { ageLedger, reminderMessage, summariseStatement, whatsappLink, whatsappNumber, whatsappShareLink, type KhataEntry } from "../../shared/khata";
 import { analyseOpeningBalances, type OpeningBalanceLookups } from "../../shared/openingBalanceImport";
 
 const entry = (docType: string, debitPaisa: number, creditPaisa: number, at: string): KhataEntry => ({ docType, debitPaisa, creditPaisa, at });
@@ -110,6 +110,10 @@ describe("WhatsApp", () => {
     expect(whatsappNumber("")).toBeNull();
     expect(whatsappNumber("12345")).toBeNull();
     expect(whatsappLink("abc", "hi")).toBeNull();
+  });
+
+  it("builds a link with no number, to choose who to send to", () => {
+    expect(whatsappShareLink("Low: A & B\n- 5")).toBe("https://wa.me/?text=Low%3A%20A%20%26%20B%0A-%205");
   });
 
   it("builds a link with the message encoded", () => {

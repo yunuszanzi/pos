@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { averageAfterReceipt, costPerBaseUnit, orderTotal, purchaseLineValue, remainingToReceive, statusAfterReceipt, suggestReorder, unitCostFromBase } from "../../shared/purchasing";
+import { averageAfterReceipt, costPerBaseUnit, orderTotal, purchaseLineValue, remainingToReceive, reorderMessage, statusAfterReceipt, suggestReorder, unitCostFromBase } from "../../shared/purchasing";
 
 describe("purchase line value and cost per base unit", () => {
   it("values a line as quantity times the price of the unit it was bought in", () => {
@@ -101,5 +101,15 @@ describe("what to reorder", () => {
 
   it("treats overselling as stock of nothing it can lean on: negative stock asks for more", () => {
     expect(suggestReorder({ ...base, onHandMilli: -5_000 })).toBe(55_000);
+  });
+});
+
+describe("the reorder message", () => {
+  it("lists each item with what is left and what to order", () => {
+    expect(reorderMessage("SGA Balloons", [
+      { name: "Latex Balloon — Red", sku: "BAL-RED", onHand: "10", suggested: "200", unitName: "Piece" },
+      { name: "Ribbon", sku: "RIB-1", onHand: "2.5", suggested: "30", unitName: "Piece" },
+    ])).toBe("SGA Balloons: running low on 2 items.\n- Latex Balloon — Red (BAL-RED): 10 Piece left, order 200\n- Ribbon (RIB-1): 2.5 Piece left, order 30");
+    expect(reorderMessage("SGA Balloons", [{ name: "Ribbon", sku: "RIB-1", onHand: "0", suggested: "30", unitName: "Piece" }]).startsWith("SGA Balloons: running low on 1 item.")).toBe(true);
   });
 });

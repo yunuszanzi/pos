@@ -69,3 +69,9 @@ export function suggestReorder(input: { onHandMilli: Milli; onOrderMilli: Milli;
   if (input.reorderQuantityMilli > 0) return input.reorderQuantityMilli;
   return Math.max(input.levelMilli - covered, 1);
 }
+
+/** The reorder list as a message to share: one line per item with what is held and what to order. */
+export function reorderMessage(businessName: string, items: Array<{ name: string; sku: string; onHand: string; suggested: string; unitName: string }>): string {
+  const lines = items.map((item) => `- ${item.name} (${item.sku}): ${item.onHand} ${item.unitName} left, order ${item.suggested}`);
+  return [`${businessName}: running low on ${items.length} ${items.length === 1 ? "item" : "items"}.`, ...lines].join("\n");
+}

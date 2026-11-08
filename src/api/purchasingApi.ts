@@ -1,5 +1,5 @@
 import type { PoStatus } from "../../shared/purchasing";
-import type { GoodsReceiptInput, PurchaseOrderInput } from "../../shared/schemas/purchasing";
+import type { GoodsReceiptInput, PurchaseOrderInput, ReorderDraftInput } from "../../shared/schemas/purchasing";
 import type { PurchaseReturnInput } from "../../shared/schemas/supplierPayments";
 import { postJson, putJson, requestApi } from "./client";
 
@@ -87,3 +87,23 @@ export const postPurchaseReturn = (input: PurchaseReturnInput, idempotencyKey: s
 export const getAllPurchaseReturns = (filter: { supplierId?: string; q?: string; page?: number; pageSize?: number } = {}, signal?: AbortSignal) =>
   requestApi<PurchaseReturnPage>(`/purchase-returns?${query(filter)}`, { signal });
 export const getPurchaseReturnById = (id: string) => requestApi<PurchaseReturn>(`/purchase-returns/${id}`);
+
+export type ReorderRow = {
+  variantId: string; sku: string; productName: string; variantName: string; baseUnitName: string; onHand: string; onOrder: string; reorderLevel: string;
+  /** In the SKU's base unit. */
+  suggestedQuantity: string;
+  /** The supplier it is normally bought from: the one set (preferred), else the one it last came from. */
+  supplier: { id: string; name: string; preferred: boolean } | null;
+  lastCostPerBasePaisa?: number;
+};
+export type ReorderPage = { data: ReorderRow[]; page: number; pageSize: number; total: number };
+export type DraftOrdersResult = { orders: Array<{ id: string; number: string; supplierName: string; lineCount: number; totalPaisa: number }> };
+export type PurchaseHistory = {
+  lastCostPerBasePaisa: number | null;
+  entries: Array<{ receiptNumber: string; receivedAt: string; supplierName: string; unitName: string; factorToBase: string; unitCostPaisa: number; billed: boolean; costPerBasePaisa: number }>;
+};
+
+export const getReorderList = (filter: { q?: string; locationId?: string; page?: number; pageSize?: number } = {}, signal?: AbortSignal) => requestApi<ReorderPage>(`/reorder-list?${query(filter)}`, { signal });
+/** The idempotency key identifies one request: retrying with the same key can never make the orders twice. */
+export const createDraftOrdersFromReorder = (input: ReorderDraftInput, idempotencyKey: string) => postJson<DraftOrdersResult>("/reorder-list/draft-orders", input, { "Idempotency-Key": idempotencyKey });
+export const getPurchaseHistory = (variantId: string, signal?: AbortSignal) => requestApi<PurchaseHistory>(`/purchase-history/${variantId}`, { signal });

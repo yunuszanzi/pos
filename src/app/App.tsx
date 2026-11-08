@@ -44,6 +44,7 @@ const PurchaseReturnsPage = lazy(() => import("../features/purchasing/PurchaseRe
 const PurchaseReturnFormPage = lazy(() => import("../features/purchasing/PurchaseReturnFormPage").then(({ PurchaseReturnFormPage: Page }) => ({ default: Page })));
 const PurchaseReturnPage = lazy(() => import("../features/purchasing/PurchaseReturnPage").then(({ PurchaseReturnPage: Page }) => ({ default: Page })));
 const SupplierPaymentsPage = lazy(() => import("../features/suppliers/SupplierPaymentsPage").then(({ SupplierPaymentsPage: Page }) => ({ default: Page })));
+const ReorderPage = lazy(() => import("../features/purchasing/ReorderPage").then(({ ReorderPage: Page }) => ({ default: Page })));
 const SuppliersPage = lazy(() => import("../features/suppliers/SuppliersPage").then(({ SuppliersPage: Page }) => ({ default: Page })));
 const SupplierFormPage = lazy(() => import("../features/suppliers/SupplierFormPage").then(({ SupplierFormPage: Page }) => ({ default: Page })));
 const SupplierLedgerPage = lazy(() => import("../features/suppliers/SupplierLedgerPage").then(({ SupplierLedgerPage: Page }) => ({ default: Page })));
@@ -108,6 +109,7 @@ const appRoutes: AppRoute[] = [
   { path: "/purchase-returns/new", label: "Return goods to a supplier", permission: "purchasing.return", element: <PurchaseReturnFormPage />, nav: false },
   { path: "/purchase-returns/:id", label: "Purchase return", permission: "purchasing.view", element: <PurchaseReturnPage />, nav: false },
   { path: "/supplier-payments", label: "Payments made", permission: "suppliers.ledger", element: <SupplierPaymentsPage /> },
+  { path: "/reorder", label: "Reorder list", permission: "purchasing.view", element: <ReorderPage /> },
   { path: "/supplier-ageing", label: "Payables ageing", permission: "suppliers.ledger", element: <SupplierAgeingPage /> },
   { path: "/cheques", label: "Cheques", permission: "customers.ledger", element: <ChequesPage /> },
   { path: "/customer-ageing", label: "Customer ageing", permission: "customers.ledger", element: <CustomerAgeingPage /> },
@@ -271,7 +273,7 @@ function Dashboard() {
     <div className="dashboard-grid">{cards.map((route) => <Link className="dashboard-card" key={route.path} to={route.path}>
       <span className="card-arrow">↗</span><strong>{route.label}</strong><small>Open workspace</small>
     </Link>)}</div>
-    <section className="foundation-note"><strong>v0.3 Point of sale</strong><span>Next: customers, credit sales and returns · v0.4</span></section>
+    <section className="foundation-note"><strong>v0.5 Suppliers and purchasing</strong><span>Next: quotations, orders and delivery · v0.6</span></section>
   </div>;
 }
 
