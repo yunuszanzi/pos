@@ -37,6 +37,9 @@ const PurchaseOrderPage = lazy(() => import("../features/purchasing/PurchaseOrde
 const ReceiveGoodsPage = lazy(() => import("../features/purchasing/ReceiveGoodsPage").then(({ ReceiveGoodsPage: Page }) => ({ default: Page })));
 const GoodsReceiptsPage = lazy(() => import("../features/purchasing/GoodsReceiptsPage").then(({ GoodsReceiptsPage: Page }) => ({ default: Page })));
 const GoodsReceiptPage = lazy(() => import("../features/purchasing/GoodsReceiptPage").then(({ GoodsReceiptPage: Page }) => ({ default: Page })));
+const PurchaseBillsPage = lazy(() => import("../features/purchasing/PurchaseBillsPage").then(({ PurchaseBillsPage: Page }) => ({ default: Page })));
+const PurchaseBillFormPage = lazy(() => import("../features/purchasing/PurchaseBillFormPage").then(({ PurchaseBillFormPage: Page }) => ({ default: Page })));
+const PurchaseBillPage = lazy(() => import("../features/purchasing/PurchaseBillPage").then(({ PurchaseBillPage: Page }) => ({ default: Page })));
 const SuppliersPage = lazy(() => import("../features/suppliers/SuppliersPage").then(({ SuppliersPage: Page }) => ({ default: Page })));
 const SupplierFormPage = lazy(() => import("../features/suppliers/SupplierFormPage").then(({ SupplierFormPage: Page }) => ({ default: Page })));
 const SupplierLedgerPage = lazy(() => import("../features/suppliers/SupplierLedgerPage").then(({ SupplierLedgerPage: Page }) => ({ default: Page })));
@@ -94,6 +97,9 @@ const appRoutes: AppRoute[] = [
   { path: "/goods-receipts", label: "Goods receipts", permission: "purchasing.view", element: <GoodsReceiptsPage /> },
   { path: "/goods-receipts/new", label: "Receive goods", permission: "purchasing.receive", element: <ReceiveGoodsPage />, nav: false },
   { path: "/goods-receipts/:id", label: "Goods receipt", permission: "purchasing.view", element: <GoodsReceiptPage />, nav: false },
+  { path: "/purchase-bills", label: "Supplier bills", permission: "purchasing.bill", element: <PurchaseBillsPage /> },
+  { path: "/purchase-bills/new", label: "Enter a supplier bill", permission: "purchasing.bill", element: <PurchaseBillFormPage />, nav: false },
+  { path: "/purchase-bills/:id", label: "Supplier bill", permission: "purchasing.bill", element: <PurchaseBillPage />, nav: false },
   { path: "/supplier-ageing", label: "Payables ageing", permission: "suppliers.ledger", element: <SupplierAgeingPage /> },
   { path: "/cheques", label: "Cheques", permission: "customers.ledger", element: <ChequesPage /> },
   { path: "/customer-ageing", label: "Customer ageing", permission: "customers.ledger", element: <CustomerAgeingPage /> },

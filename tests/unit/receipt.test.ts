@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCreditNoteReceipt, buildGoodsReceiptReceipt, buildPaymentReceipt, buildPurchaseOrderReceipt, buildReceipt, buildStatementReceipt, formatDay, formatDocumentDate, receiptPageCss, type ReceiptBusiness, type ReceiptCreditNote, type ReceiptInvoice, type ReceiptPayment } from "../../shared/receipt";
+import { buildCreditNoteReceipt, buildGoodsReceiptReceipt, buildPaymentReceipt, buildPurchaseBillReceipt, buildPurchaseOrderReceipt, buildReceipt, buildStatementReceipt, formatDay, formatDocumentDate, receiptPageCss, type ReceiptBusiness, type ReceiptCreditNote, type ReceiptInvoice, type ReceiptPayment } from "../../shared/receipt";
 
 const business: ReceiptBusiness = {
   tradeName: "SGA Balloons", legalName: "SGA Balloons (Pvt) Ltd", address: "Shop 4, Saddar, Karachi", phone: "021-111", ntn: "1234567-8", strn: null, receiptFooter: "",
@@ -251,5 +251,20 @@ describe("purchase documents", () => {
     expect(model.duplicateBanner).toBe("DUPLICATE — copy 2, not the original");
     expect(model.meta).toEqual(expect.arrayContaining([{ label: "Order", value: "PO-KHI-000007" }, { label: "Supplier ref", value: "DC-4411" }, { label: "Received by", value: "Store Keeper" }]));
     expect(model.totals).toEqual([{ label: "VALUE RECEIVED", value: "Rs 6,400.00", strong: true }]);
+  });
+
+  it("prints a supplier bill with freight, input tax, the supplier's invoice number and the due date", () => {
+    const model = buildPurchaseBillReceipt({
+      number: "BILL-KHI-000002", supplierInvoiceNo: "KBM-1001", supplierName: "Karachi Balloon Mills", branchName: "Karachi", billDate: "2026-11-09", dueDate: "2026-12-09", note: "",
+      subtotalPaisa: 640_000, chargesPaisa: 40_000, taxPaisa: 115_200, totalPaisa: 795_200,
+      lines: [{ productName: "Latex Balloon", variantName: "Red", sku: "BAL-RED", unitName: "Carton", quantity: "2", unitCostPaisa: 320_000, lineValuePaisa: 640_000 }],
+      charges: [{ description: "Freight", amountPaisa: 40_000 }],
+    }, options);
+    expect(model.title).toBe("SUPPLIER BILL");
+    expect(model.meta).toEqual(expect.arrayContaining([{ label: "Their invoice", value: "KBM-1001" }, { label: "Due", value: "09/12/2026" }]));
+    expect(model.lines[0]).toMatchObject({ quantity: "2", unitPrice: "Rs 3,200.00", total: "Rs 6,400.00" });
+    expect(model.totals).toEqual([
+      { label: "Items", value: "Rs 6,400.00" }, { label: "Freight", value: "Rs 400.00" }, { label: "Input tax", value: "Rs 1,152.00" }, { label: "BILL TOTAL", value: "Rs 7,952.00", strong: true },
+    ]);
   });
 });

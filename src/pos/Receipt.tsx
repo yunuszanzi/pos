@@ -1,8 +1,8 @@
 import { createPortal } from "react-dom";
 import { useEffect } from "react";
 import {
-  buildCreditNoteReceipt, buildGoodsReceiptReceipt, buildPaymentReceipt, buildPurchaseOrderReceipt, buildReceipt, buildStatementReceipt, receiptPageCss, type PrintFormat, type ReceiptBusiness,
-  type ReceiptCreditNote, type ReceiptGoodsReceipt, type ReceiptInvoice, type ReceiptModel, type ReceiptPayment, type ReceiptPurchaseOrder, type ReceiptStatement,
+  buildCreditNoteReceipt, buildGoodsReceiptReceipt, buildPaymentReceipt, buildPurchaseBillReceipt, buildPurchaseOrderReceipt, buildReceipt, buildStatementReceipt, receiptPageCss, type PrintFormat, type ReceiptBusiness,
+  type ReceiptCreditNote, type ReceiptGoodsReceipt, type ReceiptInvoice, type ReceiptModel, type ReceiptPayment, type ReceiptPurchaseBill, type ReceiptPurchaseOrder, type ReceiptStatement,
 } from "../../shared/receipt";
 
 type JobBase = {
@@ -16,7 +16,7 @@ type JobBase = {
 /** The documents that print, by the name each goes under in a job. */
 type Documents = {
   invoice: ReceiptInvoice; payment: ReceiptPayment; creditNote: ReceiptCreditNote; statement: ReceiptStatement;
-  purchaseOrder: ReceiptPurchaseOrder; goodsReceipt: ReceiptGoodsReceipt;
+  purchaseOrder: ReceiptPurchaseOrder; goodsReceipt: ReceiptGoodsReceipt; purchaseBill: ReceiptPurchaseBill;
 };
 type OneDocument<K extends keyof Documents> = { [P in K]: Documents[P] } & { [P in Exclude<keyof Documents, K>]?: undefined };
 /** A sale, money received, a credit note, a customer statement, a purchase order or a goods receipt: exactly one of them. */
@@ -28,6 +28,7 @@ const modelOf = (job: PrintJob) => {
   if (job.statement) return buildStatementReceipt(job.statement, options);
   if (job.purchaseOrder) return buildPurchaseOrderReceipt(job.purchaseOrder, options);
   if (job.goodsReceipt) return buildGoodsReceiptReceipt(job.goodsReceipt, options);
+  if (job.purchaseBill) return buildPurchaseBillReceipt(job.purchaseBill, options);
   return job.payment ? buildPaymentReceipt(job.payment, options) : buildReceipt(job.invoice, job.format, options);
 };
 

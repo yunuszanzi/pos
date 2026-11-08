@@ -478,3 +478,52 @@ export function buildGoodsReceiptReceipt(receipt: ReceiptGoodsReceipt, options: 
     footer: receipt.note ? [receipt.note] : [],
   };
 }
+
+export type ReceiptPurchaseBill = {
+  /** The shop's own number for the bill. */
+  number: string;
+  supplierInvoiceNo: string;
+  supplierName: string;
+  branchName: string;
+  /** yyyy-mm-dd */
+  billDate: string;
+  dueDate: string;
+  note: string;
+  subtotalPaisa: number;
+  chargesPaisa: number;
+  taxPaisa: number;
+  totalPaisa: number;
+  lines: Array<{ productName: string; variantName: string; sku: string; unitName: string; quantity: string; unitCostPaisa: number; lineValuePaisa: number }>;
+  charges: Array<{ description: string; amountPaisa: number }>;
+};
+
+/** The shop's record of a supplier's bill: what was billed, the freight and tax on it, and when it is due. */
+export function buildPurchaseBillReceipt(bill: ReceiptPurchaseBill, options: ReceiptOptions): ReceiptModel {
+  const { business } = options;
+  const dateText = formatDay(bill.billDate, options.dateFormat);
+  return {
+    title: "SUPPLIER BILL",
+    duplicateBanner: duplicateBanner(options),
+    businessName: business.tradeName,
+    headerLines: headerLinesOf(business, bill.branchName),
+    number: bill.number,
+    dateText,
+    cashier: "",
+    terminal: "",
+    customer: null,
+    meta: [
+      { label: "No.", value: bill.number }, { label: "Supplier", value: bill.supplierName }, { label: "Their invoice", value: bill.supplierInvoiceNo },
+      { label: "Date", value: dateText }, { label: "Due", value: formatDay(bill.dueDate, options.dateFormat) },
+    ],
+    lines: purchaseLineRows(bill.lines.map((line) => ({ ...line, lineTotalPaisa: line.lineValuePaisa }))),
+    totals: [
+      { label: "Items", value: formatPkr(bill.subtotalPaisa) },
+      ...bill.charges.map((charge) => ({ label: charge.description, value: formatPkr(charge.amountPaisa) })),
+      ...(bill.taxPaisa ? [{ label: "Input tax", value: formatPkr(bill.taxPaisa) }] : []),
+      { label: "BILL TOTAL", value: formatPkr(bill.totalPaisa), strong: true },
+    ],
+    taxRows: [],
+    payments: [],
+    footer: bill.note ? [bill.note] : [],
+  };
+}

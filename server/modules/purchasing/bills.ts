@@ -112,7 +112,7 @@ billRoutes.get("/billable-receipt-lines", costs, bill, async (context) => {
       return {
         id: String(row.id), lineNo: Number(row.line_no), receiptId: String(row.receipt_id), receiptNumber: String(row.receipt_number), receivedAt: iso(row.received_at),
         supplierRef: String(row.supplier_ref), productName: String(row.product_name), variantName: String(row.variant_name), sku: String(row.sku), unitName: String(row.unit_name),
-        quantity: quantityText(row.qty_entered),
+        quantity: quantityText(row.qty_entered), factorToBase: quantityText(row.factor_to_base),
         // Left to bill, in the unit it was received in (rounded down to a whole thousandth).
         unbilledQuantity: formatQuantity(Math.floor((leftBase * 1000) / factor)), unitCostPaisa: paisa(row.unit_cost_paisa),
       };
