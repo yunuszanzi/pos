@@ -197,13 +197,13 @@ inventoryRoutes.get("/stock/valuation", requirePermission("products.cost.view"),
 
   // Replay the ledger up to the end of the chosen day (Asia/Karachi), in posting order.
   const entries = await db.select({
-    variantId: stockLedger.variantId, locationId: stockLedger.locationId, qty: stockLedger.qtyBase, cost: stockLedger.unitCostPaisa,
+    variantId: stockLedger.variantId, locationId: stockLedger.locationId, qty: stockLedger.qtyBase, cost: stockLedger.unitCostPaisa, valueDelta: stockLedger.valueDeltaPaisa,
   }).from(stockLedger).where(and(
     eq(stockLedger.businessId, businessId),
     locationId ? eq(stockLedger.locationId, locationId) : undefined,
     asOf ? sql`${stockLedger.createdAt} < (${asOf}::date + 1)::timestamp at time zone 'Asia/Karachi'` : undefined,
   )).orderBy(stockLedger.seq);
-  const positions = replayStockLedger(entries.map((entry) => ({ variantId: entry.variantId, locationId: entry.locationId, qtyMilli: parseSignedQuantity(entry.qty), unitCostPaisa: entry.cost })));
+  const positions = replayStockLedger(entries.map((entry) => ({ variantId: entry.variantId, locationId: entry.locationId, qtyMilli: parseSignedQuantity(entry.qty), unitCostPaisa: entry.cost, valueDeltaPaisa: entry.valueDelta })));
 
   const perVariant = new Map<string, { onHandMilli: number; costValue: number }>();
   for (const [key, position] of positions) {

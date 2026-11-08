@@ -43,6 +43,35 @@ describe("applyEntry", () => {
   });
 });
 
+describe("cost adjustments", () => {
+  it("moves the average by the value spread over what is on hand, and no stock", () => {
+    // 100 pieces at Rs 10.00, and Rs 50.00 of freight arrives on the bill: +50c each, Rs 10.50.
+    expect(applyEntry({ onHandMilli: 100_000, avgCostPaisa: 1_000 }, 0, 0, 5_000)).toEqual({ onHandMilli: 100_000, avgCostPaisa: 1_050 });
+    // A bill Rs 20.00 cheaper than the receipt: -20c each.
+    expect(applyEntry({ onHandMilli: 100_000, avgCostPaisa: 1_000 }, 0, 0, -2_000)).toEqual({ onHandMilli: 100_000, avgCostPaisa: 980 });
+  });
+
+  it("rounds to the whole paisa, and a tiny value can round away", () => {
+    expect(applyEntry({ onHandMilli: 3_000, avgCostPaisa: 1_000 }, 0, 0, 100)).toEqual({ onHandMilli: 3_000, avgCostPaisa: 1_033 }); // 33.33 each
+    expect(applyEntry({ onHandMilli: 1_000_000, avgCostPaisa: 1_000 }, 0, 0, 5)).toEqual({ onHandMilli: 1_000_000, avgCostPaisa: 1_000 }); // 0.005 each
+  });
+
+  it("never takes the average below zero, and does nothing with no stock to carry it", () => {
+    expect(applyEntry({ onHandMilli: 1_000, avgCostPaisa: 100 }, 0, 0, -500).avgCostPaisa).toBe(0);
+    expect(applyEntry({ onHandMilli: 0, avgCostPaisa: 100 }, 0, 0, 5_000).avgCostPaisa).toBe(100);
+    expect(applyEntry({ onHandMilli: -2_000, avgCostPaisa: 100 }, 0, 0, 5_000).avgCostPaisa).toBe(100);
+  });
+
+  it("is replayed in order with receipts and issues", () => {
+    const positions = replayStockLedger([
+      { variantId: "v", locationId: "l", qtyMilli: 100_000, unitCostPaisa: 1_000 },
+      { variantId: "v", locationId: "l", qtyMilli: 0, unitCostPaisa: 0, valueDeltaPaisa: 5_000 },
+      { variantId: "v", locationId: "l", qtyMilli: -40_000, unitCostPaisa: 1_050 },
+    ]);
+    expect(positions.get("v|l")).toEqual({ onHandMilli: 60_000, avgCostPaisa: 1_050 });
+  });
+});
+
 describe("replayStockLedger", () => {
   it("keeps a separate position per variant and location", () => {
     const positions = replayStockLedger([

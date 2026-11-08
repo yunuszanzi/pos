@@ -11,6 +11,8 @@ export const stockLedger = pgTable("stock_ledger", {
   locationId: uuid("location_id").notNull(),
   qtyBase: numeric("qty_base", { precision: 14, scale: 3 }).notNull(),
   unitCostPaisa: bigint("unit_cost_paisa", { mode: "number" }).notNull().default(0),
+  /** Only on a cost adjustment (quantity zero): value added to the stock on hand. See migration 0013. */
+  valueDeltaPaisa: bigint("value_delta_paisa", { mode: "number" }).notNull().default(0),
   docType: text("doc_type").notNull(),
   docId: uuid("doc_id").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
