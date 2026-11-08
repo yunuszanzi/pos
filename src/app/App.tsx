@@ -31,6 +31,11 @@ const OpeningStockPage = lazy(() => import("../features/stock/OpeningStockPage")
 const CustomersPage = lazy(() => import("../features/customers/CustomersPage").then(({ CustomersPage: Page }) => ({ default: Page })));
 const CustomerFormPage = lazy(() => import("../features/customers/CustomerFormPage").then(({ CustomerFormPage: Page }) => ({ default: Page })));
 const CustomerLedgerPage = lazy(() => import("../features/customers/CustomerLedgerPage").then(({ CustomerLedgerPage: Page }) => ({ default: Page })));
+const SuppliersPage = lazy(() => import("../features/suppliers/SuppliersPage").then(({ SuppliersPage: Page }) => ({ default: Page })));
+const SupplierFormPage = lazy(() => import("../features/suppliers/SupplierFormPage").then(({ SupplierFormPage: Page }) => ({ default: Page })));
+const SupplierLedgerPage = lazy(() => import("../features/suppliers/SupplierLedgerPage").then(({ SupplierLedgerPage: Page }) => ({ default: Page })));
+const SupplierAgeingPage = lazy(() => import("../features/suppliers/SupplierAgeingPage").then(({ SupplierAgeingPage: Page }) => ({ default: Page })));
+const OpeningPayablesPage = lazy(() => import("../features/suppliers/OpeningPayablesPage").then(({ OpeningPayablesPage: Page }) => ({ default: Page })));
 const ChequesPage = lazy(() => import("../features/customers/ChequesPage").then(({ ChequesPage: Page }) => ({ default: Page })));
 const CustomerStatementPage = lazy(() => import("../features/customers/CustomerStatementPage").then(({ CustomerStatementPage: Page }) => ({ default: Page })));
 const CustomerAgeingPage = lazy(() => import("../features/customers/CustomerAgeingPage").then(({ CustomerAgeingPage: Page }) => ({ default: Page })));
@@ -71,6 +76,12 @@ const appRoutes: AppRoute[] = [
   { path: "/customers/setup", label: "Customer groups and areas", permission: "customers.view", element: <CustomerSetupPage />, nav: false },
   { path: "/customers/:id/ledger", label: "Customer khata", permission: "customers.ledger", element: <CustomerLedgerPage />, nav: false },
   { path: "/customers/:id/statement", label: "Customer statement", permission: "customers.ledger", element: <CustomerStatementPage />, nav: false },
+  { path: "/suppliers", label: "Suppliers", permission: "suppliers.view", element: <SuppliersPage /> },
+  { path: "/suppliers/new", label: "New supplier", permission: "suppliers.manage", element: <SupplierFormPage />, nav: false },
+  { path: "/suppliers/opening-payables", label: "Opening payables", permission: "suppliers.manage", element: <OpeningPayablesPage />, nav: false },
+  { path: "/suppliers/:id/ledger", label: "Supplier ledger", permission: "suppliers.ledger", element: <SupplierLedgerPage />, nav: false },
+  { path: "/suppliers/:id", label: "Edit supplier", permission: "suppliers.manage", element: <SupplierFormPage />, nav: false },
+  { path: "/supplier-ageing", label: "Payables ageing", permission: "suppliers.ledger", element: <SupplierAgeingPage /> },
   { path: "/cheques", label: "Cheques", permission: "customers.ledger", element: <ChequesPage /> },
   { path: "/customer-ageing", label: "Customer ageing", permission: "customers.ledger", element: <CustomerAgeingPage /> },
   { path: "/customers/opening-balances", label: "Customer opening balances", permission: "customers.manage", element: <OpeningBalancesPage />, nav: false },

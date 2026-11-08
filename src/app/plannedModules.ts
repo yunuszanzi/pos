@@ -6,7 +6,6 @@
 export type PlannedModule = { label: string; version: string };
 
 export const plannedModules: PlannedModule[] = [
-  { label: "Suppliers", version: "v0.5" },
   { label: "Purchasing", version: "v0.5" },
   { label: "Quotations & orders", version: "v0.6" },
   { label: "Delivery challans", version: "v0.6" },

@@ -425,6 +425,14 @@ Acceptance tests:
 2. Receipt at a new cost updates average cost exactly per the formula; next sale's profit uses it.
 3. Supplier ledger and payables ageing match bills minus payments and returns.
 
+#### As built in v0.5 so far (suppliers; purchase orders, receipts, bills, payments, returns and the reorder list are still to come)
+
+- **Suppliers** (migration 0011). `suppliers` mirror customers: name (unique per business), contact, phone, WhatsApp, email, address, NTN/STRN, registration, payment terms in days (0 = due on receipt), notes, archive instead of delete. Permissions: `suppliers.view`, `suppliers.manage`, `suppliers.ledger` (Owner and Manager; cashiers hold none). Without `suppliers.ledger` a person sees no balances.
+- **Supplier ledger.** Suppliers use the same append-only `party_ledger` as customers (party type `supplier`), with the debit/credit sense kept: **credit = the shop owes the supplier more** (a bill, an opening payable), **debit = it owes less** (a payment, a return). `suppliers.balance_paisa` is the amount WE owe (positive) or what they owe us (negative, credit held), written only by the ledger trigger (a guard trigger refuses anything else), the reverse sign of a customer's balance. The ledger page shows what the shop owes after each entry.
+- **Payables ageing** (`GET /supplier-ageing`, paginated, `?overdue=true`, `?q=`). The same `ageLedger` as customers with the sides swapped: a payment settles the oldest debt first, credit held is kept apart, and the owed amounts and credit always net to the balance. Overdue means the oldest unpaid debt is older than the supplier's terms (30 days when there are none).
+- **Opening payables** (`POST /suppliers-opening-balances/preview` and `/suppliers-opening-balances`, needs `suppliers.manage` and `suppliers.ledger`, Idempotency-Key, migration 0011 `post_supplier_opening_balances`). The customer importer generalised (`shared/openingBalanceImport.ts` takes the party: the column is `supplier`): matched by phone or name, positive = owed to the supplier, negative = credit held, dated (never in the future), all or nothing, refused for a supplier who already has a ledger entry.
+- **Pages:** `/suppliers`, `/suppliers/new`, `/suppliers/:id`, `/suppliers/:id/ledger`, `/suppliers/opening-payables`, `/supplier-ageing` (menu: Suppliers, Payables ageing).
+
 ### v0.6 Quotations, orders and delivery
 
 Scope: quotations with revisions and statuses, convert to order or invoice, sales orders with stock reservation, delivery challans, A4 tax invoices with buyer NTN/STRN, payment terms and due dates, WhatsApp/email sharing for all documents. SRS: FR-QUO-01–06, FR-SO-01–04, 06, FR-PRT-07.
