@@ -9,6 +9,7 @@ import { inventoryRoutes } from "./modules/inventory/routes";
 import { orgRoutes } from "./modules/org/routes";
 import { productsRoutes } from "./modules/products/routes";
 import { settingsRoutes } from "./modules/settings/routes";
+import { shiftsRoutes } from "./modules/shifts/routes";
 import { usersRoutes } from "./modules/users/routes";
 
 export const app = new Hono();
@@ -23,6 +24,7 @@ app.route("/api/v1", auditRoutes);
 app.route("/api/v1", catalogueRoutes);
 app.route("/api/v1", productsRoutes);
 app.route("/api/v1", inventoryRoutes);
+app.route("/api/v1", shiftsRoutes);
 
 app.notFound((context) => apiError(context, 404, "NOT_FOUND", "API route not found"));
 app.onError((error, context) => {
