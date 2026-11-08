@@ -9,6 +9,7 @@ import { getAppBootstrapData } from "../../api/posApi";
 import { ErrorMessage, PageTitle } from "../../app/FormElements";
 import { useCan } from "../../app/permissions";
 import { useTerminalStore } from "../../app/terminalStore";
+import { ReceiveChequeDialog } from "./ReceiveChequeDialog";
 import { ReceivePaymentDialog } from "./ReceivePaymentDialog";
 
 /** A customer's khata: what they owe, which invoices are open, and every entry with the balance after it. */
@@ -20,6 +21,7 @@ export function CustomerLedgerPage() {
   const terminalId = useTerminalStore((state) => state.terminalId);
   const [page, setPage] = useState(1);
   const [receiving, setReceiving] = useState(false);
+  const [chequeOpen, setChequeOpen] = useState(false);
   const ledger = useQuery({ queryKey: ["customer-ledger", id, page], queryFn: ({ signal }) => getCustomerLedger(id, page, signal), placeholderData: keepPreviousData });
   // The payment methods and the print details come from the same bootstrap call the till makes, shared by its cache key.
   const setup = useQuery({ queryKey: ["pos-bootstrap", terminalId], queryFn: getAppBootstrapData, staleTime: Infinity, enabled: canReceive });
@@ -48,6 +50,7 @@ export function CustomerLedgerPage() {
       {overdue && <p className="notice error" role="status">This customer has invoices past their payment terms.</p>}
       <div className="button-row">
         {canReceive && setup.data && <button className="button primary" onClick={() => setReceiving(true)}>Receive payment</button>}
+        {mayReceive && <button className="button secondary" onClick={() => setChequeOpen(true)}>Receive a cheque</button>}
         <Link className="button secondary" to={`/customers/${customer.id}/statement`}>Statement</Link>
         {reminder && <a className="button secondary" href={reminder} target="_blank" rel="noreferrer">Remind on WhatsApp</a>}
       </div>
@@ -87,6 +90,7 @@ export function CustomerLedgerPage() {
       </div>
     </section>
 
+    {chequeOpen && <ReceiveChequeDialog customer={{ id: customer.id, name: customer.name }} onClose={() => setChequeOpen(false)} />}
     {receiving && setup.data && <ReceivePaymentDialog customerId={customer.id} methods={setup.data.paymentMethods} onClose={() => setReceiving(false)}
       print={{ business: setup.data.business, dateFormat: setup.data.settings.dateFormat, timezone: setup.data.settings.timezone, defaultFormat: setup.data.terminal?.defaultPrintFormat ?? "a4" }} />}
   </div>;

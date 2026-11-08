@@ -1,3 +1,4 @@
+import type { ChequeStatus, ReceiveChequeInput } from "../../shared/schemas/cheques";
 import type { CustomerPaymentInput } from "../../shared/schemas/customerPayments";
 import type { CustomerInput } from "../../shared/schemas/customers";
 import type { StatementSummary } from "../../shared/khata";
@@ -128,3 +129,28 @@ export function getCustomerAgeing(filter: { q?: string; areaId?: string; overdue
 export const previewOpeningBalances = (csv: string) => postJson<OpeningBalancePreview>("/customers-opening-balances/preview", { csv });
 export const importOpeningBalances = (csv: string, idempotencyKey: string) =>
   postJson<OpeningBalanceResult>("/customers-opening-balances", { csv }, { "Idempotency-Key": idempotencyKey });
+
+export type Cheque = {
+  id: string; customerId: string; customerName: string; chequeNo: string; bank: string; amountPaisa: number;
+  /** The date written on the cheque, yyyy-mm-dd. */
+  chequeDate: string;
+  status: ChequeStatus;
+  /** In hand and the date on it has come. */
+  due: boolean;
+  note: string; bounceReason: string; paymentId: string; receivedAt: string; depositedAt: string | null; clearedAt: string | null; bouncedAt: string | null;
+  /** What the customer owes now (negative: credit). */
+  customerBalancePaisa: number;
+};
+export type ChequePage = { data: Cheque[]; page: number; pageSize: number; total: number };
+export type ChequeFilter = { status?: ChequeStatus | ""; due?: boolean; q?: string; customerId?: string; page?: number; pageSize?: number };
+
+export function getAllCheques(filter: ChequeFilter = {}, signal?: AbortSignal) {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(filter)) if (value !== undefined && value !== "" && value !== false) query.set(key, String(value));
+  return requestApi<ChequePage>(`/cheques?${query}`, { signal });
+}
+/** Taking a cheque records the payment at once. The idempotency key identifies one cheque, so a retry cannot take it twice. */
+export const postCheque = (input: ReceiveChequeInput, idempotencyKey: string) => postJson<Cheque>("/cheques", input, { "Idempotency-Key": idempotencyKey });
+export const depositCheque = (id: string, idempotencyKey: string) => postJson<Cheque>(`/cheques/${id}/deposit`, {}, { "Idempotency-Key": idempotencyKey });
+export const clearCheque = (id: string, idempotencyKey: string) => postJson<Cheque>(`/cheques/${id}/clear`, {}, { "Idempotency-Key": idempotencyKey });
+export const bounceCheque = (id: string, reason: string, idempotencyKey: string) => postJson<Cheque>(`/cheques/${id}/bounce`, { reason }, { "Idempotency-Key": idempotencyKey });
