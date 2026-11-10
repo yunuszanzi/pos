@@ -18,3 +18,4 @@ Branch: v1.0/hardening. Newest entry on top.
 - Quotation form default valid-until fixed (businessToday). ReportPage already gets `today` from the server; other pages already use Asia/Karachi.
 - 14 test files computed "today" in UTC and failed between 00:00-05:00 PKT; they now use businessToday(). `npm test`: 734/735, only the perf test fails under parallel load (passes alone).
 - Running final `npm run e2e`.
+- FINAL: npm run e2e fully green (main suite + PWA, exit 0). v1.0 verification done; only open item is the perf test's sensitivity to parallel load.
