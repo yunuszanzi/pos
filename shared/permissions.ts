@@ -65,6 +65,10 @@ export const permissionDefinitions = [
   ["delivery.manage", "Write, dispatch, deliver, return and cancel delivery challans (stock leaves on dispatch)"],
   ["invoices.view", "View back-office invoices"],
   ["invoices.create", "Write back-office invoices on credit, from an order, a quotation or directly"],
+  ["expenses.view", "View expenses and expense categories"],
+  ["expenses.create", "Record expenses, attach bills, and reverse a mistaken one"],
+  ["accounts.view", "View cash, bank and wallet accounts, their balances and entries"],
+  ["accounts.manage", "Add accounts, record deposits and withdrawals, and move money between accounts"],
 ] as const;
 
 export type PermissionKey = (typeof permissionDefinitions)[number][0];
@@ -89,6 +93,7 @@ export const managerPermissionKeys: PermissionKey[] = [
   "suppliers.pay", "purchasing.return",
   "quotations.view", "quotations.manage", "sales_orders.view", "sales_orders.manage",
   "delivery.view", "delivery.manage", "invoices.view", "invoices.create",
+  "expenses.view", "expenses.create", "accounts.view", "accounts.manage",
 ];
 
 export const cashierPermissionKeys: PermissionKey[] = [

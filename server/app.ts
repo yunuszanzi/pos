@@ -11,6 +11,8 @@ import { billRoutes } from "./modules/purchasing/bills";
 import { payablesRoutes } from "./modules/purchasing/payables";
 import { reorderRoutes } from "./modules/purchasing/reorder";
 import { quotationRoutes } from "./modules/quotations/routes";
+import { accountRoutes } from "./modules/accounts/routes";
+import { expenseRoutes } from "./modules/expenses/routes";
 import { challanRoutes } from "./modules/sales/challans";
 import { salesInvoiceRoutes } from "./modules/sales/invoices";
 import { publicRoutes, shareRoutes } from "./modules/shares/routes";
@@ -61,6 +63,8 @@ app.route("/api/v1", salesOrderRoutes);
 app.route("/api/v1", challanRoutes);
 app.route("/api/v1", salesInvoiceRoutes);
 app.route("/api/v1", shareRoutes);
+app.route("/api/v1", accountRoutes);
+app.route("/api/v1", expenseRoutes);
 app.route("/api/v1", returnRoutes);
 
 app.notFound((context) => apiError(context, 404, "NOT_FOUND", "API route not found"));
