@@ -1,3 +1,4 @@
+import { businessToday } from "../../../shared/dates";
 import { useState, type FormEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -25,7 +26,7 @@ type Line = {
   discount: string;
 };
 
-const inDays = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
+const inDays = (days: number) => new Date(Date.parse(businessToday()) + days * 86_400_000).toISOString().slice(0, 10);
 
 /** Writes a quotation, or changes one that is still a draft. */
 export function QuotationFormPage() {
