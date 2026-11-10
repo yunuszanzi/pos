@@ -35,6 +35,7 @@ export const accountErrors: Array<[prefix: string, status: 404 | 409 | 422, code
   ["REASON_REQUIRED", 422, "REASON_REQUIRED"],
   ["SHIFT_NOT_OPEN", 409, "SHIFT_NOT_OPEN"],
   ["ALREADY_REVERSED", 409, "ALREADY_REVERSED"],
+  ["DAY_CLOSED", 409, "DAY_CLOSED"],
 ];
 export function mapAccountError(context: Context, error: unknown): Response | null {
   const message = dbErrorMessage(error);

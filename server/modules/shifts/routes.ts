@@ -121,10 +121,18 @@ shiftsRoutes.post("/shifts/open", requirePermission("shifts.open"), idempotent()
   if (!terminal) return apiError(context, 400, "TERMINAL_REQUIRED", "Open the POS on a registered terminal");
   const actor = getActorId(principal);
   const { openingFloatPaisa } = context.req.valid("json");
-  const [created] = await db.insert(shifts).values({
-    businessId: terminal.businessId, branchId: terminal.branchId, terminalId: terminal.id, openedBy: actor,
-    openingFloatPaisa, createdBy: actor, updatedBy: actor,
-  }).onConflictDoNothing().returning();
+  let created: typeof shifts.$inferSelect | undefined;
+  try {
+    [created] = await db.insert(shifts).values({
+      businessId: terminal.businessId, branchId: terminal.branchId, terminalId: terminal.id, openedBy: actor,
+      openingFloatPaisa, createdBy: actor, updatedBy: actor,
+    }).onConflictDoNothing().returning();
+  } catch (error) {
+    // The branch's day was closed (day-end closing): no new shift, so no sale can land after the figures were written.
+    const message = String((error as { cause?: Error }).cause?.message ?? error);
+    if (message.includes("DAY_CLOSED")) return apiError(context, 409, "DAY_CLOSED", message.replace(/^.*DAY_CLOSED:\s*/, ""));
+    throw error;
+  }
   if (!created) return apiError(context, 409, "SHIFT_ALREADY_OPEN", "This terminal already has an open shift. Close it first.");
   await auditPrincipal(context, principal, "shift", created.id, "open", null, { openingFloatPaisa });
   return context.json(shiftView(created, false), 201);

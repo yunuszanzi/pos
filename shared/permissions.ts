@@ -71,6 +71,7 @@ export const permissionDefinitions = [
   ["accounts.manage", "Add accounts, record deposits and withdrawals, and move money between accounts"],
   ["reports.profit.view", "See profit, cost of goods and stock value in reports and exports"],
   ["reports.tax.view", "See the sales tax summary (output and input tax by rate)"],
+  ["cash.close_day", "Close a branch's day (day-end closing) and reopen it with a reason"],
 ] as const;
 
 export type PermissionKey = (typeof permissionDefinitions)[number][0];
@@ -96,7 +97,7 @@ export const managerPermissionKeys: PermissionKey[] = [
   "quotations.view", "quotations.manage", "sales_orders.view", "sales_orders.manage",
   "delivery.view", "delivery.manage", "invoices.view", "invoices.create",
   "expenses.view", "expenses.create", "accounts.view", "accounts.manage",
-  "reports.profit.view", "reports.tax.view",
+  "reports.profit.view", "reports.tax.view", "cash.close_day",
 ];
 
 export const cashierPermissionKeys: PermissionKey[] = [
