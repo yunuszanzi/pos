@@ -177,10 +177,10 @@ integration("what is public stays small", { timeout: 120_000 }, () => {
     const open = app.routes.filter((route) => !route.path.startsWith("/api/v1") && route.path.startsWith("/api/") && methods.includes(route.method)).map((route) => `${route.method} ${route.path}`).sort();
     expect(open).toEqual([
       "GET /api/health",
-      "GET /api/jobs/fbr-retry", "GET /api/jobs/fbr-sync", "POST /api/jobs/fbr-retry", "POST /api/jobs/fbr-sync",
+      "GET /api/jobs/fbr-retry", "GET /api/jobs/fbr-sync", "POST /api/jobs/fbr-retry", "POST /api/jobs/fbr-sync", "GET /api/jobs/fbr-health", "POST /api/jobs/fbr-health",
       "GET /api/public/documents/:token",
     ].sort());
-    for (const path of ["/api/jobs/fbr-retry", "/api/jobs/fbr-sync"]) {
+    for (const path of ["/api/jobs/fbr-retry", "/api/jobs/fbr-sync", "/api/jobs/fbr-health"]) {
       expect((await app.fetch(new Request(`http://localhost${path}`))).status).toBe(401);
       expect((await app.fetch(new Request(`http://localhost${path}`, { headers: { Authorization: "Bearer wrong-secret-wrong-secret" } }))).status).toBe(401);
     }

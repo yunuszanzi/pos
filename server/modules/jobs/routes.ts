@@ -5,6 +5,7 @@ import { fbrReferenceKinds } from "../../../shared/fbr";
 import { clientFor, loadFbrSettings } from "../../fbr/config";
 import { runDueSubmissions } from "../../fbr/service";
 import { db } from "../../lib/db";
+import { checkFbrHealth } from "../../lib/monitoring";
 import { apiError } from "../../lib/http";
 
 // Work done on a schedule, not by a person: the FBR retries and the daily refresh of FBR's own lists. These endpoints sit outside the signed-in
@@ -28,8 +29,19 @@ const retry = async (context: Context) => {
   if (refused) return refused;
   // The scheduler runs it for everyone; ?businessId= narrows it to one business (for a support person, or a test).
   const only = context.req.query("businessId");
-  return context.json(await runDueSubmissions(Number(context.req.query("limit") ?? 25) || 25, only && /^[0-9a-f-]{36}$/i.test(only) ? only : undefined));
+  const outcome = await runDueSubmissions(Number(context.req.query("limit") ?? 25) || 25, only && /^[0-9a-f-]{36}$/i.test(only) ? only : undefined);
+  await checkFbrHealth().catch(() => undefined);
+  return context.json(outcome);
 };
+/** How FBR has answered over the last hour; raises an alert (once an hour) when more than 5% of calls did not succeed. */
+const health = async (context: Context) => {
+  const refused = authorised(context);
+  if (refused) return refused;
+  return context.json({ businesses: await checkFbrHealth() });
+};
+jobRoutes.get("/fbr-health", health);
+jobRoutes.post("/fbr-health", health);
+
 jobRoutes.get("/fbr-retry", retry);
 jobRoutes.post("/fbr-retry", retry);
 

@@ -34,6 +34,7 @@ import { customersRoutes } from "./modules/customers/routes";
 import { inventoryRoutes } from "./modules/inventory/routes";
 import { orgRoutes } from "./modules/org/routes";
 import { secureHeaders } from "hono/secure-headers";
+import { captureError } from "./lib/monitoring";
 import { posRoutes } from "./modules/pos/routes";
 import { productsRoutes } from "./modules/products/routes";
 import { settingsRoutes } from "./modules/settings/routes";
@@ -104,6 +105,6 @@ app.onError((error, context) => {
   if (error instanceof HTTPException && error.status >= 400 && error.status < 500) {
     return context.json({ error: { code: "BAD_REQUEST", message: "The request could not be read. Send a JSON body." } }, error.status);
   }
-  console.error("Unhandled API error", error);
+  void captureError(error, { path: context.req.path, method: context.req.method });
   return context.json({ error: { code: "INTERNAL_ERROR", message: "The request could not be completed" } }, 500);
 });
