@@ -11,5 +11,7 @@ if (!databaseUrl) {
 const client = postgres(databaseUrl, { prepare: false, max: 5 });
 
 export const db = drizzle(client, { schema });
+/** The driver itself, for streaming a large read with a cursor (the data export). Everything else goes through `db`. */
+export const rawClient = client;
 export const closeDb = () => client.end();
 export type Database = typeof db;

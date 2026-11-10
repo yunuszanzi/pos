@@ -3,6 +3,8 @@ import { parseRupees, toPlainRupees } from "../../../shared/money";
 import { getBusinessSettings, updateBusinessSettings, type BusinessSettings } from "../../api/settingsApi";
 import { ErrorMessage, Field, PageTitle, SelectInput, SuccessMessage, TextInput } from "../../app/FormElements";
 import { MoneyInput } from "../../app/MoneyInput";
+import { useCan } from "../../app/permissions";
+import { ExportPanel } from "./ExportPanel";
 
 const defaults: BusinessSettings = {
   currency: "PKR",
@@ -20,6 +22,7 @@ const defaults: BusinessSettings = {
 };
 
 export function SettingsPage() {
+  const mayExport = useCan("data.export");
   const [settings, setSettings] = useState<BusinessSettings>(defaults);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState("");
@@ -87,5 +90,6 @@ export function SettingsPage() {
       <Field label="Return window (days)"><TextInput name="returnWindowDays" type="number" min={0} max={365} value={settings.returnWindowDays} onChange={(event) => setSettings({ ...settings, returnWindowDays: Number(event.target.value) })} /></Field>
       <button className="button primary" disabled={!loaded}>Save settings</button>
     </form>
+    {mayExport && <ExportPanel />}
   </div>;
 }

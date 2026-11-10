@@ -16,6 +16,7 @@ export const permissionDefinitions = [
   ["roles.manage", "Manage roles and permission assignments"],
   ["settings.view", "View business settings"],
   ["settings.manage", "Update business settings"],
+  ["data.export", "Download all of the business's data as a file (Owner)"],
   ["audit.view", "View audit history"],
   ["auth.pin_switch", "Switch the active terminal user with a PIN"],
   ["auth.manager_override", "Approve a manager-PIN override"],
