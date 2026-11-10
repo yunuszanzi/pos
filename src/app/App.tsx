@@ -52,6 +52,8 @@ const ExpensePage = lazy(() => import("../features/expenses/ExpensePage").then((
 const ReportsPage = lazy(() => import("../features/reports/ReportsPage").then(({ ReportsPage: Page }) => ({ default: Page })));
 const ReportPage = lazy(() => import("../features/reports/ReportPage").then(({ ReportPage: Page }) => ({ default: Page })));
 const DashboardPanel = lazy(() => import("../features/dashboard/DashboardPanel").then(({ DashboardPanel: Panel }) => ({ default: Panel })));
+const DayClosingPage = lazy(() => import("../features/cash/DayClosingPage").then(({ DayClosingPage: Page }) => ({ default: Page })));
+const DayClosingDetailPage = lazy(() => import("../features/cash/DayClosingDetailPage").then(({ DayClosingDetailPage: Page }) => ({ default: Page })));
 const SalesOrderPage = lazy(() => import("../features/sales-orders/SalesOrderPage").then(({ SalesOrderPage: Page }) => ({ default: Page })));
 const ReceiveGoodsPage = lazy(() => import("../features/purchasing/ReceiveGoodsPage").then(({ ReceiveGoodsPage: Page }) => ({ default: Page })));
 const GoodsReceiptsPage = lazy(() => import("../features/purchasing/GoodsReceiptsPage").then(({ GoodsReceiptsPage: Page }) => ({ default: Page })));
@@ -124,6 +126,8 @@ const appRoutes: AppRoute[] = [
   { path: "/expenses", label: "Expenses", permission: "expenses.view", element: <ExpensesPage /> },
   { path: "/expenses/new", label: "Record an expense", permission: "expenses.create", element: <ExpenseFormPage />, nav: false },
   { path: "/expenses/:id", label: "Expense", permission: "expenses.view", element: <ExpensePage />, nav: false },
+  { path: "/day-closings", label: "Day-end closing", permission: "shifts.view_all", element: <DayClosingPage /> },
+  { path: "/day-closings/:id", label: "Day closing", permission: "shifts.view_all", element: <DayClosingDetailPage />, nav: false },
   { path: "/accounts", label: "Accounts", permission: "accounts.view", element: <AccountsPage /> },
   { path: "/accounts/:id", label: "Account", permission: "accounts.view", element: <AccountPage />, nav: false },
   { path: "/sales-orders", label: "Sales orders", permission: "sales_orders.view", element: <SalesOrdersPage /> },
