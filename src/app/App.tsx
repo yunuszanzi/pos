@@ -84,6 +84,8 @@ const FbrSettingsPage = lazy(() => import("../features/fbr/FbrSettingsPage").the
 const TransfersPage = lazy(() => import("../features/transfers/TransfersPage").then(({ TransfersPage: Page }) => ({ default: Page })));
 const TransferFormPage = lazy(() => import("../features/transfers/TransferFormPage").then(({ TransferFormPage: Page }) => ({ default: Page })));
 const TransferPage = lazy(() => import("../features/transfers/TransferPage").then(({ TransferPage: Page }) => ({ default: Page })));
+const StockCountsPage = lazy(() => import("../features/stock-counts/StockCountsPage").then(({ StockCountsPage: Page }) => ({ default: Page })));
+const StockCountPage = lazy(() => import("../features/stock-counts/StockCountPage").then(({ StockCountPage: Page }) => ({ default: Page })));
 const PosPage = lazy(() => import("../pos/PosPage").then(({ PosPage: Page }) => ({ default: Page })));
 const ValuationPage = lazy(() => import("../features/stock/ValuationPage").then(({ ValuationPage: Page }) => ({ default: Page })));
 
@@ -168,6 +170,8 @@ const appRoutes: AppRoute[] = [
   { path: "/users", label: "Users", permission: "users.view", element: <UsersPage /> },
   { path: "/roles", label: "Roles & permissions", permission: "roles.view", element: <RolesPage /> },
   { path: "/settings", label: "Settings", permission: "settings.view", element: <SettingsPage /> },
+  { path: "/stock-counts", label: "Stock counts", permission: "inventory.view", element: <StockCountsPage /> },
+  { path: "/stock-counts/:id", label: "Stock count", permission: "inventory.view", element: <StockCountPage />, nav: false },
   { path: "/transfers", label: "Stock transfers", permission: "transfers.view", element: <TransfersPage /> },
   { path: "/transfers/new", label: "New stock transfer", permission: "transfers.manage", element: <TransferFormPage />, nav: false },
   { path: "/transfers/:id", label: "Stock transfer", permission: "transfers.view", element: <TransferPage />, nav: false },

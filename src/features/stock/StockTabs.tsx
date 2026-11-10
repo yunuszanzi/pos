@@ -10,6 +10,7 @@ export function StockTabs() {
     { to: "/stock", label: "Stock levels", show: true },
     { to: "/stock/adjustments", label: "Adjustments", show: true },
     { to: "/transfers", label: "Transfers", show: canTransfer },
+    { to: "/stock-counts", label: "Counts", show: true },
     { to: "/stock/valuation", label: "Valuation", show: canValue },
     { to: "/stock/opening", label: "Opening stock", show: canOpen },
   ];

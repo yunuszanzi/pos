@@ -6,5 +6,5 @@
 export type PlannedModule = { label: string; version: string };
 
 export const plannedModules: PlannedModule[] = [
-  { label: "Stock counts and offline till", version: "v0.9" },
+  { label: "Offline till", version: "v0.9" },
 ];

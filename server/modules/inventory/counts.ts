@@ -79,7 +79,7 @@ async function loadCount(businessId: string, id: string, withCost: boolean, opti
   const page = options.page ?? 1;
   const pageSize = options.pageSize ?? 100;
   const lines = await db.execute(sql`
-    select l.*, u.name as base_unit_name, coalesce(b.on_hand, 0) as on_hand_now, count(*) over () as total
+    select l.*, p.base_unit_id, u.name as base_unit_name, coalesce(b.on_hand, 0) as on_hand_now, count(*) over () as total
     from stock_count_lines l join product_variants v on v.id = l.variant_id join products p on p.id = v.product_id join units u on u.id = p.base_unit_id
     left join stock_balances b on b.variant_id = l.variant_id and b.location_id = ${String(row.location_id)}
     where ${sql.join(filters, sql` and `)}
@@ -103,7 +103,7 @@ async function loadCount(businessId: string, id: string, withCost: boolean, opti
         const counted = line.counted_base === null ? null : String(line.counted_base);
         const variance = counted === null ? null : parseSignedQuantity(counted) - parseSignedQuantity(expected);
         return {
-          variantId: String(line.variant_id), sku: String(line.sku), productName: String(line.product_name), variantName: String(line.variant_name), unitName: String(line.base_unit_name),
+          variantId: String(line.variant_id), sku: String(line.sku), productName: String(line.product_name), variantName: String(line.variant_name), unitName: String(line.base_unit_name), baseUnitId: String(line.base_unit_id),
           expectedBase: qty(expected), countedBase: counted === null ? null : qty(counted),
           varianceBase: variance === null ? null : signedQuantityText(formatSigned(variance)),
           // What the stock has done since the freeze (sales, receipts, transfers): the count is measured against the frozen figure.
