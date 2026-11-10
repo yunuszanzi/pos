@@ -1,15 +1,17 @@
 import { useRef, useState, type FormEvent } from "react";
 import { formatPkr, toPlainRupees } from "../../shared/money";
 import { PaymentError, settleTenders, type Tender } from "../../shared/payments";
-import { ApiRequestError } from "../api/client";
+import { ApiRequestError, NetworkError } from "../api/client";
 import { postSaleInvoice, type PostedSale } from "../api/posApi";
 import { ErrorMessage, Field, SelectInput, TextInput } from "../app/FormElements";
 import { MoneyInput } from "../app/MoneyInput";
 import { amountOf } from "./amounts";
-import { toSaleRequest, type Cart } from "./cart";
+import { toSaleRequest, type Cart, type CartTotals } from "./cart";
 import { useCartStore } from "./cartStore";
 import { Dialog } from "./Dialog";
+import { buildOfflineInvoice, whyNotOffline } from "./offlineSale";
 import { usePos } from "./pos-context";
+import { parseSignedQuantity, formatQuantity } from "../../shared/units";
 
 type Row = { id: string; methodId: string; amount: string; reference: string };
 
@@ -17,8 +19,8 @@ type Row = { id: string; methodId: string; amount: string; reference: string };
  * Takes the money: one or several payment methods, change for cash, a manager's PIN when a discount is above the cashier's limit.
  * Pressing Pay sends one request; the checkout key keeps a repeat press, or a retry after a lost reply, from posting a second bill.
  */
-export function PaymentDialog({ cart, totalPaisa, onClose, onPaid }: { cart: Cart; totalPaisa: number; onClose: () => void; onPaid: (sale: PostedSale) => void }) {
-  const { data, shift, applyStock, syncNow, customers, rememberCustomer } = usePos();
+export function PaymentDialog({ cart, totals, totalPaisa, onClose, onPaid }: { cart: Cart; totals: CartTotals; totalPaisa: number; onClose: () => void; onPaid: (sale: PostedSale) => void }) {
+  const { data, shift, applyStock, syncNow, customers, rememberCustomer, offline, can, stockOnHand } = usePos();
   const customer = cart.customerId ? customers.get(cart.customerId) : undefined;
   const methods = data.paymentMethods;
   const cash = methods.find((method) => method.kind === "cash") ?? methods[0];
@@ -62,6 +64,33 @@ export function PaymentDialog({ cart, totalPaisa, onClose, onPaid }: { cart: Car
     setRows((current) => [...current, { id: crypto.randomUUID(), methodId: other.id, amount: left > 0 ? toPlainRupees(left) : "", reference: "" }]);
   }
 
+  /**
+   * No connection: the sale is kept on this device and sent when it returns. The customer is served now; the slip says it is not yet in
+   * the books. The request is the very one that would have been sent, with the same key, so a sale that did reach the server before the
+   * reply was lost is recognised and not posted twice.
+   */
+  async function takeOffline(request: ReturnType<typeof toSaleRequest>, key: string) {
+    const reason = whyNotOffline({ cart, totals, onAccountPaisa: onAccount, maxDiscountBps: data.user.maxDiscountBps, mayDiscountAboveLimit: can("sales.discount.above_limit") });
+    if (reason) throw new Error(reason);
+    const tenders: Tender[] = rows.map((row, index) => ({ kind: kindOf(row.methodId) === "cash" ? "cash" : "other", amountPaisa: amounts[index]! }));
+    const settlement = settleTenders(totalPaisa, tenders);
+    const soldAt = new Date().toISOString();
+    const reference = await offline.nextReference();
+    const invoice = buildOfflineInvoice({
+      offlineRef: reference, soldAt, cart, totals, taxMode: data.settings.taxMode, branchName: data.branch.name, terminalName: data.terminal.name,
+      cashierName: data.user.name, shiftId: shift!.id, customer: customer ? { id: customer.id, name: customer.name, balancePaisa: customer.balancePaisa } : null, settlement,
+      payments: rows.map((row) => { const method = methods.find((entry) => entry.id === row.methodId)!; return { methodCode: method.code, methodName: method.name, reference: row.reference }; }),
+    });
+    await offline.save({ offlineRef: reference, idempotencyKey: key, terminalId: data.terminal.id, soldAt, request, invoice });
+    // What is on the shelf, as far as this till knows, drops by what was sold.
+    applyStock(totals.lines.filter(({ entry }) => entry.productType === "stocked").map(({ line, entry }) => {
+      const sold = Math.round((line.quantityMilli * entry.factorToBaseMilli) / 1000);
+      const left = parseSignedQuantity(stockOnHand.get(entry.variantId) ?? "0") - sold;
+      return { variantId: entry.variantId, onHand: `${left < 0 ? "-" : ""}${formatQuantity(Math.abs(left))}` };
+    }));
+    onPaid({ invoice, stock: [], offline: { reference, flags: [] } });
+  }
+
   async function pay(event?: FormEvent) {
     event?.preventDefault();
     if (!canPay || sending.current || !shift) return;
@@ -74,7 +103,21 @@ export function PaymentDialog({ cart, totalPaisa, onClose, onPaid }: { cart: Car
         expectedTotalPaisa: totalPaisa,
         ...(needsManager && manager.email ? { approval: { managerEmail: manager.email.trim(), pin: manager.pin } } : {}),
       });
-      const sale = await postSaleInvoice(request, key);
+      // With no connection at all there is nothing to wait for: keep the sale on the device and carry on.
+      if (!offline.online) {
+        await takeOffline(request, key);
+        return;
+      }
+      let sale: PostedSale;
+      try {
+        sale = await postSaleInvoice(request, key);
+      } catch (caught) {
+        // The server could not be reached; it may or may not have seen the request. Same key, so it is never posted twice.
+        if (!(caught instanceof NetworkError)) throw caught;
+        offline.markUnreachable();
+        await takeOffline(request, key);
+        return;
+      }
       applyStock(sale.stock);
       // The response carries the customer's new balance, so the till does not ask for it again.
       if (customer && sale.invoice.customerBalancePaisa !== null) rememberCustomer({ ...customer, balancePaisa: sale.invoice.customerBalancePaisa });

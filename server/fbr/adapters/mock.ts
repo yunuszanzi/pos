@@ -14,7 +14,7 @@ import type { FbrBuyerCheck, FbrClient, FbrClientSettings, FbrPosted, FbrReferen
 export type MockCall = { kind: "validate" | "post"; token: string; payload: Record<string, unknown> };
 /** Every call this process has seen, for tests to count. */
 export const mockCalls: MockCall[] = [];
-const issued = new Map<string, string>();
+let issuedCount = 0;
 
 const referenceData: Record<FbrReferenceKind, Array<{ code: string; description: string }>> = {
   province: [{ code: "SINDH", description: "SINDH" }, { code: "PUNJAB", description: "PUNJAB" }, { code: "KHYBER PAKHTUNKHWA", description: "KHYBER PAKHTUNKHWA" }, { code: "BALOCHISTAN", description: "BALOCHISTAN" }],
@@ -53,11 +53,10 @@ export class MockAdapter implements FbrClient {
     mockCalls.push({ kind: "post", token: this.token, payload: body });
     const stopped = this.blocked() ?? this.refusal(body);
     if (stopped) return stopped as FbrPosted;
-    // The same content gets the same number, as a real service that recognised a repeat would answer.
-    const content = JSON.stringify(body);
-    const digest = createHash("sha1").update(content).digest("hex").slice(0, 12).toUpperCase();
-    const irn = issued.get(content) ?? `${String(body.sellerNTNCNIC)}${body.invoiceType === "Debit Note" ? "DN" : "DI"}${digest}`;
-    issued.set(content, irn);
+    // Every accepted invoice gets a number of its own, as FBR's does: two sales of the same thing on the same day are still two invoices.
+    const digest = createHash("sha1").update(JSON.stringify(body)).digest("hex").slice(0, 8).toUpperCase();
+    issuedCount += 1;
+    const irn = `${String(body.sellerNTNCNIC)}${body.invoiceType === "Debit Note" ? "DN" : "DI"}${digest}${String(issuedCount).padStart(4, "0")}`;
     return { outcome: "accepted", irn, qrData: irn, httpStatus: 200, response: { invoiceNumber: irn, dated: new Date().toISOString(), validationResponse: { statusCode: "00", status: "Valid", error: "" } } };
   }
 

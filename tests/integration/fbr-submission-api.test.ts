@@ -312,7 +312,7 @@ integration("reporting to FBR", { timeout: 600_000 }, () => {
     expect(ran.body).toMatchObject({ tried: 2, accepted: 2 });
     expect((await submissionOf(sale.body.invoice.id)).status).toBe("accepted");
     expect((await submissionOf(back.body.creditNote.id)).status).toBe("accepted");
-    const debit = postsWith(OK).find((call) => call.payload.invoiceType === "Debit Note")!;
+    const debit = postsWith(OK).filter((call) => call.payload.invoiceType === "Debit Note").at(-1)!;
     expect(debit.payload.invoiceRefNo).toBe((await submissionOf(sale.body.invoice.id)).irn);
 
     // A sale made before FBR was switched on has no FBR number, so its return is noted as not reported.

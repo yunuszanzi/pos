@@ -298,3 +298,7 @@ fieldset { border: 1px solid #e0e6ef; border-radius: 8px; }
 
 /* ---- The FBR log: what was sent and what came back. ---- */
 .code-block { margin: 4px 0 12px; padding: 8px; max-height: 280px; overflow: auto; background: #f4f4f5; border-radius: 6px; font-size: 12px; white-space: pre-wrap; word-break: break-word; }
+
+/* ---- The till without a connection: what it says, and what is waiting. ---- */
+.offline-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 8px 16px; background: #fff7e0; border-bottom: 1px solid #e0c36a; color: #5c4300; }
+.status.short, .offline-bar .short { color: #a31f1f; font-weight: 700; }

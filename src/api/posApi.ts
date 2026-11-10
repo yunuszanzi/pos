@@ -47,6 +47,8 @@ export type SaleInvoice = {
   paidPaisa: number;
   changePaisa: number;
   balancePaisa: number;
+  /** Set on a sale rung up offline: what its slip was called. The number above is then that reference until the sale is sent. */
+  offlineRef?: string | null;
   /** Where FBR stands on this sale (absent or null when FBR is not on). */
   fbrStatus?: "pending" | "accepted" | "rejected" | "failed" | "skipped" | null;
   fbrIrn?: string | null;
@@ -58,7 +60,7 @@ export type SaleInvoice = {
   }>;
   payments: Array<{ methodCode: string; methodName: string; amountPaisa: number; tenderedPaisa: number; changePaisa: number; reference: string }>;
 };
-export type PostedSale = { invoice: SaleInvoice; stock: Array<{ variantId: string; onHand: string }> };
+export type PostedSale = { invoice: SaleInvoice; stock: Array<{ variantId: string; onHand: string }>; offline?: { reference: string; flags: string[] } };
 export type SaleSummary = { id: string; number: string; postedAt: string; totalPaisa: number; paidPaisa: number; shiftId: string; cashierName: string | null };
 export type SalePage = { data: SaleSummary[]; page: number; pageSize: number; total: number };
 export type SaleFilter = { q?: string; shiftId?: string; from?: string; to?: string; page?: number; pageSize?: number };
@@ -110,7 +112,12 @@ export const getDataVersions = () => requestApi<DataVersions>("/pos/data-version
 export const getProductChangesSince = (since: number, signal?: AbortSignal) => requestApi<ProductChanges>(`/pos/products/changes?since=${since}`, { signal });
 
 /** The idempotency key identifies one checkout: retrying with the same key can never post a second invoice. */
-export const postSaleInvoice = (sale: PostSaleInput, idempotencyKey: string) => postJson<PostedSale>("/sales", sale, { "Idempotency-Key": idempotencyKey });
+export const postSaleInvoice = (sale: PostSaleInput, idempotencyKey: string, offline?: { reference: string; soldAt: string }) =>
+  postJson<PostedSale>("/sales", sale, {
+    "Idempotency-Key": idempotencyKey,
+    // Headers, not body fields: the same sale sent again is the same request, so it can never post twice.
+    ...(offline ? { "X-Offline-Ref": offline.reference, "X-Offline-Sold-At": offline.soldAt } : {}),
+  });
 export const getSaleById = (id: string) => requestApi<SaleInvoice>(`/sales/${id}`);
 export function getAllSales(filter: SaleFilter = {}, signal?: AbortSignal) {
   const query = new URLSearchParams();
