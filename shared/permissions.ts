@@ -57,6 +57,8 @@ export const permissionDefinitions = [
   ["purchasing.bill", "Enter supplier bills (prices, freight and input tax; needs the cost permission)"],
   ["suppliers.pay", "Pay a supplier (cash comes out of the open shift)"],
   ["purchasing.return", "Return goods to a supplier (needs the cost permission)"],
+  ["quotations.view", "View quotations"],
+  ["quotations.manage", "Write, send, revise, accept and reject quotations"],
 ] as const;
 
 export type PermissionKey = (typeof permissionDefinitions)[number][0];
@@ -79,6 +81,7 @@ export const managerPermissionKeys: PermissionKey[] = [
   "suppliers.view", "suppliers.manage", "suppliers.ledger",
   "purchasing.view", "purchasing.order", "purchasing.receive", "purchasing.bill",
   "suppliers.pay", "purchasing.return",
+  "quotations.view", "quotations.manage",
 ];
 
 export const cashierPermissionKeys: PermissionKey[] = [
