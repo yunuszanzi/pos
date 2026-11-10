@@ -44,6 +44,11 @@ const DeliveryChallanPage = lazy(() => import("../features/delivery/DeliveryChal
 const InvoicesPage = lazy(() => import("../features/invoices/InvoicesPage").then(({ InvoicesPage: Page }) => ({ default: Page })));
 const InvoicePage = lazy(() => import("../features/invoices/InvoicePage").then(({ InvoicePage: Page }) => ({ default: Page })));
 const PublicDocumentPage = lazy(() => import("../features/public/PublicDocumentPage").then(({ PublicDocumentPage: Page }) => ({ default: Page })));
+const AccountsPage = lazy(() => import("../features/accounts/AccountsPage").then(({ AccountsPage: Page }) => ({ default: Page })));
+const AccountPage = lazy(() => import("../features/accounts/AccountPage").then(({ AccountPage: Page }) => ({ default: Page })));
+const ExpensesPage = lazy(() => import("../features/expenses/ExpensesPage").then(({ ExpensesPage: Page }) => ({ default: Page })));
+const ExpenseFormPage = lazy(() => import("../features/expenses/ExpenseFormPage").then(({ ExpenseFormPage: Page }) => ({ default: Page })));
+const ExpensePage = lazy(() => import("../features/expenses/ExpensePage").then(({ ExpensePage: Page }) => ({ default: Page })));
 const SalesOrderPage = lazy(() => import("../features/sales-orders/SalesOrderPage").then(({ SalesOrderPage: Page }) => ({ default: Page })));
 const ReceiveGoodsPage = lazy(() => import("../features/purchasing/ReceiveGoodsPage").then(({ ReceiveGoodsPage: Page }) => ({ default: Page })));
 const GoodsReceiptsPage = lazy(() => import("../features/purchasing/GoodsReceiptsPage").then(({ GoodsReceiptsPage: Page }) => ({ default: Page })));
@@ -113,6 +118,11 @@ const appRoutes: AppRoute[] = [
   { path: "/invoices", label: "Invoices", permission: "invoices.view", element: <InvoicesPage /> },
   { path: "/invoices/new", label: "New invoice", permission: "invoices.create", element: <SalesOrderFormPage mode="invoice" />, nav: false },
   { path: "/invoices/:id", label: "Invoice", permission: "invoices.view", element: <InvoicePage />, nav: false },
+  { path: "/expenses", label: "Expenses", permission: "expenses.view", element: <ExpensesPage /> },
+  { path: "/expenses/new", label: "Record an expense", permission: "expenses.create", element: <ExpenseFormPage />, nav: false },
+  { path: "/expenses/:id", label: "Expense", permission: "expenses.view", element: <ExpensePage />, nav: false },
+  { path: "/accounts", label: "Accounts", permission: "accounts.view", element: <AccountsPage /> },
+  { path: "/accounts/:id", label: "Account", permission: "accounts.view", element: <AccountPage />, nav: false },
   { path: "/sales-orders", label: "Sales orders", permission: "sales_orders.view", element: <SalesOrdersPage /> },
   { path: "/sales-orders/new", label: "New sales order", permission: "sales_orders.manage", element: <SalesOrderFormPage />, nav: false },
   { path: "/sales-orders/:id", label: "Sales order", permission: "sales_orders.view", element: <SalesOrderPage />, nav: false },
