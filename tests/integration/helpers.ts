@@ -44,7 +44,7 @@ export async function signIn(email: string): Promise<string> {
 }
 
 type ApiResponse<T> = { status: number; body: T; headers: Headers };
-type CallOptions = { body?: unknown; terminalId?: string; pinSession?: string; idempotencyKey?: string };
+type CallOptions = { body?: unknown; terminalId?: string; pinSession?: string; idempotencyKey?: string; headers?: Record<string, string> };
 
 // Response shapes vary per route; tests assert on them directly instead of typing each one.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -53,6 +53,7 @@ export async function callApi<T = any>(token: string, method: string, path: stri
   if (options.terminalId) headers.set("X-Terminal-Id", options.terminalId);
   if (options.pinSession) headers.set("X-PIN-Session", options.pinSession);
   if (options.idempotencyKey) headers.set("Idempotency-Key", options.idempotencyKey);
+  for (const [name, value] of Object.entries(options.headers ?? {})) headers.set(name, value);
   // Integration tests call the Hono app in-process; e2e tests set TEST_API_URL to use the running server.
   const baseUrl = process.env.TEST_API_URL ?? "http://localhost";
   const request = new Request(`${baseUrl}/api/v1${path}`, {

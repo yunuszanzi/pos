@@ -81,6 +81,12 @@ const DailySalesPage = lazy(() => import("../features/reports/DailySalesPage").t
 const FbrLogPage = lazy(() => import("../features/fbr/FbrLogPage").then(({ FbrLogPage: Page }) => ({ default: Page })));
 const FbrSubmissionPage = lazy(() => import("../features/fbr/FbrSubmissionPage").then(({ FbrSubmissionPage: Page }) => ({ default: Page })));
 const FbrSettingsPage = lazy(() => import("../features/fbr/FbrSettingsPage").then(({ FbrSettingsPage: Page }) => ({ default: Page })));
+const TransfersPage = lazy(() => import("../features/transfers/TransfersPage").then(({ TransfersPage: Page }) => ({ default: Page })));
+const TransferFormPage = lazy(() => import("../features/transfers/TransferFormPage").then(({ TransferFormPage: Page }) => ({ default: Page })));
+const TransferPage = lazy(() => import("../features/transfers/TransferPage").then(({ TransferPage: Page }) => ({ default: Page })));
+const StockCountsPage = lazy(() => import("../features/stock-counts/StockCountsPage").then(({ StockCountsPage: Page }) => ({ default: Page })));
+const StockCountPage = lazy(() => import("../features/stock-counts/StockCountPage").then(({ StockCountPage: Page }) => ({ default: Page })));
+const OfflineSalesPage = lazy(() => import("../features/offline-sales/OfflineSalesPage").then(({ OfflineSalesPage: Page }) => ({ default: Page })));
 const PosPage = lazy(() => import("../pos/PosPage").then(({ PosPage: Page }) => ({ default: Page })));
 const ValuationPage = lazy(() => import("../features/stock/ValuationPage").then(({ ValuationPage: Page }) => ({ default: Page })));
 
@@ -165,6 +171,12 @@ const appRoutes: AppRoute[] = [
   { path: "/users", label: "Users", permission: "users.view", element: <UsersPage /> },
   { path: "/roles", label: "Roles & permissions", permission: "roles.view", element: <RolesPage /> },
   { path: "/settings", label: "Settings", permission: "settings.view", element: <SettingsPage /> },
+  { path: "/offline-sales", label: "Offline sales to review", permission: "sales.offline_review", element: <OfflineSalesPage /> },
+  { path: "/stock-counts", label: "Stock counts", permission: "inventory.view", element: <StockCountsPage /> },
+  { path: "/stock-counts/:id", label: "Stock count", permission: "inventory.view", element: <StockCountPage />, nav: false },
+  { path: "/transfers", label: "Stock transfers", permission: "transfers.view", element: <TransfersPage /> },
+  { path: "/transfers/new", label: "New stock transfer", permission: "transfers.manage", element: <TransferFormPage />, nav: false },
+  { path: "/transfers/:id", label: "Stock transfer", permission: "transfers.view", element: <TransferPage />, nav: false },
   { path: "/fbr/log", label: "FBR log", permission: "fbr.view", element: <FbrLogPage /> },
   { path: "/fbr/log/:id", label: "FBR submission", permission: "fbr.view", element: <FbrSubmissionPage />, nav: false },
   { path: "/settings/fbr", label: "FBR settings", permission: "fbr.manage", element: <FbrSettingsPage /> },
@@ -279,12 +291,12 @@ function Shell({ children }: { children: ReactNode }) {
         {hasPermission(currentUser?.permissions ?? [], "sales.create") && <NavLink to="/pos" className="nav-link">Point of sale</NavLink>}
         {visibleRoutes.map((route) => <NavLink key={route.path} to={route.path} className={({ isActive }) => isActive ? "nav-link selected" : "nav-link"}>{route.label}</NavLink>)}
       </nav>
-      <nav className="planned-nav" aria-label="Coming soon">
+      {plannedModules.length > 0 && <nav className="planned-nav" aria-label="Coming soon">
         <p className="eyebrow">Coming soon</p>
         {plannedModules.map((module) => <span key={module.label} className="nav-link disabled" aria-disabled="true" title={`Planned for ${module.version}`}>
           {module.label}<small className="badge">Under development</small>
         </span>)}
-      </nav>
+      </nav>}
       <div className="sidebar-bottom">
         <span className="user-initial">{(currentUser?.activeUserName ?? currentUser?.email ?? "U").slice(0, 1).toUpperCase()}</span>
         <div className="user-summary"><strong>{currentUser?.activeUserName ?? currentUser?.activeUserEmail ?? "Signed in"}</strong><small>{currentUser?.activeUserEmail}</small></div>
@@ -316,15 +328,15 @@ function Dashboard() {
   const cards = appRoutes.filter((route) => route.path !== "/" && route.nav !== false && (!route.permission || hasPermission(currentUser?.permissions ?? [], route.permission)));
   return <div className="content">
     <div className="welcome-panel">
-      <p className="eyebrow">Release v0.8 · FBR integration</p>
+      <p className="eyebrow">Release v0.9 · Transfers, counts and the offline till</p>
       <h1>Welcome{currentUser?.activeUserName ? `, ${currentUser.activeUserName}` : ""}</h1>
-      <p>Selling, stock, customers, suppliers, quotations, orders, reports and expenses are ready. Modules marked “Under development” in the menu arrive in later releases.</p>
+      <p>Selling, stock, customers, suppliers, quotations, orders, reports and expenses are ready. The till keeps selling without a connection and sends its sales when it returns.</p>
     </div>
     <DashboardPanel />
     <div className="dashboard-grid">{cards.map((route) => <Link className="dashboard-card" key={route.path} to={route.path}>
       <span className="card-arrow">↗</span><strong>{route.label}</strong><small>Open workspace</small>
     </Link>)}</div>
-    <section className="foundation-note"><strong>v0.8 FBR integration</strong><span>Next: Transfers and stock counts · v0.9</span></section>
+    <section className="foundation-note"><strong>v0.9 Transfers, counts and the offline till</strong><span>Next: hardening and go-live · v1.0</span></section>
   </div>;
 }
 

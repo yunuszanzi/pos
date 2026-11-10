@@ -56,6 +56,8 @@ export type ReceiptInvoice = {
   buyerNtn?: string | null;
   buyerStrn?: string | null;
   buyerAddress?: string;
+  /** Set on a sale rung up offline: the slip reference, which stands in for the invoice number until the sale is sent. */
+  offlineRef?: string | null;
   /** FBR's answer for this invoice (absent when FBR is off). */
   fbrStatus?: string | null;
   fbrIrn?: string | null;
@@ -86,6 +88,8 @@ export type ReceiptStatementRow = { date: string; document: string; memo: string
 export type ReceiptModel = {
   title: string;
   duplicateBanner: string | null;
+  /** Set on a slip printed while the till had no connection: it is not yet in the books. */
+  offlineBanner?: string;
   businessName: string;
   headerLines: string[];
   number: string;
@@ -230,6 +234,7 @@ export function buildReceipt(invoice: ReceiptInvoice, format: PrintFormat, optio
     taxRows: taxRowsOf(invoice.lines),
     payments,
     ...fbrPart(invoice.fbrStatus, invoice.fbrIrn, invoice.fbrQr),
+    ...(invoice.offlineRef ? { offlineBanner: `OFFLINE SALE, TO BE SYNCED — slip ${invoice.offlineRef}. Not yet in the books or reported to FBR. Keep this slip.` } : {}),
     footer: business.receiptFooter ? business.receiptFooter.split(/\r?\n/).filter(Boolean) : ["Thank you for shopping with us."],
   };
 }

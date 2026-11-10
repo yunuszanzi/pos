@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
-import { requestApi } from "../api/client";
+import { NetworkError, requestApi } from "../api/client";
 import { signOutUser } from "../api/authApi";
 import { supabase } from "../api/supabase";
 import { AuthContext, type AuthContextValue, type CurrentUser } from "./auth-context";
 import { queryClient } from "./queryClient";
+import { keepCopy, readCopy } from "../pos/offlineCache";
 import { wipeLocalPosData } from "../pos/localData";
 import { useTerminalStore } from "./terminalStore";
 
@@ -35,9 +36,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       try {
         const user = await requestApi<CurrentUser>("/me");
+        keepCopy(`me:${nextSession.user.id}`, user);
         if (active) setCurrentUser(user);
       } catch (caught) {
-        if (active) {
+        // Opened with no connection: start from what the server said last time. The server checks everything again on every request.
+        const kept = caught instanceof NetworkError ? readCopy<CurrentUser>(`me:${nextSession.user.id}`) : null;
+        if (kept) {
+          if (active) setCurrentUser(kept);
+        } else if (active) {
           setCurrentUser(null);
           setAuthError(caught instanceof Error ? caught.message : "Could not load user profile");
         }

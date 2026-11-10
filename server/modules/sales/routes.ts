@@ -1,5 +1,5 @@
 import { and, eq, sql } from "drizzle-orm";
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { z } from "zod";
 import { auditLog, businessSettings, customerGroups, customers, priceListItems, priceLists, roles, terminals } from "../../../db/schema";
 import { formatPkr } from "../../../shared/money";
@@ -63,11 +63,34 @@ type LineFacts = {
   factor_to_base: string; sale_price_paisa: string; rate_bps: number | null; product_type: string;
 };
 
+/**
+ * A sale rung up while the till had no connection and sent later carries two headers (not body fields, so that sending the same sale
+ * again with the same Idempotency-Key is the same request and can never post it twice): what its slip was called, and when it happened.
+ */
+function offlineSaleOf(context: Context): { reference: string; soldAt: Date } | Response | null {
+  const reference = context.req.header("X-Offline-Ref")?.trim();
+  const soldAtText = context.req.header("X-Offline-Sold-At")?.trim();
+  if (!reference && !soldAtText) return null;
+  if (!reference || !/^[A-Za-z0-9-]{3,40}$/.test(reference)) return apiError(context, 400, "OFFLINE_REFERENCE_INVALID", "The offline reference is missing or not valid");
+  const soldAt = soldAtText ? new Date(soldAtText) : new Date(Number.NaN);
+  if (Number.isNaN(soldAt.getTime())) return apiError(context, 400, "OFFLINE_TIME_INVALID", "The time the sale was made is missing or not valid");
+  if (soldAt.getTime() > Date.now() + 5 * 60_000) return apiError(context, 422, "OFFLINE_TIME_INVALID", "The sale is dated in the future. Check the clock on the till");
+  if (soldAt.getTime() < Date.now() - offlineMaxAgeDays * 86_400_000) return apiError(context, 422, "OFFLINE_TOO_OLD", `The sale is more than ${offlineMaxAgeDays} days old. It needs an owner to deal with it`);
+  return { reference, soldAt };
+}
+const offlineMaxAgeDays = 14;
+
 salesRoutes.post("/sales", requirePermission("sales.create"), idempotent(), validateJson(postSaleSchema), async (context) => {
   const principal = getPrincipal(context);
   const businessId = principal.businessId!;
   const actor = getActorId(principal);
   const input = context.req.valid("json");
+  const offlineOrError = offlineSaleOf(context);
+  if (offlineOrError instanceof Response) return offlineOrError;
+  const offline = offlineOrError;
+  // What a person should look at afterwards. An offline sale is posted even so: the customer has paid and gone.
+  const flags: string[] = [];
+  const flagDetail: Record<string, unknown> = {};
 
   if (!principal.terminalId) return apiError(context, 400, "TERMINAL_REQUIRED", "Sales are rung up on a registered terminal");
   const [terminal] = await db.select().from(terminals)
@@ -155,7 +178,11 @@ salesRoutes.post("/sales", requirePermission("sales.create"), idempotent(), vali
   if (hasDiscount) {
     const [role] = await db.select({ limit: roles.maxDiscountBps }).from(roles).where(eq(roles.id, principal.roleId!)).limit(1);
     const breaches = discountsOverLimit(pricingInput, priced, hasPermission(principal, "sales.discount.above_limit") ? 10000 : role?.limit ?? 0);
-    if (breaches.length) {
+    if (breaches.length && offline) {
+      // No manager could approve it with the connection down; it is posted and flagged.
+      flags.push("DISCOUNT_OVER_LIMIT");
+      flagDetail.discountLimitBps = role?.limit ?? 0;
+    } else if (breaches.length) {
       if (!input.approval) {
         return apiError(context, 403, "DISCOUNT_APPROVAL_REQUIRED", "This discount is more than you may give. A manager must approve it.");
       }
@@ -168,7 +195,12 @@ salesRoutes.post("/sales", requirePermission("sales.create"), idempotent(), vali
     }
   }
 
-  if (input.expectedTotalPaisa !== undefined && input.expectedTotalPaisa !== priced.totalPaisa) {
+  if (input.expectedTotalPaisa !== undefined && input.expectedTotalPaisa !== priced.totalPaisa && offline) {
+    // The customer paid what the till showed; the shop's price or tax moved while it was offline.
+    flags.push("PRICE_CHANGED");
+    flagDetail.expectedTotalPaisa = input.expectedTotalPaisa;
+    flagDetail.actualTotalPaisa = priced.totalPaisa;
+  } else if (input.expectedTotalPaisa !== undefined && input.expectedTotalPaisa !== priced.totalPaisa) {
     return apiError(context, 409, "TOTAL_CHANGED", "The total changed since it was shown (a price or tax rate was updated). Check the cart and try again.");
   }
 
@@ -203,7 +235,7 @@ salesRoutes.post("/sales", requirePermission("sales.create"), idempotent(), vali
 
   const payload = {
     business_id: businessId, customer_id: customerId, credit_approved_by: creditApprovedBy, branch_id: terminal.branchId, terminal_id: terminal.id, shift_id: input.shiftId, location_id: locationId,
-    allow_negative_stock: settings.allowNegativeStock, tax_mode: settings.taxMode,
+    allow_negative_stock: settings.allowNegativeStock || Boolean(offline), tax_mode: settings.taxMode,
     gross_paisa: priced.grossPaisa, line_discount_paisa: priced.lineDiscountPaisa, invoice_discount_paisa: priced.invoiceDiscountPaisa,
     taxable_paisa: priced.taxablePaisa, tax_paisa: priced.taxPaisa, rounding_paisa: priced.roundingPaisa, total_paisa: priced.totalPaisa,
     approved_by: approvedBy, approval_note: approvalNote,
@@ -227,6 +259,28 @@ salesRoutes.post("/sales", requirePermission("sales.create"), idempotent(), vali
     })),
   };
 
+  if (offline) {
+    // Stock that goes below zero because of a sale that was already made is posted and flagged, not refused.
+    const wanted = new Map<string, number>();
+    for (const line of payload.lines) {
+      if (factsOfVariant(facts, line.variant_id)?.product_type !== "stocked") continue;
+      wanted.set(line.variant_id, (wanted.get(line.variant_id) ?? 0) + parseQuantity(line.qty_base));
+    }
+    if (wanted.size) {
+      const held = await db.execute<{ variant_id: string; on_hand: string; reserved: string }>(sql`
+        select variant_id, on_hand::text, reserved::text from stock_balances where business_id = ${businessId} and location_id = ${locationId}
+          and variant_id in (${sql.join([...wanted.keys()].map((id) => sql`${id}::uuid`), sql`, `)})`);
+      const short = [...wanted].filter(([variantId, qty]) => {
+        const row = held.find((entry) => entry.variant_id === variantId);
+        return parseQuantity(quantityText(row?.on_hand ?? "0")) - parseQuantity(quantityText(row?.reserved ?? "0")) - qty < 0;
+      }).map(([variantId]) => variantId);
+      if (short.length) {
+        flags.push("NEGATIVE_STOCK");
+        flagDetail.shortVariantIds = short;
+      }
+    }
+  }
+
   // FBR: nothing is posted if what FBR needs is missing, and the sale says what to fix (FR-FBR-10).
   const fbrProblems = await fbrPreflight(businessId, { terminalId: terminal.id, customerId: customerId, totalPaisa: priced.totalPaisa, lines: payload.lines as Array<Record<string, unknown>> });
   if (fbrProblems.length) return apiError(context, 422, "FBR_INCOMPLETE", `FBR needs more detail before this can be posted. ${fbrProblems.slice(0, 5).join(". ")}${fbrProblems.length > 5 ? `. And ${fbrProblems.length - 5} more` : ""}.`);
@@ -235,12 +289,17 @@ salesRoutes.post("/sales", requirePermission("sales.create"), idempotent(), vali
   try {
     invoiceId = await db.transaction(async (tx) => {
       const [row] = await tx.execute<{ id: string }>(sql`select post_sales_invoice(${JSON.stringify(payload)}::jsonb, ${actor}) as id`);
+      if (offline) {
+        await tx.execute(sql`select stamp_offline_sale(${businessId}::uuid, ${row.id}::uuid, ${offline.soldAt.toISOString()}::timestamptz, ${offline.reference}, ${JSON.stringify(flags)}::jsonb, ${JSON.stringify(flagDetail)}::jsonb)`);
+      }
       // Queued in the same transaction, so a posted sale can never miss being reported.
       fbrQueued = await queueFbrSubmission(tx, businessId, "sales_invoice", row.id, terminal.id);
       return row.id;
     });
   } catch (error) {
     const message = dbErrorMessage(error);
+    if (message.includes("sales_invoices_offline_ref_uidx")) return apiError(context, 409, "OFFLINE_REFERENCE_USED", "A different sale was already sent with this offline reference");
+    if (message.includes("OFFLINE_TIME_INVALID")) return apiError(context, 422, "OFFLINE_TIME_INVALID", "The sale is dated in the future. Check the clock on the till");
     const known = postingErrors.find(([prefix]) => message.includes(prefix));
     if (known?.[2] === "STOCK_INSUFFICIENT") return apiError(context, 409, "STOCK_INSUFFICIENT", await describeShortage(businessId, message));
     const credit = /CREDIT_LIMIT_EXCEEDED|CUSTOMER_OVERDUE/.exec(message)?.[0];
@@ -259,8 +318,13 @@ salesRoutes.post("/sales", requirePermission("sales.create"), idempotent(), vali
     where business_id = ${businessId} and location_id = ${locationId} and variant_id in (${sql.join(input.lines.map((line) => sql`${line.variantId}::uuid`), sql`, `)})
     group by variant_id
   `);
-  return context.json({ invoice, stock: stock.map((row) => ({ variantId: row.variant_id, onHand: quantityText(row.on_hand) })) }, 201);
+  return context.json({
+    invoice, stock: stock.map((row) => ({ variantId: row.variant_id, onHand: quantityText(row.on_hand) })),
+    ...(offline ? { offline: { reference: offline.reference, flags } } : {}),
+  }, 201);
 });
+
+const factsOfVariant = (facts: Array<{ variant_id: string; product_type: string }>, variantId: string) => facts.find((row) => row.variant_id === variantId);
 
 export async function loadInvoice(businessId: string, id: string, withCost: boolean) {
   const [invoice] = await db.execute(sql`

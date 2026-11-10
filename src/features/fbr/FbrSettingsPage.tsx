@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { fbrReferenceLabels, fbrReferenceKinds } from "../../../shared/fbr";
@@ -59,7 +59,6 @@ function ConnectionForm({ data, run }: { data: FbrConfig; run: Run }) {
     cancelWindowHours: data.cancelWindowHours, confirmUntested: false,
   });
   const [threshold, setThreshold] = useState(toPlainRupees(data.buyerIdThresholdPaisa));
-  useEffect(() => { setThreshold(toPlainRupees(data.buyerIdThresholdPaisa)); }, [data.buyerIdThresholdPaisa]);
   const goingLive = form.environment === "production" && !data.allScenariosPassed;
 
   function submit(event: FormEvent) {

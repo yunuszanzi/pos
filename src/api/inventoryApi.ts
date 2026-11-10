@@ -11,6 +11,8 @@ export type StockLevel = {
   baseUnitId: string;
   onHand: string;
   reserved: string;
+  /** Sent from one location and not yet received: on no shelf. */
+  inTransit: string;
   available: string;
   reorderLevel: string;
   low: boolean;

@@ -11,6 +11,13 @@ export class ApiRequestError extends Error {
   }
 }
 
+/** The request never got an answer: no connection, or the server could not be reached at all. Whether it arrived is not known. */
+export class NetworkError extends Error {
+  constructor(message = "There is no connection to the server") {
+    super(message);
+  }
+}
+
 export async function requestApi<T>(path: string, init: RequestInit = {}): Promise<T> {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error("Please sign in again");
@@ -22,7 +29,14 @@ export async function requestApi<T>(path: string, init: RequestInit = {}): Promi
   const pinSession = sessionStorage.getItem("pos.pinSession");
   if (terminalId) headers.set("X-Terminal-Id", terminalId);
   if (pinSession) headers.set("X-PIN-Session", pinSession);
-  const response = await fetch(`/api/v1${path}`, { ...init, headers });
+  let response: Response;
+  try {
+    response = await fetch(`/api/v1${path}`, { ...init, headers });
+  } catch (caught) {
+    // An aborted request is the caller's own doing (a stale search); anything else is the network.
+    if (caught instanceof DOMException && caught.name === "AbortError") throw caught;
+    throw new NetworkError();
+  }
   // A dead or restarting API answers with an empty or non-JSON body (the dev proxy returns an empty 500); say what is wrong instead of a parser error.
   const result = await response.json().catch(() => null) as (T & ApiError) | null;
   if (result === null) {

@@ -66,6 +66,7 @@ export function Receipt({ model, format }: { model: ReceiptModel; format: PrintF
   const sheet = format === "a4" || format === "a5";
   return <article className={`receipt receipt-${format}`} aria-label="Receipt">
     {model.duplicateBanner && <p className="receipt-duplicate">{model.duplicateBanner}</p>}
+    {model.offlineBanner && <p className="receipt-duplicate" data-testid="receipt-offline">{model.offlineBanner}</p>}
     <header className="receipt-head">
       <h1>{model.businessName}</h1>
       {model.headerLines.map((line) => <p key={line}>{line}</p>)}

@@ -102,5 +102,10 @@ dashboardRoutes.get("/dashboard", async (context) => {
       from fbr_submissions where business_id = ${businessId}`);
     if (Number(row.rejected) + Number(row.failed) + Number(row.pending) > 0) out.fbr = { rejected: Number(row.rejected), failed: Number(row.failed), pending: Number(row.pending) };
   }
+  // Sales rung up offline that went wrong in some way (stock below zero, a price that moved, a discount nobody approved) and have not been looked at.
+  if (may("sales.offline_review")) {
+    const [row] = await db.execute(sql`select count(*)::int as open from offline_sale_flags where business_id = ${businessId} and reviewed_at is null`);
+    if (Number(row.open) > 0) out.offlineReview = { open: Number(row.open) };
+  }
   return context.json(out);
 });

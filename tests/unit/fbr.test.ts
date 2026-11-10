@@ -182,12 +182,13 @@ describe("the Digital Invoicing adapter sorts FBR's answers", () => {
 
 describe("the mock FBR behaves as its token says", () => {
   const payload = (hs = "9503.0090") => ({ invoiceType: "Sale Invoice", sellerNTNCNIC: "12345678", items: [{ hsCode: hs }] });
-  it("accepts with a number worked out from the content, the same each time", async () => {
+  it("accepts, and gives every invoice a number of its own, even two identical ones", async () => {
     const mock = new MockAdapter({ ...settings, token: "mock-ok" });
     const first = await mock.post(payload());
     const again = await mock.post(payload());
     expect(first).toMatchObject({ outcome: "accepted" });
-    expect(again).toMatchObject({ outcome: "accepted", irn: (first as { irn: string }).irn });
+    expect(again).toMatchObject({ outcome: "accepted", irn: expect.stringContaining("DI") });
+    expect((again as { irn: string }).irn).not.toBe((first as { irn: string }).irn);
     expect(await mock.post({ ...payload(), invoiceType: "Debit Note" })).toMatchObject({ irn: expect.stringContaining("DN") });
     expect(mockCalls.filter((call) => call.kind === "post").length).toBeGreaterThanOrEqual(3);
   });

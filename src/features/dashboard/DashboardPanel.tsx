@@ -33,7 +33,7 @@ export function DashboardPanel() {
   if (board.isPending) return <p className="muted">Loading today's numbers…</p>;
   if (board.isError) return <ErrorMessage>{board.error.message}</ErrorMessage>;
   const data = board.data;
-  const nothing = !data.sales && !data.cash && !data.receivables && !data.payables && !data.lowStock && !data.fbr;
+  const nothing = !data.sales && !data.cash && !data.receivables && !data.payables && !data.lowStock && !data.fbr && !data.offlineReview;
   if (nothing) return null;
 
   return <section className="stack" aria-label="Today at a glance">
@@ -52,6 +52,8 @@ export function DashboardPanel() {
         <small>{data.payables.suppliers} {data.payables.suppliers === 1 ? "supplier" : "suppliers"}</small></Link>}
       {data.lowStock && <Link className="dashboard-card" to="/reports/low-stock"><small>Low stock</small><strong data-testid="dash-low-stock">{data.lowStock.items} {data.lowStock.items === 1 ? "item" : "items"}</strong>
         <small>At or below their reorder level</small></Link>}
+      {data.offlineReview && <Link className="dashboard-card" to="/offline-sales"><small>Offline sales to review</small><strong data-testid="dash-offline-review">{data.offlineReview.open} {data.offlineReview.open === 1 ? "sale" : "sales"}</strong>
+        <small>Stock below zero, a price that moved, or a discount nobody approved</small></Link>}
       {data.fbr && <Link className="dashboard-card" to={data.fbr.rejected + data.fbr.failed > 0 ? "/fbr/log?attention=1" : "/fbr/log"}><small>FBR</small><strong data-testid="dash-fbr">{data.fbr.rejected + data.fbr.failed > 0 ? `${data.fbr.rejected + data.fbr.failed} need attention` : `${data.fbr.pending} waiting`}</strong>
         <small>{data.fbr.pending} waiting · {data.fbr.rejected} refused · {data.fbr.failed} given up</small></Link>}
     </div>

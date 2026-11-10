@@ -12,7 +12,8 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "e2e": "playwright test",
+    "e2e": "playwright test && playwright test -c playwright.pwa.config.ts",
+    "e2e:pwa": "playwright test -c playwright.pwa.config.ts",
     "db:migrate": "tsx db/migrate.ts",
     "db:seed": "tsx db/seed.ts",
     "db:seed-demo": "tsx db/seed-demo.ts"

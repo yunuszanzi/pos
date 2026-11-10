@@ -18,6 +18,7 @@ import { useCartStore } from "./cartStore";
 import { BillDiscountDialog, HeldSalesDialog, LineDialog } from "./CartDialogs";
 import type { CatalogueEntry } from "./catalogueIndex";
 import { Dialog } from "./Dialog";
+import { OfflineBar } from "./OfflineBar";
 import { PaymentDialog } from "./PaymentDialog";
 import { ReceiptPrinter, type PrintJob } from "./Receipt";
 import { ReturnDialog } from "./ReturnDialog";
@@ -122,7 +123,7 @@ function PosScreen() {
 
   const jobBase = { business: data.business, dateFormat: data.settings.dateFormat, timezone: data.settings.timezone };
   /** The first print of a sale is the original. */
-  const printOriginal = (sale: PostedSale, format: PrintFormat) => setJob({ ...jobBase, invoice: sale.invoice, format });
+  const printOriginal = (sale: PostedSale, format: PrintFormat, copyNumber?: number) => setJob({ ...jobBase, invoice: sale.invoice, format, ...(copyNumber ? { duplicate: { copyNumber } } : {}) });
   /** Any later print is a logged duplicate, numbered by the server. */
   async function printDuplicate(saleId: string, format: PrintFormat) {
     const copy = await reprintSale(saleId, format);
@@ -184,15 +185,17 @@ function PosScreen() {
       <span>{data.branch.name} · {data.terminal.name}</span>
       <span>{data.user.name ?? data.user.email}</span>
       <span className="grow" />
+      {!pos.offline.online && <span className="status short" data-testid="till-offline">Offline</span>}
       {pos.catalogueStatus !== "ready" && <span className="status" role="status">{pos.catalogueStatus === "error" ? "Products not loaded" : "Updating products…"}</span>}
       <button className="button secondary" onClick={() => setModal("history")}>Recent sales</button>
       <button className="button secondary" onClick={() => setModal("held")}>Held (F7)</button>
       {can("sales.return") && <button className="button secondary" onClick={() => setModal("return")}>Return</button>}
       {can("customers.receive_payment") && <button className="button secondary" onClick={() => setModal("receive")}>Customer payment</button>}
       {can("cash.movement") && <button className="button secondary" onClick={() => setModal("cash")}>Cash in/out</button>}
-      {can("shifts.close") && <button className="button secondary" onClick={() => setModal("close")}>Close shift</button>}
+      {can("shifts.close") && <button className="button secondary" onClick={() => (pos.offline.queued.length || pos.offline.refused.length ? setNotice("Sales made without a connection have not been sent yet. Close the shift once they are.") : setModal("close"))}>Close shift</button>}
       {can("catalog.view") && <Link className="button secondary" to="/">Back office</Link>}
     </header>
+    <OfflineBar />
 
     <div className="pos-main">
       <section className="pos-left">
@@ -253,7 +256,7 @@ function PosScreen() {
       </aside>
     </div>
 
-    {modal === "pay" && totals && <PaymentDialog cart={cart} totalPaisa={totals.priced.totalPaisa} onClose={() => { setModal(null); focusSearch(); }}
+    {modal === "pay" && totals && <PaymentDialog cart={cart} totals={totals} totalPaisa={totals.priced.totalPaisa} onClose={() => { setModal(null); focusSearch(); }}
       onPaid={(sale) => { cart.clear(); setModal(null); setDone(sale); }} />}
     {modal === "customer" && <CustomerDialog onClose={() => { setModal(null); focusSearch(); }} onPick={(customerId) => { cart.setCustomer(customerId); setModal(null); focusSearch(); }} />}
     {modal === "receive" && !receivingFrom && <CustomerDialog onClose={() => { setModal(null); focusSearch(); }} onPick={(customerId) => { if (customerId) setReceivingFrom(customerId); else setModal(null); }} />}
@@ -284,7 +287,7 @@ function PosScreen() {
 }
 
 function SaleDone({ sale, onNext, onPrintOriginal, onPrintDuplicate }: {
-  sale: PostedSale; onNext: () => void; onPrintOriginal: (sale: PostedSale, format: PrintFormat) => void; onPrintDuplicate: (saleId: string, format: PrintFormat) => Promise<void>;
+  sale: PostedSale; onNext: () => void; onPrintOriginal: (sale: PostedSale, format: PrintFormat, copyNumber?: number) => void; onPrintDuplicate: (saleId: string, format: PrintFormat) => Promise<void>;
 }) {
   const { data, can } = usePos();
   const { invoice } = sale;
@@ -292,6 +295,7 @@ function SaleDone({ sale, onNext, onPrintOriginal, onPrintDuplicate }: {
   const [printed, setPrinted] = useState(false);
   const [error, setError] = useState("");
   const autoPrinted = useRef(false);
+  const localCopies = useRef(0);
 
   // The receipt prints by itself when the shop wants it to; that print is the original.
   useEffect(() => {
@@ -307,6 +311,10 @@ function SaleDone({ sale, onNext, onPrintOriginal, onPrintDuplicate }: {
       if (!printed) {
         onPrintOriginal(sale, format);
         setPrinted(true);
+      } else if (sale.offline) {
+        // The server does not know this sale yet, so a copy is made here and marked as one.
+        localCopies.current += 1;
+        onPrintOriginal(sale, format, localCopies.current);
       } else {
         await onPrintDuplicate(invoice.id, format);
       }
@@ -317,6 +325,7 @@ function SaleDone({ sale, onNext, onPrintOriginal, onPrintDuplicate }: {
 
   return <Dialog title="Sale complete" onClose={onNext}><div className="stack">
     <p className="eyebrow">{invoice.number}</p>
+    {sale.offline && <p className="notice error" role="status" data-testid="done-offline">There is no connection. This sale is saved on this till and will be sent when the connection returns. The slip says so. Its invoice number is given once it is sent.</p>}
     <dl className="totals">
       <div className="grand"><dt>Total</dt><dd data-testid="done-total">{formatPkr(invoice.totalPaisa)}</dd></div>
       {invoice.payments.map((payment) => <div key={payment.methodCode + payment.reference}><dt>{payment.methodName}{payment.reference ? ` (${payment.reference})` : ""}</dt><dd>{formatPkr(payment.tenderedPaisa)}</dd></div>)}

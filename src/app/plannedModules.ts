@@ -5,6 +5,5 @@
  */
 export type PlannedModule = { label: string; version: string };
 
-export const plannedModules: PlannedModule[] = [
-  { label: "Transfers & stock counts", version: "v0.9" },
-];
+// Nothing is planned without a page now: every module on the v0.x roadmap has shipped. Add an entry here when a new one is announced.
+export const plannedModules: PlannedModule[] = [];

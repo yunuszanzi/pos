@@ -2,20 +2,13 @@ import { expect, test } from "@playwright/test";
 import { createTestBusiness } from "../integration/helpers";
 import { signInThroughUi } from "./helpers";
 
-test("modules that are not built yet are listed as under development and cannot be opened", async ({ page }) => {
+test("a module with no page yet is not linked, and with none planned the menu has no 'coming soon' list; every entry opens a page", async ({ page }) => {
   const business = await createTestBusiness();
   await signInThroughUi(page, business.ownerEmail);
 
-  const soon = page.getByRole("navigation", { name: "Coming soon" });
-  await expect(soon).toContainText("Transfers & stock counts");
-  await expect(soon.getByText("Under development").first()).toBeVisible();
-  await expect(soon.getByRole("link")).toHaveCount(0);
-
-  // Clicking one does nothing: the page does not change.
-  const before = page.url();
-  await soon.getByText("Transfers & stock counts").click();
-  expect(page.url()).toBe(before);
-  await expect(page.getByRole("heading", { name: /Welcome/ })).toBeVisible();
+  // Every module on the roadmap has a page now, so nothing is listed as under development. (When one is announced, src/app/plannedModules.ts
+  // lists it again, unlinked, until its page ships.)
+  await expect(page.getByRole("navigation", { name: "Coming soon" })).toHaveCount(0);
 
   // Every real menu entry still opens a page with content.
   const main = page.getByRole("navigation", { name: "Main navigation" });

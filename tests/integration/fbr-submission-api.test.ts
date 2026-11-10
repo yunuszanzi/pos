@@ -46,6 +46,7 @@ const sell = (context: Setup, quantity = "10", extra: Record<string, unknown> = 
 const setToken = (context: Setup, token: string) => callApi(context.business.ownerToken, "PUT", "/fbr/token", { body: { token } });
 const submissionOf = async (invoiceId: string) => {
   const client = sql();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [row] = await client<Array<{ id: string; status: string; attempts: number; irn: string | null; error_code: string | null; error_message: string | null; next_retry_at: Date | null; payload: any }>>`
     SELECT id, status, attempts, irn, error_code, error_message, next_retry_at, payload FROM fbr_submissions WHERE doc_id = ${invoiceId}`;
   await client.end();
@@ -57,6 +58,7 @@ const postsWith = (token: string) => mockCalls.filter((call) => call.kind === "p
 const job = async (scope: { business: TestBusiness } | null, secret: string | null = process.env.CRON_SECRET!, method = "POST") => {
   const { app } = await import("../../server/app");
   const response = await app.fetch(new Request(`http://localhost/api/jobs/fbr-retry${scope ? `?businessId=${scope.business.businessId}` : ""}`, { method, headers: secret ? { Authorization: `Bearer ${secret}` } : {} }));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return { status: response.status, body: await response.json() as Record<string, any> };
 };
 /** Make everything pending due now, as if the wait had passed. */
@@ -312,7 +314,7 @@ integration("reporting to FBR", { timeout: 600_000 }, () => {
     expect(ran.body).toMatchObject({ tried: 2, accepted: 2 });
     expect((await submissionOf(sale.body.invoice.id)).status).toBe("accepted");
     expect((await submissionOf(back.body.creditNote.id)).status).toBe("accepted");
-    const debit = postsWith(OK).find((call) => call.payload.invoiceType === "Debit Note")!;
+    const debit = postsWith(OK).filter((call) => call.payload.invoiceType === "Debit Note").at(-1)!;
     expect(debit.payload.invoiceRefNo).toBe((await submissionOf(sale.body.invoice.id)).irn);
 
     // A sale made before FBR was switched on has no FBR number, so its return is noted as not reported.
