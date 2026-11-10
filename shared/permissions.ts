@@ -61,6 +61,8 @@ export const permissionDefinitions = [
   ["quotations.manage", "Write, send, revise, accept and reject quotations"],
   ["sales_orders.view", "View sales orders"],
   ["sales_orders.manage", "Take, cancel and close sales orders; convert a quotation into one"],
+  ["delivery.view", "View delivery challans"],
+  ["delivery.manage", "Write, dispatch, deliver, return and cancel delivery challans (stock leaves on dispatch)"],
 ] as const;
 
 export type PermissionKey = (typeof permissionDefinitions)[number][0];
@@ -84,6 +86,7 @@ export const managerPermissionKeys: PermissionKey[] = [
   "purchasing.view", "purchasing.order", "purchasing.receive", "purchasing.bill",
   "suppliers.pay", "purchasing.return",
   "quotations.view", "quotations.manage", "sales_orders.view", "sales_orders.manage",
+  "delivery.view", "delivery.manage",
 ];
 
 export const cashierPermissionKeys: PermissionKey[] = [

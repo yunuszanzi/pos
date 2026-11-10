@@ -64,7 +64,10 @@ export async function loadSalesOrder(businessId: string, id: string) {
     left join quotations q on q.id = o.quotation_id
     where o.business_id = ${businessId} and o.id = ${id}`);
   if (!row) return null;
-  const lines = await db.execute(sql`select * from sales_order_lines where business_id = ${businessId} and order_id = ${id} order by line_no`);
+  const lines = await db.execute(sql`
+    select l.*, coalesce((select sum(cl.qty_base) from delivery_challan_lines cl join delivery_challans c on c.id = cl.challan_id where cl.order_line_id = l.id and c.status = 'pending'), 0) as pending_base
+    from sales_order_lines l where l.business_id = ${businessId} and l.order_id = ${id} order by l.line_no`);
+  const challans = await db.execute(sql`select id, number, status, driver_name, vehicle_no, dispatched_at from delivery_challans where business_id = ${businessId} and order_id = ${id} order by created_at, number`);
   return {
     id: String(row.id), number: String(row.number), status: String(row.status), customerId: String(row.customer_id), customerName: String(row.customer_name),
     customerPhone: String(row.customer_phone ?? ""), customerNtn: row.customer_ntn ? String(row.customer_ntn) : null, customerStrn: row.customer_strn ? String(row.customer_strn) : null,
@@ -73,12 +76,17 @@ export async function loadSalesOrder(businessId: string, id: string) {
     customerPo: String(row.customer_po), orderDate: day(row.order_date), deliveryDate: day(row.delivery_date), deliveryAddress: String(row.delivery_address), note: String(row.note),
     taxMode: String(row.tax_mode), grossPaisa: paisa(row.gross_paisa), lineDiscountPaisa: paisa(row.line_discount_paisa), invoiceDiscountPaisa: paisa(row.invoice_discount_paisa),
     taxablePaisa: paisa(row.taxable_paisa), taxPaisa: paisa(row.tax_paisa), roundingPaisa: paisa(row.rounding_paisa), totalPaisa: paisa(row.total_paisa), createdAt: iso(row.created_at),
+    challans: challans.map((challan) => ({
+      id: String(challan.id), number: String(challan.number), status: String(challan.status), driverName: String(challan.driver_name), vehicleNo: String(challan.vehicle_no), dispatchedAt: iso(challan.dispatched_at),
+    })),
     lines: lines.map((line) => ({
       id: String(line.id), lineNo: Number(line.line_no), variantId: String(line.variant_id), unitId: String(line.unit_id), productName: String(line.product_name),
       variantName: String(line.variant_name), sku: String(line.sku), unitName: String(line.unit_name), hsCode: line.hs_code ? String(line.hs_code) : null,
       quantity: quantityText(String(line.qty_entered)), factorToBase: quantityText(String(line.factor_to_base)), qtyBase: quantityText(String(line.qty_base)),
       deliveredBase: quantityText(String(line.delivered_base)), invoicedBase: quantityText(String(line.invoiced_base)),
       remainingBase: formatQuantity(parseQuantity(String(line.qty_base)) - parseQuantity(String(line.delivered_base))),
+      // Still to be put on a challan: not delivered and not already on a pending one.
+      unassignedBase: formatQuantity(parseQuantity(String(line.qty_base)) - parseQuantity(String(line.delivered_base)) - parseQuantity(String(line.pending_base))),
       unitPricePaisa: paisa(line.unit_price_paisa), grossPaisa: paisa(line.gross_paisa), lineDiscountPaisa: paisa(line.line_discount_paisa),
       invoiceDiscountSharePaisa: paisa(line.invoice_discount_share_paisa), netPaisa: paisa(line.net_paisa), taxRateBps: Number(line.tax_rate_bps),
       taxPaisa: paisa(line.tax_paisa), totalPaisa: paisa(line.total_paisa),

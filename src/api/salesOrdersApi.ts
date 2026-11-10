@@ -1,3 +1,4 @@
+import type { ChallanStatus } from "../../shared/schemas/deliveryChallans";
 import type { ConvertQuotationInput, SalesOrderInput, SalesOrderStatus } from "../../shared/schemas/salesOrders";
 import { postJson, requestApi } from "./client";
 
@@ -9,7 +10,7 @@ export type SalesOrderFilter = { status?: SalesOrderStatus | "active" | ""; cust
 
 export type SalesOrderLine = {
   id: string; lineNo: number; variantId: string; unitId: string; productName: string; variantName: string; sku: string; unitName: string; hsCode: string | null;
-  quantity: string; factorToBase: string; qtyBase: string; deliveredBase: string; invoicedBase: string; remainingBase: string;
+  quantity: string; factorToBase: string; qtyBase: string; deliveredBase: string; invoicedBase: string; remainingBase: string; unassignedBase: string;
   unitPricePaisa: number; grossPaisa: number; lineDiscountPaisa: number; invoiceDiscountSharePaisa: number; netPaisa: number; taxRateBps: number; taxPaisa: number; totalPaisa: number;
 };
 export type SalesOrder = {
@@ -18,6 +19,7 @@ export type SalesOrder = {
   customerPo: string; orderDate: string; deliveryDate: string | null; deliveryAddress: string; note: string; taxMode: "inclusive" | "exclusive";
   grossPaisa: number; lineDiscountPaisa: number; invoiceDiscountPaisa: number; taxablePaisa: number; taxPaisa: number; roundingPaisa: number; totalPaisa: number; createdAt: string;
   lines: SalesOrderLine[];
+  challans: Array<{ id: string; number: string; status: ChallanStatus; driverName: string; vehicleNo: string; dispatchedAt: string | null }>;
 };
 export type StockAfter = Array<{ variantId: string; onHand: string; reserved: string; available: string }>;
 export type OrderResult = { order: SalesOrder; stock: StockAfter };
