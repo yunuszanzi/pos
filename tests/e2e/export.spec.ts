@@ -23,6 +23,6 @@ test("the owner downloads all the business's data, and a table as CSV", async ({
   const one = page.waitForEvent("download");
   await page.getByRole("listitem").filter({ hasText: "customers" }).getByRole("button", { name: "Download" }).click();
   const csv = await one;
-  expect(csv.suggestedFilename()).toMatch(/^customers-d{4}-d{2}-d{2}.csv$/);
+  expect(csv.suggestedFilename()).toMatch(/^customers-\d{4}-\d{2}-\d{2}\.csv$/);
   expect(readFileSync((await csv.path())!, "utf8")).toContain("Bilal Wholesale");
 });
