@@ -3,7 +3,9 @@ import { useQuery } from "@tanstack/react-query";
 import { getCustomerChangesSince, type TillCustomer } from "../api/customersApi";
 import { getAppBootstrapData, getDataVersions, getProductChangesSince, getStockLevelsForProducts, postSaleInvoice, type AppBootstrapData, type DataVersions } from "../api/posApi";
 import type { Product } from "../api/productsApi";
+import { NetworkError } from "../api/client";
 import { useTerminalStore } from "../app/terminalStore";
+import { keepCopy, readCopy } from "./offlineCache";
 import { PosCache, cacheScope } from "./catalogueCache";
 import { CatalogueIndex } from "./catalogueIndex";
 import { syncCatalogue, syncCustomers, whatChanged } from "./catalogueSync";
@@ -21,7 +23,18 @@ export function PosProvider({ children }: { children: ReactNode }) {
   const terminalId = useTerminalStore((state) => state.terminalId);
   const bootstrap = useQuery({
     queryKey: ["pos-bootstrap", terminalId],
-    queryFn: getAppBootstrapData,
+    queryFn: async () => {
+      try {
+        const fresh = await getAppBootstrapData();
+        keepCopy(`bootstrap:${terminalId}`, fresh);
+        return fresh;
+      } catch (caught) {
+        // The till is opened with no connection: start from what it was told last time, so selling can go on.
+        const kept = caught instanceof NetworkError ? readCopy<AppBootstrapData>(`bootstrap:${terminalId}`) : null;
+        if (kept) return kept;
+        throw caught;
+      }
+    },
     staleTime: Infinity,
     gcTime: Infinity,
     retry: 1,

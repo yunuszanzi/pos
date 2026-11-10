@@ -1,5 +1,6 @@
 import { PosCache } from "./catalogueCache";
 import { useCartStore } from "./cartStore";
+import { forgetCopies } from "./offlineCache";
 
 const scopeKey = "pos.cacheScope";
 
@@ -14,6 +15,7 @@ export const rememberCacheScope = (scope: string) => {
 /** Signing out removes what this device kept about the business: the catalogue cache and any cart in progress. */
 export async function wipeLocalPosData(): Promise<void> {
   useCartStore.getState().clear();
+  forgetCopies();
   try {
     const scope = localStorage.getItem(scopeKey);
     localStorage.removeItem(scopeKey);

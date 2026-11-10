@@ -106,3 +106,33 @@ test("2. with the network unplugged, 10 sales are taken; on reconnecting all 10 
   await expect(page.getByTestId("done-offline")).toHaveCount(0);
   await expect(page.getByRole("dialog", { name: "Sale complete" }).locator(".eyebrow")).toHaveText("INV-KHI-000011");
 });
+
+test("a sale that went wrong while offline is flagged on the dashboard, and an owner reviews it", async ({ page }) => {
+  const business = await createTestBusiness();
+  const product = await createSimpleProduct(business, "REV-A", 100);
+  expect((await callApi(business.ownerToken, "POST", "/stock/opening", { body: { csv: "sku,quantity,unit,cost\nREV-A,1,Piece,1.00" }, idempotencyKey: `open-${crypto.randomUUID()}` })).status).toBe(201);
+  const shift = await callApi(business.ownerToken, "POST", "/shifts/open", { terminalId: business.terminalId, body: { openingFloatPaisa: 0 }, idempotencyKey: `shift-${crypto.randomUUID()}` });
+  const client = sql();
+  const [cash] = await client<{ id: string }[]>`SELECT id FROM payment_methods WHERE business_id = ${business.businessId} AND code = 'cash'`;
+  await client.end();
+  // Three sold of the one on the shelf, rung up offline and sent later: it is posted, and flagged.
+  const sale = await callApi(business.ownerToken, "POST", "/sales", {
+    terminalId: business.terminalId, idempotencyKey: `sale-${crypto.randomUUID()}`, headers: { "X-Offline-Ref": "REGISTER1-OFF-000001", "X-Offline-Sold-At": new Date(Date.now() - 600_000).toISOString() },
+    body: { shiftId: shift.body.id, lines: [{ variantId: product.variantId, unitId: product.pieceId, quantity: "3" }], payments: [{ methodId: cash.id, amountPaisa: 1500 }] },
+  });
+  expect(sale.status, JSON.stringify(sale.body)).toBe(201);
+  expect(sale.body.offline.flags).toEqual(["NEGATIVE_STOCK"]);
+
+  await signInThroughUi(page, business.ownerEmail);
+  await expect(page.getByTestId("dash-offline-review")).toHaveText("1 sale");
+  await page.getByTestId("dash-offline-review").click();
+  const row = page.getByRole("row").filter({ hasText: "REGISTER1-OFF-000001" });
+  await expect(row).toContainText("Stock went below zero");
+  await row.getByLabel(/^Note for/).fill("Counted the shelf; one was never entered");
+  await row.getByRole("button", { name: "Mark as reviewed" }).click();
+  await expect(page.getByText("Nothing here.")).toBeVisible();
+  await page.getByLabel("Show").selectOption("reviewed");
+  await expect(page.getByRole("row").filter({ hasText: "REGISTER1-OFF-000001" })).toContainText("Counted the shelf; one was never entered");
+  await page.goto("/");
+  await expect(page.getByTestId("dash-offline-review")).toHaveCount(0);
+});

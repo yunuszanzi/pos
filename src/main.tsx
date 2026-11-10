@@ -13,3 +13,12 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     </QueryClientProvider>
   </React.StrictMode>,
 );
+
+// The service worker keeps the till openable without a connection. Only in the real build: in development a worker would serve stale code.
+if (import.meta.env.PROD && "serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch(() => {
+      // Without it the app works exactly as before; it just cannot be opened offline.
+    });
+  });
+}
