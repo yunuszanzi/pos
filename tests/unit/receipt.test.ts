@@ -387,3 +387,39 @@ describe("back-office tax invoice print", () => {
     expect(model.meta.map((row) => row.label)).toEqual(["No.", "Date", "Cashier", "Till"]);
   });
 });
+
+describe("what a bill says about FBR (FR-PRT-04)", () => {
+  it("prints FBR's number and the QR data once accepted, on a slip and on A4 alike", () => {
+    const accepted = { ...invoice, fbrStatus: "accepted", fbrIrn: "12345678DI0A1B2C3D4E5F", fbrQr: "12345678DI0A1B2C3D4E5F" };
+    for (const format of ["pos80", "pos58", "a4", "a5"] as const) {
+      const model = buildReceipt(accepted, format, options);
+      expect(model.fbr).toEqual({ irn: "12345678DI0A1B2C3D4E5F", qrData: "12345678DI0A1B2C3D4E5F", lines: ["FBR invoice no.: 12345678DI0A1B2C3D4E5F", "Verify this invoice with FBR using this number or the QR code."] });
+    }
+  });
+
+  it("says so, without a number, while FBR has not accepted it", () => {
+    expect(buildReceipt({ ...invoice, fbrStatus: "pending" }, "pos80", options).fbr).toEqual({ irn: null, qrData: null, lines: ["FBR: not reported yet. Reprint this bill later to get the FBR invoice number."] });
+    for (const status of ["rejected", "failed"]) {
+      expect(buildReceipt({ ...invoice, fbrStatus: status }, "a4", options).fbr).toEqual({ irn: null, qrData: null, lines: ["FBR: this invoice has not been accepted yet."] });
+    }
+    // An accepted status with no number is not shown as accepted.
+    expect(buildReceipt({ ...invoice, fbrStatus: "accepted", fbrIrn: null }, "a4", options).fbr?.irn).toBeNull();
+  });
+
+  it("leaves a bill exactly as it was when FBR is not involved", () => {
+    expect(buildReceipt(invoice, "pos80", options)).not.toHaveProperty("fbr");
+    expect(buildReceipt({ ...invoice, fbrStatus: null }, "pos80", options)).not.toHaveProperty("fbr");
+    expect(buildReceipt({ ...invoice, fbrStatus: "skipped" }, "pos80", options)).not.toHaveProperty("fbr");
+  });
+
+  it("puts the debit note's own FBR number on a credit note", () => {
+    const note = {
+      number: "RET-KHI-000001", postedAt: "2026-11-09T09:30:00Z", cashierName: "Ayesha", terminalName: "Register 1", branchName: "Karachi", taxMode: "inclusive" as const, invoiceNumber: "INV-KHI-000042",
+      customerName: null, customerBalancePaisa: null, reason: "", grossPaisa: 2_000, lineDiscountPaisa: 0, invoiceDiscountPaisa: 0, taxPaisa: 305, roundingPaisa: 0, totalPaisa: 2_000,
+      refundMethodName: "Cash", refundPaisa: 2_000, refundReference: "", accountCreditPaisa: 0,
+      lines: [{ productName: "Red Balloon", variantName: "", sku: "BAL-RED", unitName: "Pack", quantity: "1", unitPricePaisa: 2_000, lineDiscountPaisa: 0, invoiceDiscountSharePaisa: 0, taxRateBps: 1800, taxPaisa: 305, totalPaisa: 2_000, restockTo: "sellable" as const }],
+    };
+    expect(buildCreditNoteReceipt({ ...note, fbrStatus: "accepted", fbrIrn: "12345678DN00112233AABB", fbrQr: "12345678DN00112233AABB" }, options).fbr?.lines[0]).toBe("FBR invoice no.: 12345678DN00112233AABB");
+    expect(buildCreditNoteReceipt(note, options)).not.toHaveProperty("fbr");
+  });
+});

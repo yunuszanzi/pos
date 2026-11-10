@@ -14,6 +14,7 @@ export type Invoice = {
   grossPaisa: number; lineDiscountPaisa: number; invoiceDiscountPaisa: number; taxablePaisa: number; taxPaisa: number; roundingPaisa: number; totalPaisa: number;
   paidPaisa: number; changePaisa: number; balancePaisa: number;
   channel: "pos" | "back_office"; orderId: string | null; orderNumber: string | null; quotationId: string | null; termsDays: number | null; dueDate: string | null;
+  fbrStatus?: string | null; fbrIrn?: string | null; fbrQr?: string | null;
   customerPo: string; note: string; buyerName: string; buyerNtn: string | null; buyerStrn: string | null; buyerAddress: string;
   /** What is still owing after payments received since (back-office invoices). */
   outstandingPaisa?: number;

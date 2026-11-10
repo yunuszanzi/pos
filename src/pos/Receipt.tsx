@@ -1,3 +1,4 @@
+import { qrcode, drawingSVG } from "bwip-js/browser";
 import { createPortal } from "react-dom";
 import { useEffect } from "react";
 import {
@@ -40,6 +41,24 @@ export const modelOf = (job: PrintJob) => {
 
 function Rows({ rows }: { rows: ReceiptModel["totals"] }) {
   return <dl className="receipt-rows">{rows.map((row) => <div key={row.label} className={row.strong ? "strong" : undefined}><dt>{row.label}</dt><dd>{row.value}</dd></div>)}</dl>;
+}
+
+const qrCache = new Map<string, string>();
+/** FBR's QR code as an image URL. Drawn through an <img>, never inserted as markup, so nothing in the text can run as script. */
+function qrImageUrl(text: string): string {
+  const cached = qrCache.get(text);
+  if (cached) return cached;
+  const url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(qrcode({ bcid: "qrcode", text, scale: 3, eclevel: "M" }, drawingSVG()))}`;
+  qrCache.set(text, url);
+  return url;
+}
+
+/** Where the document stands with FBR: its invoice number and a QR code to check it by, or a plain note that it has none yet. */
+function FbrBlock({ fbr }: { fbr: NonNullable<ReceiptModel["fbr"]> }) {
+  return <section className="receipt-fbr" aria-label="FBR">
+    {fbr.qrData && <img className="receipt-qr" src={qrImageUrl(fbr.qrData)} alt="FBR invoice QR code" />}
+    {fbr.lines.map((line) => <p key={line}>{line}</p>)}
+  </section>;
 }
 
 /** The document itself. Slips list each item over two lines; sheets use a table. */
@@ -86,6 +105,7 @@ export function Receipt({ model, format }: { model: ReceiptModel; format: PrintF
       <thead><tr><th>Tax rate</th><th className="num">Taxable</th><th className="num">Tax</th></tr></thead>
       <tbody>{model.taxRows.map((row) => <tr key={row.rate}><td>{row.rate}</td><td className="num">{row.taxable}</td><td className="num">{row.tax}</td></tr>)}</tbody>
     </table>}
+    {model.fbr && <FbrBlock fbr={model.fbr} />}
     <footer className="receipt-foot">{model.footer.map((line) => <p key={line}>{line}</p>)}</footer>
   </article>;
 }

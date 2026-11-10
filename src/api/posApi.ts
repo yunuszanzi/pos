@@ -47,6 +47,10 @@ export type SaleInvoice = {
   paidPaisa: number;
   changePaisa: number;
   balancePaisa: number;
+  /** Where FBR stands on this sale (absent or null when FBR is not on). */
+  fbrStatus?: "pending" | "accepted" | "rejected" | "failed" | "skipped" | null;
+  fbrIrn?: string | null;
+  fbrQr?: string | null;
   lines: Array<{
     lineNo: number; variantId: string; unitId: string; productName: string; variantName: string; sku: string; unitName: string; hsCode: string | null;
     quantity: string; unitPricePaisa: number; grossPaisa: number; lineDiscountPaisa: number; invoiceDiscountSharePaisa: number; netPaisa: number;

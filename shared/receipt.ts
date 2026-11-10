@@ -56,6 +56,10 @@ export type ReceiptInvoice = {
   buyerNtn?: string | null;
   buyerStrn?: string | null;
   buyerAddress?: string;
+  /** FBR's answer for this invoice (absent when FBR is off). */
+  fbrStatus?: string | null;
+  fbrIrn?: string | null;
+  fbrQr?: string | null;
   lines: Array<{
     productName: string; variantName: string; sku: string; unitName: string; quantity: string; unitPricePaisa: number;
     lineDiscountPaisa: number; invoiceDiscountSharePaisa: number; taxRateBps: number; taxPaisa: number; totalPaisa: number;
@@ -99,8 +103,22 @@ export type ReceiptModel = {
   /** Tax by rate, for the buyer and the tax office. */
   taxRows: Array<{ rate: string; taxable: string; tax: string }>;
   payments: ReceiptRow[];
+  /** Where the document stands with FBR, when FBR is on: the number and QR data once accepted, else why there is none yet (FR-PRT-04). */
+  fbr?: ReceiptFbr;
   footer: string[];
 };
+
+export type ReceiptFbr = { irn: string | null; qrData: string | null; lines: string[] };
+
+/** What a bill says about FBR. Nothing when FBR is not involved; the invoice number and QR once accepted; an honest note while it is not. */
+export function fbrBlock(status: string | null | undefined, irn: string | null | undefined, qrData: string | null | undefined): ReceiptFbr | undefined {
+  if (!status || status === "skipped") return undefined;
+  if (status === "accepted" && irn) {
+    return { irn, qrData: qrData || irn, lines: [`FBR invoice no.: ${irn}`, "Verify this invoice with FBR using this number or the QR code."] };
+  }
+  if (status === "pending") return { irn: null, qrData: null, lines: ["FBR: not reported yet. Reprint this bill later to get the FBR invoice number."] };
+  return { irn: null, qrData: null, lines: ["FBR: this invoice has not been accepted yet."] };
+}
 
 /** "08/11/2026 14:35" in the business's time zone and date style. */
 export function formatDocumentDate(iso: string, dateFormat: string, timezone: string): string {
@@ -164,6 +182,8 @@ function backOfficeMeta(invoice: ReceiptInvoice, options: ReceiptOptions): Recei
   ];
 }
 
+const fbrPart = (status: string | null | undefined, irn: string | null | undefined, qr: string | null | undefined) => { const fbr = fbrBlock(status, irn, qr); return fbr ? { fbr } : {}; };
+
 export function buildReceipt(invoice: ReceiptInvoice, format: PrintFormat, options: ReceiptOptions): ReceiptModel {
   const { business } = options;
   const sheet = format === "a4" || format === "a5"; const back = invoice.channel === "back_office";
@@ -209,6 +229,7 @@ export function buildReceipt(invoice: ReceiptInvoice, format: PrintFormat, optio
     totals,
     taxRows: taxRowsOf(invoice.lines),
     payments,
+    ...fbrPart(invoice.fbrStatus, invoice.fbrIrn, invoice.fbrQr),
     footer: business.receiptFooter ? business.receiptFooter.split(/\r?\n/).filter(Boolean) : ["Thank you for shopping with us."],
   };
 }
@@ -287,6 +308,9 @@ export type ReceiptCreditNote = {
   refundPaisa: number;
   refundReference: string;
   accountCreditPaisa: number;
+  fbrStatus?: string | null;
+  fbrIrn?: string | null;
+  fbrQr?: string | null;
   lines: Array<DocumentLine & { restockTo: "sellable" | "damaged" | "write_off" }>;
 };
 
@@ -335,6 +359,7 @@ export function buildCreditNoteReceipt(note: ReceiptCreditNote, options: Receipt
     totals,
     taxRows: taxRowsOf(note.lines),
     payments,
+    ...fbrPart(note.fbrStatus, note.fbrIrn, note.fbrQr),
     footer: business.receiptFooter ? business.receiptFooter.split(/\r?\n/).filter(Boolean) : ["Thank you."],
   };
 }
