@@ -1,10 +1,11 @@
+import { businessToday } from "../../shared/dates";
 import { expect, test } from "@playwright/test";
 import { callApi, createTestBusiness } from "../integration/helpers";
 import { signInThroughUi } from "./helpers";
 
 // v0.4 slice 4 against the real UI, API and local Supabase: loading opening balances, the ageing report and a customer's statement.
 
-const daysAgo = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+const daysAgo = (days: number) => new Date(Date.parse(businessToday()) - days * 86_400_000).toISOString().slice(0, 10);
 const csv = (text: string) => ({ name: "balances.csv", mimeType: "text/csv", buffer: Buffer.from(text) });
 
 test("4. opening balances are loaded from a file, aged, and shown on a statement that can be sent on WhatsApp", async ({ page }) => {

@@ -1,10 +1,11 @@
+import { businessToday } from "../../shared/dates";
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 import { callApi, createSimpleProduct, createTestBusiness, firstLocationId, hasLocalStack, inviteStaffWithPermissions, inviteTestStaff, sql } from "./helpers";
 
 const integration = describe.skipIf(!hasLocalStack);
 const key = () => `key-${crypto.randomUUID()}`;
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => businessToday();
 
 // v0.5 slice 5 against the real API and database: the reorder list, draft orders per supplier, and what a SKU cost last time.
 

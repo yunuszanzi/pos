@@ -15,3 +15,6 @@ Branch: v1.0/hardening. Newest entry on top.
   2. pos.spec:223: stale test; the "Clear" button became "Cancel sale" (asks why) in 9607fd7. Test updated.
 - Known same-pattern leftovers (UTC dates in the browser, not fixed): src/features/quotations/QuotationFormPage.tsx:28 inDays, src/features/reports/ReportPage.tsx:19-24. Consider businessToday() there.
 - Next: commit (migrations, date fix, test fix), then a final full `npm test` + `npm run e2e` before saying v1.0 done.
+- Quotation form default valid-until fixed (businessToday). ReportPage already gets `today` from the server; other pages already use Asia/Karachi.
+- 14 test files computed "today" in UTC and failed between 00:00-05:00 PKT; they now use businessToday(). `npm test`: 734/735, only the perf test fails under parallel load (passes alone).
+- Running final `npm run e2e`.

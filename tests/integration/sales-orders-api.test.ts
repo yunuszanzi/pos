@@ -1,10 +1,11 @@
+import { businessToday } from "../../shared/dates";
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 import { callApi, createSimpleProduct, createTestBusiness, hasLocalStack, inviteTestStaff, sql } from "./helpers";
 
 const integration = describe.skipIf(!hasLocalStack);
 const key = () => `key-${crypto.randomUUID()}`;
-const inDays = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
+const inDays = (days: number) => new Date(Date.parse(businessToday()) + days * 86_400_000).toISOString().slice(0, 10);
 
 // v0.6 slice 3 against the real API and database: sales orders reserve stock; a quotation becomes an order at the quoted prices.
 

@@ -1,10 +1,11 @@
+import { businessToday } from "../../shared/dates";
 import { expect, test } from "@playwright/test";
 import { createTestBusiness } from "../integration/helpers";
 import { signInThroughUi } from "./helpers";
 
 // v0.5 slice 1 against the real UI, API and local Supabase: adding suppliers, loading what is owed to them, and the payables ageing.
 
-const daysAgo = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+const daysAgo = (days: number) => new Date(Date.parse(businessToday()) - days * 86_400_000).toISOString().slice(0, 10);
 const csv = (text: string) => ({ name: "payables.csv", mimeType: "text/csv", buffer: Buffer.from(text) });
 
 test("1. suppliers are added, opening payables are loaded and aged, and the ledger shows what is owed", async ({ page }) => {

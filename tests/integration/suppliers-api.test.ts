@@ -1,10 +1,11 @@
+import { businessToday } from "../../shared/dates";
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 import { callApi, createTestBusiness, hasLocalStack, inviteTestStaff, type TestBusiness } from "./helpers";
 
 const integration = describe.skipIf(!hasLocalStack);
 const key = () => `key-${crypto.randomUUID()}`;
-const daysAgo = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+const daysAgo = (days: number) => new Date(Date.parse(businessToday()) - days * 86_400_000).toISOString().slice(0, 10);
 
 // v0.5 slice 1 against the real API and database: suppliers, their ledger, opening payables and payables ageing.
 

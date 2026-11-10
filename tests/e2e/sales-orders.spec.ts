@@ -1,3 +1,4 @@
+import { businessToday } from "../../shared/dates";
 import { expect, test } from "@playwright/test";
 import { callApi, createSimpleProduct, createTestBusiness, sql } from "../integration/helpers";
 import { signInThroughUi } from "./helpers";
@@ -5,7 +6,7 @@ import { signInThroughUi } from "./helpers";
 // v0.6 slice 3 against the real UI, API and local Supabase: part of a quotation becomes an order at the quoted price, and the stock is held.
 
 const key = () => `key-${crypto.randomUUID()}`;
-const inDays = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
+const inDays = (days: number) => new Date(Date.parse(businessToday()) + days * 86_400_000).toISOString().slice(0, 10);
 
 test("2. a quotation is ordered in two parts at the quoted price, and each order holds its stock", async ({ page }) => {
   const business = await createTestBusiness();

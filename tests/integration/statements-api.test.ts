@@ -1,10 +1,11 @@
+import { businessToday } from "../../shared/dates";
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 import { callApi, createSimpleProduct, createTestBusiness, hasLocalStack, inviteTestStaff, sql, type TestBusiness } from "./helpers";
 
 const integration = describe.skipIf(!hasLocalStack);
 const key = () => `key-${crypto.randomUUID()}`;
-const daysAgo = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+const daysAgo = (days: number) => new Date(Date.parse(businessToday()) - days * 86_400_000).toISOString().slice(0, 10);
 
 // v0.4 slice 4 against the real API and database: statements, ageing and opening balances.
 
@@ -51,7 +52,7 @@ integration("customer statements, ageing and opening balances", { timeout: 180_0
     const customerId = await newCustomer(context.business, "Statement Customer");
 
     // Before this month: an opening balance of Rs 1,000.00 loaded for the last day of last month.
-    const lastMonth = new Date();
+    const lastMonth = new Date(`${businessToday()}T00:00:00Z`);
     lastMonth.setUTCDate(0);
     const imported = await importBalances(context, `customer,balance,date\nStatement Customer,1000.00,${lastMonth.toISOString().slice(0, 10)}\n`);
     expect(imported.status, JSON.stringify(imported.body)).toBe(201);

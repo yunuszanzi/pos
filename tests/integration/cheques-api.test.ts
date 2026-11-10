@@ -1,10 +1,11 @@
+import { businessToday } from "../../shared/dates";
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 import { callApi, createSimpleProduct, createTestBusiness, hasLocalStack, inviteTestStaff } from "./helpers";
 
 const integration = describe.skipIf(!hasLocalStack);
 const key = () => `key-${crypto.randomUUID()}`;
-const daysFromNow = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
+const daysFromNow = (days: number) => new Date(Date.parse(businessToday()) + days * 86_400_000).toISOString().slice(0, 10);
 
 // v0.4 slice 5 against the real API and database: cheques, post-dated ones, and what a bounce does to the khata.
 
