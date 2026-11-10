@@ -14,6 +14,8 @@
     "test:watch": "vitest",
     "e2e": "playwright test && playwright test -c playwright.pwa.config.ts",
     "e2e:pwa": "playwright test -c playwright.pwa.config.ts",
+    "reconcile": "node scripts/reconcile.mjs",
+    "drill:local": "node scripts/restore-drill-local.mjs",
     "db:migrate": "tsx db/migrate.ts",
     "db:seed": "tsx db/seed.ts",
     "db:seed-demo": "tsx db/seed-demo.ts"
