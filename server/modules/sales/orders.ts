@@ -41,7 +41,7 @@ const functionErrors: Array<[prefix: string, status: 404 | 409 | 422, code: stri
 ];
 
 /** The database says which SKU ran short by id; the person needs its name and the numbers. */
-async function describeShortage(businessId: string, message: string): Promise<string> {
+export async function describeShortage(businessId: string, message: string): Promise<string> {
   const found = /variant ([0-9a-f-]{36}) has (-?[\d.]+) available \((-?[\d.]+) on hand, (-?[\d.]+) reserved\), needs ([\d.]+)/i.exec(message);
   if (!found) return "Not enough stock available to reserve for this order";
   const [row] = await db.execute<{ name: string; sku: string }>(sql`
@@ -68,6 +68,7 @@ export async function loadSalesOrder(businessId: string, id: string) {
     select l.*, coalesce((select sum(cl.qty_base) from delivery_challan_lines cl join delivery_challans c on c.id = cl.challan_id where cl.order_line_id = l.id and c.status = 'pending'), 0) as pending_base
     from sales_order_lines l where l.business_id = ${businessId} and l.order_id = ${id} order by l.line_no`);
   const challans = await db.execute(sql`select id, number, status, driver_name, vehicle_no, dispatched_at from delivery_challans where business_id = ${businessId} and order_id = ${id} order by created_at, number`);
+  const invoices = await db.execute(sql`select id, number, posted_at, total_paisa, due_date from sales_invoices where business_id = ${businessId} and order_id = ${id} order by posted_at, number`);
   return {
     id: String(row.id), number: String(row.number), status: String(row.status), customerId: String(row.customer_id), customerName: String(row.customer_name),
     customerPhone: String(row.customer_phone ?? ""), customerNtn: row.customer_ntn ? String(row.customer_ntn) : null, customerStrn: row.customer_strn ? String(row.customer_strn) : null,
@@ -76,6 +77,7 @@ export async function loadSalesOrder(businessId: string, id: string) {
     customerPo: String(row.customer_po), orderDate: day(row.order_date), deliveryDate: day(row.delivery_date), deliveryAddress: String(row.delivery_address), note: String(row.note),
     taxMode: String(row.tax_mode), grossPaisa: paisa(row.gross_paisa), lineDiscountPaisa: paisa(row.line_discount_paisa), invoiceDiscountPaisa: paisa(row.invoice_discount_paisa),
     taxablePaisa: paisa(row.taxable_paisa), taxPaisa: paisa(row.tax_paisa), roundingPaisa: paisa(row.rounding_paisa), totalPaisa: paisa(row.total_paisa), createdAt: iso(row.created_at),
+    invoices: invoices.map((invoice) => ({ id: String(invoice.id), number: String(invoice.number), postedAt: iso(invoice.posted_at), totalPaisa: paisa(invoice.total_paisa), dueDate: day(invoice.due_date) })),
     challans: challans.map((challan) => ({
       id: String(challan.id), number: String(challan.number), status: String(challan.status), driverName: String(challan.driver_name), vehicleNo: String(challan.vehicle_no), dispatchedAt: iso(challan.dispatched_at),
     })),
@@ -85,6 +87,8 @@ export async function loadSalesOrder(businessId: string, id: string) {
       quantity: quantityText(String(line.qty_entered)), factorToBase: quantityText(String(line.factor_to_base)), qtyBase: quantityText(String(line.qty_base)),
       deliveredBase: quantityText(String(line.delivered_base)), invoicedBase: quantityText(String(line.invoiced_base)),
       remainingBase: formatQuantity(parseQuantity(String(line.qty_base)) - parseQuantity(String(line.delivered_base))),
+      // Delivered and not yet billed: what an invoice can take now.
+      billableBase: formatQuantity(parseQuantity(String(line.delivered_base)) - parseQuantity(String(line.invoiced_base))),
       // Still to be put on a challan: not delivered and not already on a pending one.
       unassignedBase: formatQuantity(parseQuantity(String(line.qty_base)) - parseQuantity(String(line.delivered_base)) - parseQuantity(String(line.pending_base))),
       unitPricePaisa: paisa(line.unit_price_paisa), grossPaisa: paisa(line.gross_paisa), lineDiscountPaisa: paisa(line.line_discount_paisa),

@@ -31,7 +31,7 @@ const postingErrors: Array<[prefix: string, status: 409 | 422, code: string]> = 
 ];
 
 /** The database says what is wrong with the credit in paisa; the cashier needs it in words. */
-function describeCredit(code: string, message: string, customerName: string): string {
+export function describeCredit(code: string, message: string, customerName: string): string {
   if (code === "CREDIT_LIMIT_EXCEEDED") {
     const found = /owes (-?\d+), this sale adds (\d+), limit (\d+)/.exec(message);
     if (!found) return `${customerName} is over their credit limit`;
@@ -250,17 +250,17 @@ salesRoutes.post("/sales", requirePermission("sales.create"), idempotent(), vali
   return context.json({ invoice, stock: stock.map((row) => ({ variantId: row.variant_id, onHand: quantityText(row.on_hand) })) }, 201);
 });
 
-async function loadInvoice(businessId: string, id: string, withCost: boolean) {
+export async function loadInvoice(businessId: string, id: string, withCost: boolean) {
   const [invoice] = await db.execute(sql`
-    select i.*, b.name as branch_name, t.name as terminal_name, u.display_name as cashier_name, c.name as customer_name,
+    select i.*, b.name as branch_name, t.name as terminal_name, u.display_name as cashier_name, c.name as customer_name, so.number as order_number,
            -- What the customer owed straight after this invoice, so a reprint shows the figure of the day.
            (select coalesce(sum(l.debit_paisa - l.credit_paisa), 0) from party_ledger l
             where l.business_id = i.business_id and l.party_type = 'customer' and l.party_id = i.customer_id
               and l.seq <= (select max(x.seq) from party_ledger x where x.doc_id = i.id)) as customer_balance
     from sales_invoices i
-    join branches b on b.id = i.branch_id join terminals t on t.id = i.terminal_id
+    join branches b on b.id = i.branch_id left join terminals t on t.id = i.terminal_id
     left join users u on u.id = i.cashier_id
-    left join customers c on c.id = i.customer_id
+    left join customers c on c.id = i.customer_id left join sales_orders so on so.id = i.order_id
     where i.business_id = ${businessId} and i.id = ${id}
   `);
   if (!invoice) return null;
@@ -272,9 +272,21 @@ async function loadInvoice(businessId: string, id: string, withCost: boolean) {
     number: String(invoice.number),
     postedAt: invoice.posted_at,
     branchName: invoice.branch_name,
-    terminalName: invoice.terminal_name,
+    terminalName: invoice.terminal_name ?? "",
+    channel: String(invoice.channel),
+    orderId: invoice.order_id ? String(invoice.order_id) : null,
+    orderNumber: invoice.order_number ? String(invoice.order_number) : null,
+    quotationId: invoice.quotation_id ? String(invoice.quotation_id) : null,
+    termsDays: invoice.terms_days === null || invoice.terms_days === undefined ? null : Number(invoice.terms_days),
+    dueDate: invoice.due_date ? String(invoice.due_date).slice(0, 10) : null,
+    customerPo: String(invoice.customer_po ?? ""),
+    note: String(invoice.note ?? ""),
+    buyerName: String(invoice.buyer_name ?? ""),
+    buyerNtn: invoice.buyer_ntn ? String(invoice.buyer_ntn) : null,
+    buyerStrn: invoice.buyer_strn ? String(invoice.buyer_strn) : null,
+    buyerAddress: String(invoice.buyer_address ?? ""),
     cashierName: invoice.cashier_name,
-    shiftId: invoice.shift_id,
+    shiftId: invoice.shift_id ?? null,
     customerId: invoice.customer_id ?? null,
     customerName: invoice.customer_name ?? null,
     customerBalancePaisa: invoice.customer_id ? paisa(invoice.customer_balance) : null,
