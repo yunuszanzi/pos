@@ -6,7 +6,7 @@ import { formatPkr } from "../../../shared/money";
 import { effectivePriceListId, tierPrice, type PriceListItem } from "../../../shared/priceLists";
 import { PaymentError, settleTenders, type Tender } from "../../../shared/payments";
 import { discountsOverLimit, priceCart, PricingError, type PricingInput } from "../../../shared/pricing";
-import { postSaleSchema } from "../../../shared/schemas/sales";
+import { postSaleSchema, voidSaleSchema } from "../../../shared/schemas/sales";
 import { formatQuantity, parseQuantity, toBaseQuantity } from "../../../shared/units";
 import { auditPrincipal } from "../../lib/audit";
 import { db } from "../../lib/db";
@@ -62,6 +62,14 @@ type LineFacts = {
   variant_id: string; unit_id: string; product_name: string; variant_name: string; sku: string; unit_name: string; hs_code: string | null;
   factor_to_base: string; sale_price_paisa: string; rate_bps: number | null; product_type: string;
 };
+
+/** A sale given up before payment: nothing was posted, so nothing changes except the record that it happened, and why (FR-SAL-10). */
+salesRoutes.post("/sales/void", requirePermission("sales.void"), validateJson(voidSaleSchema), async (context) => {
+  const principal = getPrincipal(context);
+  const input = context.req.valid("json");
+  await auditPrincipal(context, principal, "sale", principal.terminalId ?? principal.businessId!, "void", null, { reason: input.reason, totalPaisa: input.totalPaisa, lines: input.lines });
+  return context.json({ ok: true }, 201);
+});
 
 /**
  * A sale rung up while the till had no connection and sent later carries two headers (not body fields, so that sending the same sale

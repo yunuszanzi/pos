@@ -145,3 +145,6 @@ export type StockLevelNow = { variantId: string; onHand: string; reserved: strin
 /** Many SKUs in one call (at most 500), for the till to show what is on the shelf. */
 export const getStockLevelsForProducts = (variantIds: string[], locationId: string) =>
   postJson<StockLevelNow[]>("/stock/levels", { variantIds, locationId });
+
+/** Records that a sale was given up before payment, and why. Nothing is posted. */
+export const logVoidedSale = (sale: { reason: string; totalPaisa: number; lines: Array<{ sku: string; quantity: string }> }) => postJson<{ ok: true }>("/sales/void", sale);

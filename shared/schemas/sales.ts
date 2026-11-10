@@ -44,3 +44,11 @@ export const postSaleSchema = z.object({
 });
 
 export type PostSaleInput = z.input<typeof postSaleSchema>;
+
+/** A sale given up before payment (FR-SAL-10): why, and what was in the cart, so the log shows what was cancelled and by whom. */
+export const voidSaleSchema = z.object({
+  reason: z.string().trim().min(3, "Say why the sale is being cancelled").max(200),
+  totalPaisa: z.number().int().min(0).max(100_000_000_000_000),
+  lines: z.array(z.object({ sku: z.string().trim().max(100), quantity: z.string().trim().max(20) })).max(200).default([]),
+});
+export type VoidSaleInput = z.input<typeof voidSaleSchema>;

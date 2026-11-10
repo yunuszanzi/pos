@@ -5,7 +5,7 @@ import { formatPkr } from "../../shared/money";
 import { formatQuantity, parseQuantity, parseSignedQuantity } from "../../shared/units";
 import { getAllTerminals } from "../api/orgApi";
 import { printFormatLabels, printFormats, type PrintFormat } from "../../shared/receipt";
-import { holdSale, reprintSale, type PostedSale } from "../api/posApi";
+import { holdSale, logVoidedSale, reprintSale, type PostedSale } from "../api/posApi";
 import { SelectInput } from "../app/FormElements";
 import { useTerminalStore } from "../app/terminalStore";
 import { parseQuantity as parseQty } from "../../shared/units";
@@ -15,7 +15,7 @@ import { ReceivePaymentDialog } from "../features/customers/ReceivePaymentDialog
 import { totalsOf, type CartLine } from "./cart";
 import { CustomerDialog } from "./CustomerDialog";
 import { useCartStore } from "./cartStore";
-import { BillDiscountDialog, HeldSalesDialog, LineDialog } from "./CartDialogs";
+import { BillDiscountDialog, HeldSalesDialog, LineDialog, VoidSaleDialog } from "./CartDialogs";
 import type { CatalogueEntry } from "./catalogueIndex";
 import { Dialog } from "./Dialog";
 import { OfflineBar } from "./OfflineBar";
@@ -27,7 +27,7 @@ import { PosProvider } from "./PosProvider";
 import { usePos } from "./pos-context";
 import { CashMovementDialog, CloseShiftDialog, OpenShiftForm } from "./ShiftPanels";
 
-type Modal = "customer" | "receive" | "pay" | "discount" | "held" | "cash" | "close" | "history" | "return" | { line: string } | null;
+type Modal = "customer" | "receive" | "pay" | "discount" | "held" | "cash" | "close" | "history" | "return" | "void" | { line: string } | null;
 
 export function PosPage() {
   const terminalId = useTerminalStore((state) => state.terminalId);
@@ -250,7 +250,7 @@ function PosScreen() {
         <div className="button-row">
           {can("sales.discount") && <button className="button secondary" disabled={!cart.lines.length} onClick={() => setModal("discount")}>Bill discount (F9)</button>}
           <button className="button secondary" disabled={!cart.lines.length} onClick={() => void hold()}>Hold (F6)</button>
-          <button className="button secondary" disabled={!cart.lines.length} onClick={() => cart.clear()}>Clear</button>
+          <button className="button secondary" disabled={!cart.lines.length} onClick={() => setModal("void")}>Cancel sale</button>
         </div>
         <button className="button primary pay-button" disabled={!totals} onClick={startPayment}>Pay (F4)</button>
       </aside>
@@ -265,6 +265,9 @@ function PosScreen() {
       onPosted={(payment) => { const held = pos.customers.get(payment.customerId); if (held) pos.rememberCustomer({ ...held, balancePaisa: payment.customerBalancePaisa }); }}
       onClose={() => { setReceivingFrom(null); setModal(null); focusSearch(); }} />}
     {modal === "discount" && <BillDiscountDialog current={cart.invoiceDiscount} onClose={() => setModal(null)} onApply={(discount) => { cart.setInvoiceDiscount(discount); setModal(null); focusSearch(); }} />}
+    {modal === "void" && totals && <VoidSaleDialog itemCount={cart.lines.length} totalPaisa={totals.priced.totalPaisa}
+      lines={cart.lines.map((line) => ({ sku: catalogue.get(line.variantId, line.unitId)?.sku ?? line.variantId, quantity: formatQuantity(line.quantityMilli) }))}
+      onClose={() => { setModal(null); focusSearch(); }} onVoided={(message) => { cart.clear(); setModal(null); setNotice(message); focusSearch(); }} />}
     {modal === "held" && <HeldSalesDialog onClose={() => setModal(null)} onRecalled={(recalled) => {
       // Whatever was in the cart goes on hold first, so recalling never loses a sale in progress.
       if (cart.lines.length && totals) {

@@ -4,7 +4,8 @@ import { formatBps, formatPkr, parsePercentToBps, toPlainRupees } from "../../sh
 import type { Discount } from "../../shared/pricing";
 import { formatQuantity, parseQuantity } from "../../shared/units";
 import { QuantityInput } from "../app/QuantityInput";
-import { discardHeldSale, getAllHeldSales, recallHeldSale } from "../api/posApi";
+import { NetworkError } from "../api/client";
+import { discardHeldSale, getAllHeldSales, logVoidedSale, recallHeldSale } from "../api/posApi";
 import { ErrorMessage, Field, SelectInput, TextInput } from "../app/FormElements";
 import { MoneyInput } from "../app/MoneyInput";
 import { amountOf } from "./amounts";
@@ -154,4 +155,50 @@ export function HeldSalesDialog({ onClose, onRecalled }: { onClose: () => void; 
     </div>)}
     {error && <ErrorMessage>{error}</ErrorMessage>}
   </div></Dialog>;
+}
+
+const voidReasons = ["Customer changed their mind", "Wrong items were scanned", "Customer could not pay", "Cashier error"] as const;
+
+/** Giving up a sale before payment (FR-SAL-10): a reason is required, and the log keeps what was in the cart. Removing one line needs no reason. */
+export function VoidSaleDialog({ itemCount, totalPaisa, lines, onClose, onVoided }: {
+  itemCount: number; totalPaisa: number; lines: Array<{ sku: string; quantity: string }>; onClose: () => void; onVoided: (message: string) => void;
+}) {
+  const [choice, setChoice] = useState<string>(voidReasons[0]);
+  const [other, setOther] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const reason = choice === "Other" ? other.trim() : choice;
+
+  async function confirm() {
+    setBusy(true);
+    setError("");
+    try {
+      await logVoidedSale({ reason, totalPaisa, lines });
+      onVoided("Sale cancelled and logged");
+    } catch (caught) {
+      // With no connection the log cannot be written; the sale is still given up rather than left on the screen.
+      if (caught instanceof NetworkError) onVoided("Sale cancelled. There was no connection, so it was not logged.");
+      else {
+        setError(caught instanceof Error ? caught.message : "Could not cancel the sale");
+        setBusy(false);
+      }
+    }
+  }
+
+  return <Dialog title="Cancel this sale" onClose={() => { if (!busy) onClose(); }}>
+    <div className="stack">
+      <p>{itemCount} {itemCount === 1 ? "item" : "items"} worth {formatPkr(totalPaisa)} will be removed. Nothing has been paid or posted. The cancellation is logged with your name.</p>
+      <Field label="Why?">
+        <SelectInput value={choice} onChange={(event) => setChoice(event.target.value)}>
+          {voidReasons.map((value) => <option key={value} value={value}>{value}</option>)}<option value="Other">Other</option>
+        </SelectInput>
+      </Field>
+      {choice === "Other" && <Field label="Say why"><TextInput value={other} maxLength={200} onChange={(event) => setOther(event.target.value)} autoFocus /></Field>}
+      {error && <ErrorMessage>{error}</ErrorMessage>}
+      <div className="button-row">
+        <button className="button primary" disabled={busy || reason.length < 3} onClick={() => void confirm()}>Cancel the sale</button>
+        <button className="button secondary" disabled={busy} onClick={onClose}>Keep it</button>
+      </div>
+    </div>
+  </Dialog>;
 }
