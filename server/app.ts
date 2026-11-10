@@ -10,6 +10,7 @@ import { billRoutes } from "./modules/purchasing/bills";
 import { payablesRoutes } from "./modules/purchasing/payables";
 import { reorderRoutes } from "./modules/purchasing/reorder";
 import { quotationRoutes } from "./modules/quotations/routes";
+import { salesOrderRoutes } from "./modules/sales/orders";
 import { purchasingRoutes } from "./modules/purchasing/routes";
 import { suppliersRoutes } from "./modules/suppliers/routes";
 import { customerLedgerRoutes } from "./modules/customers/ledger";
@@ -50,6 +51,7 @@ app.route("/api/v1", billRoutes);
 app.route("/api/v1", payablesRoutes);
 app.route("/api/v1", reorderRoutes);
 app.route("/api/v1", quotationRoutes);
+app.route("/api/v1", salesOrderRoutes);
 app.route("/api/v1", returnRoutes);
 
 app.notFound((context) => apiError(context, 404, "NOT_FOUND", "API route not found"));

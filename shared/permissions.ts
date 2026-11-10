@@ -59,6 +59,8 @@ export const permissionDefinitions = [
   ["purchasing.return", "Return goods to a supplier (needs the cost permission)"],
   ["quotations.view", "View quotations"],
   ["quotations.manage", "Write, send, revise, accept and reject quotations"],
+  ["sales_orders.view", "View sales orders"],
+  ["sales_orders.manage", "Take, cancel and close sales orders; convert a quotation into one"],
 ] as const;
 
 export type PermissionKey = (typeof permissionDefinitions)[number][0];
@@ -81,7 +83,7 @@ export const managerPermissionKeys: PermissionKey[] = [
   "suppliers.view", "suppliers.manage", "suppliers.ledger",
   "purchasing.view", "purchasing.order", "purchasing.receive", "purchasing.bill",
   "suppliers.pay", "purchasing.return",
-  "quotations.view", "quotations.manage",
+  "quotations.view", "quotations.manage", "sales_orders.view", "sales_orders.manage",
 ];
 
 export const cashierPermissionKeys: PermissionKey[] = [
