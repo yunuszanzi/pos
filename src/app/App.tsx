@@ -49,6 +49,8 @@ const AccountPage = lazy(() => import("../features/accounts/AccountPage").then((
 const ExpensesPage = lazy(() => import("../features/expenses/ExpensesPage").then(({ ExpensesPage: Page }) => ({ default: Page })));
 const ExpenseFormPage = lazy(() => import("../features/expenses/ExpenseFormPage").then(({ ExpenseFormPage: Page }) => ({ default: Page })));
 const ExpensePage = lazy(() => import("../features/expenses/ExpensePage").then(({ ExpensePage: Page }) => ({ default: Page })));
+const ReportsPage = lazy(() => import("../features/reports/ReportsPage").then(({ ReportsPage: Page }) => ({ default: Page })));
+const ReportPage = lazy(() => import("../features/reports/ReportPage").then(({ ReportPage: Page }) => ({ default: Page })));
 const SalesOrderPage = lazy(() => import("../features/sales-orders/SalesOrderPage").then(({ SalesOrderPage: Page }) => ({ default: Page })));
 const ReceiveGoodsPage = lazy(() => import("../features/purchasing/ReceiveGoodsPage").then(({ ReceiveGoodsPage: Page }) => ({ default: Page })));
 const GoodsReceiptsPage = lazy(() => import("../features/purchasing/GoodsReceiptsPage").then(({ GoodsReceiptsPage: Page }) => ({ default: Page })));
@@ -149,7 +151,9 @@ const appRoutes: AppRoute[] = [
   { path: "/customers/opening-balances", label: "Customer opening balances", permission: "customers.manage", element: <OpeningBalancesPage />, nav: false },
   { path: "/customers/:id", label: "Edit customer", permission: "customers.manage", element: <CustomerFormPage />, nav: false },
   { path: "/returns", label: "Returns", permission: "sales.return", element: <ReturnsPage /> },
-  { path: "/reports/daily-sales", label: "Daily sales", permission: "reports.sales.view", element: <DailySalesPage /> },
+  { path: "/reports", label: "Reports", element: <ReportsPage /> },
+  { path: "/reports/daily-sales", label: "Daily sales", permission: "reports.sales.view", element: <DailySalesPage />, nav: false },
+  { path: "/reports/:key", label: "Report", element: <ReportPage />, nav: false },
   { path: "/users", label: "Users", permission: "users.view", element: <UsersPage /> },
   { path: "/roles", label: "Roles & permissions", permission: "roles.view", element: <RolesPage /> },
   { path: "/settings", label: "Settings", permission: "settings.view", element: <SettingsPage /> },

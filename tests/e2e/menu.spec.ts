@@ -8,7 +8,7 @@ test("modules that are not built yet are listed as under development and cannot 
 
   const soon = page.getByRole("navigation", { name: "Coming soon" });
   await expect(soon).toContainText("FBR integration");
-  await expect(soon).toContainText("Reports & dashboard");
+  await expect(soon).toContainText("Transfers & stock counts");
   await expect(soon.getByText("Under development").first()).toBeVisible();
   await expect(soon.getByRole("link")).toHaveCount(0);
 

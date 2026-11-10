@@ -153,7 +153,10 @@ details pre { max-width: 380px; overflow: auto; font-size: .7rem; }
 .label-barcode { align-self: center; max-width: 100%; max-height: 12mm; object-fit: contain; }
 .label-print-root { display: none; }
 @media print {
-  #root { display: none !important; }
+  /* Only while a receipt or document is printing: other pages (reports) print as they look, without the menu. */
+  body.printing-receipt #root { display: none !important; }
+  .sidebar, .topbar, .no-print { display: none !important; }
+  .main-area { width: 100% !important; margin: 0 !important; }
   .label-print-root { display: block !important; }
   html, body { background: #fff !important; }
 }
