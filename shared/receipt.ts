@@ -43,6 +43,19 @@ export type ReceiptInvoice = {
   /** Set when the sale was to a named customer. The balance is what they owed straight after this invoice. */
   customerName?: string | null;
   customerBalancePaisa?: number | null;
+  /** A back-office invoice (written at a desk, on credit, with terms) rather than a till sale. */
+  channel?: "pos" | "back_office";
+  termsDays?: number | null;
+  /** yyyy-mm-dd */
+  dueDate?: string | null;
+  customerPo?: string;
+  orderNumber?: string | null;
+  note?: string;
+  /** The buyer as they were on the day; a tax invoice shows their NTN and STRN. */
+  buyerName?: string;
+  buyerNtn?: string | null;
+  buyerStrn?: string | null;
+  buyerAddress?: string;
   lines: Array<{
     productName: string; variantName: string; sku: string; unitName: string; quantity: string; unitPricePaisa: number;
     lineDiscountPaisa: number; invoiceDiscountSharePaisa: number; taxRateBps: number; taxPaisa: number; totalPaisa: number;
@@ -137,9 +150,23 @@ function lineRowsOf<T extends DocumentLine>(lines: T[], detailExtra: (line: T) =
   });
 }
 
+/** What a back-office invoice shows besides a till receipt: the buyer's registration and address, the order, their PO, the terms and the due date. */
+function backOfficeMeta(invoice: ReceiptInvoice, options: ReceiptOptions): ReceiptRow[] {
+  const registration = [invoice.buyerNtn ? `NTN ${invoice.buyerNtn}` : "", invoice.buyerStrn ? `STRN ${invoice.buyerStrn}` : ""].filter(Boolean).join("  ");
+  const terms = invoice.termsDays === null || invoice.termsDays === undefined ? "" : invoice.termsDays === 0 ? "Due on receipt" : `${invoice.termsDays} days`;
+  return [
+    ...(registration ? [{ label: "Buyer", value: registration }] : []),
+    ...(invoice.buyerAddress ? [{ label: "Address", value: invoice.buyerAddress }] : []),
+    ...(invoice.customerPo ? [{ label: "Customer PO", value: invoice.customerPo }] : []),
+    ...(invoice.orderNumber ? [{ label: "Order", value: invoice.orderNumber }] : []),
+    ...(terms ? [{ label: "Terms", value: terms }] : []),
+    ...(invoice.dueDate ? [{ label: "Due date", value: formatDay(invoice.dueDate, options.dateFormat) }] : []),
+  ];
+}
+
 export function buildReceipt(invoice: ReceiptInvoice, format: PrintFormat, options: ReceiptOptions): ReceiptModel {
   const { business } = options;
-  const sheet = format === "a4" || format === "a5";
+  const sheet = format === "a4" || format === "a5"; const back = invoice.channel === "back_office";
   const lineDiscount = invoice.lineDiscountPaisa;
   const billDiscount = invoice.invoiceDiscountPaisa;
 
@@ -165,7 +192,7 @@ export function buildReceipt(invoice: ReceiptInvoice, format: PrintFormat, optio
 
   const dateText = formatDocumentDate(invoice.postedAt, options.dateFormat, options.timezone);
   return {
-    title: sheet ? "SALES INVOICE" : "SALES RECEIPT",
+    title: back ? (invoice.buyerNtn || invoice.buyerStrn ? "TAX INVOICE" : "SALES INVOICE") : sheet ? "SALES INVOICE" : "SALES RECEIPT",
     duplicateBanner: duplicateBanner(options),
     businessName: business.tradeName,
     headerLines: headerLinesOf(business, invoice.branchName),
@@ -175,8 +202,8 @@ export function buildReceipt(invoice: ReceiptInvoice, format: PrintFormat, optio
     terminal: invoice.terminalName,
     customer: invoice.customerName || null,
     meta: [
-      { label: "No.", value: invoice.number }, { label: "Date", value: dateText }, { label: "Cashier", value: invoice.cashierName ?? "" },
-      { label: "Till", value: invoice.terminalName }, ...(invoice.customerName ? [{ label: "Customer", value: invoice.customerName }] : []),
+      { label: "No.", value: invoice.number }, { label: "Date", value: dateText }, ...(back ? [] : [{ label: "Cashier", value: invoice.cashierName ?? "" }]),
+      ...(back ? [] : [{ label: "Till", value: invoice.terminalName }]), ...(invoice.customerName ? [{ label: "Customer", value: (back && invoice.buyerName) || invoice.customerName }] : []), ...(back ? backOfficeMeta(invoice, options) : []),
     ],
     lines: lineRowsOf(invoice.lines),
     totals,
@@ -624,5 +651,190 @@ export function buildPurchaseReturnReceipt(note: ReceiptPurchaseReturn, options:
       ...(note.onAccountPaisa ? [{ label: "Credit on account", value: formatPkr(note.onAccountPaisa) }] : []),
     ],
     footer: [],
+  };
+}
+
+// ---------------------------------------------------------------- quotations (v0.6)
+
+export type ReceiptQuotation = {
+  number: string;
+  /** Shown as "Rev 2" once there is more than one. */
+  revisionNo: number;
+  /** yyyy-mm-dd */
+  quoteDate: string;
+  validUntil: string;
+  branchName: string;
+  customerName: string;
+  customerPhone: string;
+  customerNtn: string | null;
+  customerStrn: string | null;
+  terms: string;
+  note: string;
+  taxMode: "inclusive" | "exclusive";
+  grossPaisa: number;
+  lineDiscountPaisa: number;
+  invoiceDiscountPaisa: number;
+  taxPaisa: number;
+  roundingPaisa: number;
+  totalPaisa: number;
+  lines: ReceiptInvoice["lines"];
+};
+
+/** A quotation: the same lines, discounts and tax as the invoice it may become, with how long the offer stands. It is not a bill. */
+export function buildQuotationReceipt(quote: ReceiptQuotation, options: ReceiptOptions): ReceiptModel {
+  const { business } = options;
+  const dateText = formatDay(quote.quoteDate, options.dateFormat);
+  const totals: ReceiptRow[] = [{ label: "Subtotal", value: formatPkr(quote.grossPaisa) }];
+  if (quote.lineDiscountPaisa > 0) totals.push({ label: "Item discounts", value: negative(quote.lineDiscountPaisa) });
+  if (quote.invoiceDiscountPaisa > 0) totals.push({ label: "Discount", value: negative(quote.invoiceDiscountPaisa) });
+  totals.push({ label: quote.taxMode === "inclusive" ? "Tax (included)" : "Tax", value: formatPkr(quote.taxPaisa) });
+  if (quote.roundingPaisa !== 0) totals.push({ label: "Rounding", value: quote.roundingPaisa < 0 ? negative(-quote.roundingPaisa) : formatPkr(quote.roundingPaisa) });
+  totals.push({ label: "QUOTED TOTAL", value: formatPkr(quote.totalPaisa), strong: true });
+  const registration = [quote.customerNtn ? `NTN ${quote.customerNtn}` : "", quote.customerStrn ? `STRN ${quote.customerStrn}` : ""].filter(Boolean).join("  ");
+  return {
+    title: "QUOTATION",
+    duplicateBanner: duplicateBanner(options),
+    businessName: business.tradeName,
+    headerLines: headerLinesOf(business, quote.branchName),
+    number: quote.number,
+    dateText,
+    cashier: "",
+    terminal: "",
+    customer: quote.customerName,
+    meta: [
+      { label: "No.", value: quote.revisionNo > 1 ? `${quote.number} Rev ${quote.revisionNo}` : quote.number },
+      { label: "Date", value: dateText },
+      { label: "Valid until", value: formatDay(quote.validUntil, options.dateFormat) },
+      { label: "For", value: quote.customerName },
+      ...(quote.customerPhone ? [{ label: "Phone", value: quote.customerPhone }] : []),
+      ...(registration ? [{ label: "Buyer", value: registration }] : []),
+    ],
+    lines: lineRowsOf(quote.lines),
+    totals,
+    taxRows: taxRowsOf(quote.lines),
+    payments: [],
+    footer: [...(quote.terms ? [`Terms: ${quote.terms}`] : []), ...(quote.note ? [quote.note] : []), "This is a quotation, not a bill. Prices hold until the date above."],
+  };
+}
+
+// ---------------------------------------------------------------- sales orders (v0.6)
+
+export type ReceiptSalesOrder = {
+  number: string;
+  /** yyyy-mm-dd */
+  orderDate: string;
+  deliveryDate: string | null;
+  branchName: string;
+  customerName: string;
+  customerPhone: string;
+  customerNtn: string | null;
+  customerStrn: string | null;
+  customerPo: string;
+  quotationNumber: string | null;
+  deliveryAddress: string;
+  note: string;
+  taxMode: "inclusive" | "exclusive";
+  grossPaisa: number;
+  lineDiscountPaisa: number;
+  invoiceDiscountPaisa: number;
+  taxPaisa: number;
+  roundingPaisa: number;
+  totalPaisa: number;
+  lines: ReceiptInvoice["lines"];
+};
+
+/** A sales order: what the customer ordered at the agreed prices. Not a bill. */
+export function buildSalesOrderReceipt(order: ReceiptSalesOrder, options: ReceiptOptions): ReceiptModel {
+  const { business } = options;
+  const dateText = formatDay(order.orderDate, options.dateFormat);
+  const totals: ReceiptRow[] = [{ label: "Subtotal", value: formatPkr(order.grossPaisa) }];
+  if (order.lineDiscountPaisa > 0) totals.push({ label: "Item discounts", value: negative(order.lineDiscountPaisa) });
+  if (order.invoiceDiscountPaisa > 0) totals.push({ label: "Discount", value: negative(order.invoiceDiscountPaisa) });
+  totals.push({ label: order.taxMode === "inclusive" ? "Tax (included)" : "Tax", value: formatPkr(order.taxPaisa) });
+  if (order.roundingPaisa !== 0) totals.push({ label: "Rounding", value: order.roundingPaisa < 0 ? negative(-order.roundingPaisa) : formatPkr(order.roundingPaisa) });
+  totals.push({ label: "ORDER TOTAL", value: formatPkr(order.totalPaisa), strong: true });
+  const registration = [order.customerNtn ? `NTN ${order.customerNtn}` : "", order.customerStrn ? `STRN ${order.customerStrn}` : ""].filter(Boolean).join("  ");
+  return {
+    title: "SALES ORDER",
+    duplicateBanner: duplicateBanner(options),
+    businessName: business.tradeName,
+    headerLines: headerLinesOf(business, order.branchName),
+    number: order.number,
+    dateText,
+    cashier: "",
+    terminal: "",
+    customer: order.customerName,
+    meta: [
+      { label: "No.", value: order.number }, { label: "Date", value: dateText }, { label: "Customer", value: order.customerName },
+      ...(order.customerPhone ? [{ label: "Phone", value: order.customerPhone }] : []),
+      ...(registration ? [{ label: "Buyer", value: registration }] : []),
+      ...(order.customerPo ? [{ label: "Customer PO", value: order.customerPo }] : []),
+      ...(order.quotationNumber ? [{ label: "Quotation", value: order.quotationNumber }] : []),
+      ...(order.deliveryDate ? [{ label: "Deliver by", value: formatDay(order.deliveryDate, options.dateFormat) }] : []),
+      ...(order.deliveryAddress ? [{ label: "Deliver to", value: order.deliveryAddress }] : []),
+    ],
+    lines: lineRowsOf(order.lines),
+    totals,
+    taxRows: taxRowsOf(order.lines),
+    payments: [],
+    footer: order.note ? [order.note] : [],
+  };
+}
+
+// ---------------------------------------------------------------- delivery challans (v0.6)
+
+export type ReceiptDeliveryChallan = {
+  number: string;
+  /** When it left, or was written if it has not left yet. */
+  at: string;
+  branchName: string;
+  customerName: string;
+  customerPhone: string;
+  orderNumber: string;
+  customerPo: string;
+  driverName: string;
+  vehicleNo: string;
+  route: string;
+  deliveryAddress: string;
+  note: string;
+  lines: Array<{ productName: string; variantName: string; sku: string; unitName: string; quantity: string }>;
+};
+
+/** A dispatch note: what is on the truck and who is taking it where. It carries no prices; the customer signs for the goods. */
+export function buildDeliveryChallanReceipt(challan: ReceiptDeliveryChallan, options: ReceiptOptions): ReceiptModel {
+  const { business } = options;
+  const dateText = formatDocumentDate(challan.at, options.dateFormat, options.timezone);
+  return {
+    title: "DELIVERY CHALLAN",
+    duplicateBanner: duplicateBanner(options),
+    businessName: business.tradeName,
+    headerLines: headerLinesOf(business, challan.branchName),
+    number: challan.number,
+    dateText,
+    cashier: "",
+    terminal: "",
+    customer: challan.customerName,
+    meta: [
+      { label: "No.", value: challan.number }, { label: "Date", value: dateText }, { label: "Customer", value: challan.customerName },
+      ...(challan.customerPhone ? [{ label: "Phone", value: challan.customerPhone }] : []),
+      { label: "Order", value: challan.orderNumber },
+      ...(challan.customerPo ? [{ label: "Customer PO", value: challan.customerPo }] : []),
+      ...(challan.deliveryAddress ? [{ label: "Deliver to", value: challan.deliveryAddress }] : []),
+      ...(challan.driverName ? [{ label: "Driver", value: challan.driverName }] : []),
+      ...(challan.vehicleNo ? [{ label: "Vehicle", value: challan.vehicleNo }] : []),
+      ...(challan.route ? [{ label: "Route", value: challan.route }] : []),
+    ],
+    lines: challan.lines.map((line) => ({
+      name: line.variantName ? `${line.productName} — ${line.variantName}` : line.productName,
+      detail: `${line.sku} · ${line.unitName}`,
+      quantity: formatQuantity(parseQuantity(line.quantity)),
+      unitPrice: "",
+      discount: null,
+      total: "",
+    })),
+    totals: [],
+    taxRows: [],
+    payments: [],
+    footer: [...(challan.note ? [challan.note] : []), "Goods received in good condition.", "Received by (name and signature): ____________________"],
   };
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCreditNoteReceipt, buildGoodsReceiptReceipt, buildPaymentReceipt, buildPurchaseBillReceipt, buildPurchaseOrderReceipt, buildPurchaseReturnReceipt, buildSupplierPaymentReceipt, buildReceipt, buildStatementReceipt, formatDay, formatDocumentDate, receiptPageCss, type ReceiptBusiness, type ReceiptCreditNote, type ReceiptInvoice, type ReceiptPayment } from "../../shared/receipt";
+import { buildCreditNoteReceipt, buildGoodsReceiptReceipt, buildPaymentReceipt, buildPurchaseBillReceipt, buildPurchaseOrderReceipt, buildPurchaseReturnReceipt, buildDeliveryChallanReceipt, buildQuotationReceipt, buildSalesOrderReceipt, buildSupplierPaymentReceipt, buildReceipt, buildStatementReceipt, formatDay, formatDocumentDate, receiptPageCss, type ReceiptBusiness, type ReceiptCreditNote, type ReceiptInvoice, type ReceiptPayment } from "../../shared/receipt";
 
 const business: ReceiptBusiness = {
   tradeName: "SGA Balloons", legalName: "SGA Balloons (Pvt) Ltd", address: "Shop 4, Saddar, Karachi", phone: "021-111", ntn: "1234567-8", strn: null, receiptFooter: "",
@@ -298,5 +298,92 @@ it("prints a payment voucher with the bills it settled and what is still owed, o
     expect(model.meta).toEqual(expect.arrayContaining([{ label: "Goods receipt", value: "GRN-KHI-000003" }, { label: "Reason", value: "Damaged in transit" }]));
     expect(model.totals).toEqual([{ label: "Goods returned", value: "Rs 360.00" }, { label: "Input tax reversed", value: "Rs 64.80" }, { label: "DEBIT TOTAL", value: "Rs 424.80", strong: true }]);
     expect(model.payments).toEqual([{ label: "Taken off bills", value: "Rs 300.00" }, { label: "Credit on account", value: "Rs 124.80" }]);
+  });
+});
+describe("quotation print", () => {
+  it("prints the offer with its validity, the revision, the buyer's registration and the terms", () => {
+    const options = { business: { tradeName: "SGA Balloons", legalName: "SGA", address: "Karachi", phone: "021-1", ntn: "123", strn: null, receiptFooter: "" }, dateFormat: "dd/MM/yyyy", timezone: "Asia/Karachi" };
+    const model = buildQuotationReceipt({
+      number: "QUO-KHI-000007", revisionNo: 2, quoteDate: "2026-11-10", validUntil: "2026-11-24", branchName: "Karachi", customerName: "Ali Traders", customerPhone: "0300-1234567",
+      customerNtn: "7654321-1", customerStrn: null, terms: "50% advance", note: "", taxMode: "exclusive", grossPaisa: 100_000, lineDiscountPaisa: 10_000, invoiceDiscountPaisa: 0, taxPaisa: 16_200,
+      roundingPaisa: 0, totalPaisa: 106_200,
+      lines: [{ productName: "Latex Balloon", variantName: "Red", sku: "BAL-RED", unitName: "Carton", quantity: "2", unitPricePaisa: 50_000, lineDiscountPaisa: 10_000, invoiceDiscountSharePaisa: 0, taxRateBps: 1800, taxPaisa: 16_200, totalPaisa: 106_200 }],
+    }, options);
+    expect(model.title).toBe("QUOTATION");
+    expect(model.meta).toEqual(expect.arrayContaining([
+      { label: "No.", value: "QUO-KHI-000007 Rev 2" }, { label: "Valid until", value: "24/11/2026" }, { label: "Buyer", value: "NTN 7654321-1" },
+    ]));
+    expect(model.totals).toEqual([
+      { label: "Subtotal", value: "Rs 1,000.00" }, { label: "Item discounts", value: "-Rs 100.00" }, { label: "Tax", value: "Rs 162.00" }, { label: "QUOTED TOTAL", value: "Rs 1,062.00", strong: true },
+    ]);
+    expect(model.footer[0]).toBe("Terms: 50% advance");
+    expect(model.lines[0].total).toBe("Rs 1,062.00");
+  });
+});
+
+describe("sales order print", () => {
+  it("prints the order with the customer's PO, the quotation it came from and where it goes", () => {
+    const model = buildSalesOrderReceipt({
+      number: "SO-KHI-000003", orderDate: "2026-11-10", deliveryDate: "2026-11-15", branchName: "Karachi", customerName: "Bilal Wholesale", customerPhone: "0301-1111111",
+      customerNtn: null, customerStrn: "STRN-9", customerPo: "PO-77", quotationNumber: "QUO-KHI-000007", deliveryAddress: "Shop 9, Jodia Bazaar", note: "Call before delivery",
+      taxMode: "inclusive", grossPaisa: 5_000, lineDiscountPaisa: 500, invoiceDiscountPaisa: 0, taxPaisa: 687, roundingPaisa: 0, totalPaisa: 4_500,
+      lines: [{ productName: "Latex Balloon", variantName: "", sku: "BAL", unitName: "Piece", quantity: "10", unitPricePaisa: 500, lineDiscountPaisa: 500, invoiceDiscountSharePaisa: 0, taxRateBps: 1800, taxPaisa: 687, totalPaisa: 4_500 }],
+    }, options);
+    expect(model.title).toBe("SALES ORDER");
+    expect(model.meta).toEqual(expect.arrayContaining([
+      { label: "Customer PO", value: "PO-77" }, { label: "Quotation", value: "QUO-KHI-000007" }, { label: "Deliver by", value: "15/11/2026" },
+      { label: "Deliver to", value: "Shop 9, Jodia Bazaar" }, { label: "Buyer", value: "STRN STRN-9" },
+    ]));
+    expect(model.totals.at(-1)).toEqual({ label: "ORDER TOTAL", value: "Rs 45.00", strong: true });
+    expect(model.footer).toEqual(["Call before delivery"]);
+  });
+});
+
+describe("delivery challan print", () => {
+  it("prints what is on the truck, who takes it where, no prices, and a line to sign", () => {
+    const model = buildDeliveryChallanReceipt({
+      number: "DC-KHI-000002", at: "2026-11-10T09:30:00Z", branchName: "Karachi", customerName: "Bilal Wholesale", customerPhone: "0301-1111111", orderNumber: "SO-KHI-000003",
+      customerPo: "PO-77", driverName: "Rafiq", vehicleNo: "KHI-1234", route: "Saddar", deliveryAddress: "Shop 9, Jodia Bazaar", note: "",
+      lines: [{ productName: "Latex Balloon", variantName: "Red", sku: "BAL-RED", unitName: "Carton", quantity: "2" }],
+    }, options);
+    expect(model.title).toBe("DELIVERY CHALLAN");
+    expect(model.meta).toEqual(expect.arrayContaining([
+      { label: "Date", value: "10/11/2026 14:30" }, { label: "Order", value: "SO-KHI-000003" }, { label: "Driver", value: "Rafiq" }, { label: "Vehicle", value: "KHI-1234" }, { label: "Route", value: "Saddar" },
+    ]));
+    expect(model.lines).toEqual([{ name: "Latex Balloon — Red", detail: "BAL-RED · Carton", quantity: "2", unitPrice: "", discount: null, total: "" }]);
+    expect(model.totals).toEqual([]);
+    expect(model.footer.at(-1)).toMatch(/Received by/);
+  });
+});
+
+describe("back-office tax invoice print", () => {
+  const backOffice: ReceiptInvoice = {
+    ...invoice, number: "INV-KHI-000050", cashierName: "Owner", terminalName: "", channel: "back_office", termsDays: 15, dueDate: "2026-11-25", customerPo: "PO-77", orderNumber: "SO-KHI-000003",
+    customerName: "Bilal Wholesale", customerBalancePaisa: 4745, buyerName: "Bilal Traders", buyerNtn: "7654321-1", buyerStrn: "STRN-9", buyerAddress: "Shop 9, Jodia Bazaar",
+    paidPaisa: 0, changePaisa: 0, balancePaisa: 4745, payments: [],
+  };
+
+  it("is a TAX INVOICE for a registered buyer, with their NTN and STRN, the terms and the due date, and no till or cashier", () => {
+    const model = buildReceipt(backOffice, "a4", options);
+    expect(model.title).toBe("TAX INVOICE");
+    expect(model.meta).toEqual([
+      { label: "No.", value: "INV-KHI-000050" }, { label: "Date", value: "08/11/2026 14:35" }, { label: "Customer", value: "Bilal Traders" },
+      { label: "Buyer", value: "NTN 7654321-1  STRN STRN-9" }, { label: "Address", value: "Shop 9, Jodia Bazaar" }, { label: "Customer PO", value: "PO-77" },
+      { label: "Order", value: "SO-KHI-000003" }, { label: "Terms", value: "15 days" }, { label: "Due date", value: "25/11/2026" },
+    ]);
+    expect(model.payments).toEqual(expect.arrayContaining([{ label: "Balance due", value: "Rs 47.45", strong: true }]));
+  });
+
+  it("is a plain SALES INVOICE for a buyer with no registration, and says due on receipt for zero days", () => {
+    const model = buildReceipt({ ...backOffice, buyerNtn: null, buyerStrn: null, termsDays: 0 }, "a4", options);
+    expect(model.title).toBe("SALES INVOICE");
+    expect(model.meta).toEqual(expect.arrayContaining([{ label: "Terms", value: "Due on receipt" }]));
+    expect(model.meta.some((row) => row.label === "Buyer")).toBe(false);
+  });
+
+  it("leaves a till receipt exactly as it was", () => {
+    const model = buildReceipt(invoice, "pos80", options);
+    expect(model.title).toBe("SALES RECEIPT");
+    expect(model.meta.map((row) => row.label)).toEqual(["No.", "Date", "Cashier", "Till"]);
   });
 });

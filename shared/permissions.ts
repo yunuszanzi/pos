@@ -57,6 +57,14 @@ export const permissionDefinitions = [
   ["purchasing.bill", "Enter supplier bills (prices, freight and input tax; needs the cost permission)"],
   ["suppliers.pay", "Pay a supplier (cash comes out of the open shift)"],
   ["purchasing.return", "Return goods to a supplier (needs the cost permission)"],
+  ["quotations.view", "View quotations"],
+  ["quotations.manage", "Write, send, revise, accept and reject quotations"],
+  ["sales_orders.view", "View sales orders"],
+  ["sales_orders.manage", "Take, cancel and close sales orders; convert a quotation into one"],
+  ["delivery.view", "View delivery challans"],
+  ["delivery.manage", "Write, dispatch, deliver, return and cancel delivery challans (stock leaves on dispatch)"],
+  ["invoices.view", "View back-office invoices"],
+  ["invoices.create", "Write back-office invoices on credit, from an order, a quotation or directly"],
 ] as const;
 
 export type PermissionKey = (typeof permissionDefinitions)[number][0];
@@ -79,6 +87,8 @@ export const managerPermissionKeys: PermissionKey[] = [
   "suppliers.view", "suppliers.manage", "suppliers.ledger",
   "purchasing.view", "purchasing.order", "purchasing.receive", "purchasing.bill",
   "suppliers.pay", "purchasing.return",
+  "quotations.view", "quotations.manage", "sales_orders.view", "sales_orders.manage",
+  "delivery.view", "delivery.manage", "invoices.view", "invoices.create",
 ];
 
 export const cashierPermissionKeys: PermissionKey[] = [
