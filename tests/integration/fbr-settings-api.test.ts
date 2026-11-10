@@ -168,4 +168,27 @@ integration("FBR settings", { timeout: 300_000 }, () => {
     expect((await callApi(viewer.token, "POST", "/fbr/verify-buyer", { body: { registrationNo: "7654320-0" } })).body).toMatchObject({ ok: true, registered: false });
     expect((await callApi(viewer.token, "POST", "/fbr/verify-buyer", { body: { registrationNo: "12" } })).status).toBe(400);
   });
+
+  it("runs the sandbox scenarios, records each result, and lets production through once all nine pass", async () => {
+    const business = await createTestBusiness();
+    const viewer = await inviteStaffWithPermissions(business, "FBR viewer", ["fbr.view"]);
+    await setToken(business, "mock-reject");
+    await callApi(business.ownerToken, "PUT", "/fbr/config", { body: config() });
+    const failed = await callApi(business.ownerToken, "POST", "/fbr/scenarios/SN001/run");
+    expect(failed.status, JSON.stringify(failed.body)).toBe(200);
+    expect(failed.body).toMatchObject({ id: "SN001", passed: false });
+    expect((await callApi(business.ownerToken, "GET", "/fbr/config")).body.scenarios[0]).toMatchObject({ id: "SN001", passed: false });
+
+    await setToken(business, "mock-ok-token");
+    expect((await callApi(viewer.token, "POST", "/fbr/scenarios/SN001/run")).status).toBe(403);
+    expect((await callApi(business.ownerToken, "POST", "/fbr/scenarios/SN999/run")).status).toBe(404);
+    for (const scenario of (await callApi(business.ownerToken, "GET", "/fbr/config")).body.scenarios) {
+      expect((await callApi(business.ownerToken, "POST", `/fbr/scenarios/${scenario.id}/run`)).body.passed, scenario.id).toBe(true);
+    }
+    const after = (await callApi(business.ownerToken, "GET", "/fbr/config")).body;
+    expect(after.allScenariosPassed).toBe(true);
+    expect((await callApi(business.ownerToken, "PUT", "/fbr/config", { body: config({ environment: "production" }) })).status).toBe(200);
+    // Scenarios only run against the sandbox.
+    expect((await callApi(business.ownerToken, "POST", "/fbr/scenarios/SN001/run")).status).toBe(409);
+  });
 });

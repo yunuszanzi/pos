@@ -11,6 +11,8 @@ export type DashboardData = {
   receivables?: { totalPaisa: number; customers: number };
   payables?: { totalPaisa: number; suppliers: number };
   lowStock?: { items: number };
+  /** Invoices FBR has not accepted: waiting, refused or given up. Present only when there are some. */
+  fbr?: { pending: number; rejected: number; failed: number };
 };
 
 export const getDashboard = (branchId?: string, signal?: AbortSignal) => requestApi<DashboardData>(`/dashboard${branchId ? `?branchId=${branchId}` : ""}`, { signal });

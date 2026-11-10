@@ -61,3 +61,4 @@ export const getFbrSubmissionById = (id: string) => requestApi<FbrSubmissionView
 export const getFbrSummary = () => requestApi<{ pending: number; rejected: number; failed: number; accepted: number }>("/fbr/summary");
 /** The idempotency key identifies one resubmission: pressing twice cannot send it twice. */
 export const resubmitToFbr = (id: string, idempotencyKey: string) => postJson<{ id: string; status: FbrStatus; irn: string | null; message: string }>(`/fbr/submissions/${id}/retry`, {}, { "Idempotency-Key": idempotencyKey });
+export const runFbrScenario = (id: string) => postJson<{ id: string; passed: boolean; message: string }>(`/fbr/scenarios/${id}/run`, {});

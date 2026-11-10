@@ -78,6 +78,9 @@ const OpeningBalancesPage = lazy(() => import("../features/customers/OpeningBala
 const CustomerSetupPage = lazy(() => import("../features/customers/CustomerSetupPage").then(({ CustomerSetupPage: Page }) => ({ default: Page })));
 const ReturnsPage = lazy(() => import("../features/returns/ReturnsPage").then(({ ReturnsPage: Page }) => ({ default: Page })));
 const DailySalesPage = lazy(() => import("../features/reports/DailySalesPage").then(({ DailySalesPage: Page }) => ({ default: Page })));
+const FbrLogPage = lazy(() => import("../features/fbr/FbrLogPage").then(({ FbrLogPage: Page }) => ({ default: Page })));
+const FbrSubmissionPage = lazy(() => import("../features/fbr/FbrSubmissionPage").then(({ FbrSubmissionPage: Page }) => ({ default: Page })));
+const FbrSettingsPage = lazy(() => import("../features/fbr/FbrSettingsPage").then(({ FbrSettingsPage: Page }) => ({ default: Page })));
 const PosPage = lazy(() => import("../pos/PosPage").then(({ PosPage: Page }) => ({ default: Page })));
 const ValuationPage = lazy(() => import("../features/stock/ValuationPage").then(({ ValuationPage: Page }) => ({ default: Page })));
 
@@ -162,6 +165,9 @@ const appRoutes: AppRoute[] = [
   { path: "/users", label: "Users", permission: "users.view", element: <UsersPage /> },
   { path: "/roles", label: "Roles & permissions", permission: "roles.view", element: <RolesPage /> },
   { path: "/settings", label: "Settings", permission: "settings.view", element: <SettingsPage /> },
+  { path: "/fbr/log", label: "FBR log", permission: "fbr.view", element: <FbrLogPage /> },
+  { path: "/fbr/log/:id", label: "FBR submission", permission: "fbr.view", element: <FbrSubmissionPage />, nav: false },
+  { path: "/settings/fbr", label: "FBR settings", permission: "fbr.manage", element: <FbrSettingsPage /> },
   { path: "/audit", label: "Audit history", permission: "audit.view", element: <AuditPage /> },
 ];
 
@@ -310,7 +316,7 @@ function Dashboard() {
   const cards = appRoutes.filter((route) => route.path !== "/" && route.nav !== false && (!route.permission || hasPermission(currentUser?.permissions ?? [], route.permission)));
   return <div className="content">
     <div className="welcome-panel">
-      <p className="eyebrow">Release v0.7 · Reports, accounts and expenses</p>
+      <p className="eyebrow">Release v0.8 · FBR integration</p>
       <h1>Welcome{currentUser?.activeUserName ? `, ${currentUser.activeUserName}` : ""}</h1>
       <p>Selling, stock, customers, suppliers, quotations, orders, reports and expenses are ready. Modules marked “Under development” in the menu arrive in later releases.</p>
     </div>
@@ -318,7 +324,7 @@ function Dashboard() {
     <div className="dashboard-grid">{cards.map((route) => <Link className="dashboard-card" key={route.path} to={route.path}>
       <span className="card-arrow">↗</span><strong>{route.label}</strong><small>Open workspace</small>
     </Link>)}</div>
-    <section className="foundation-note"><strong>v0.7 Reports, dashboard and expenses</strong><span>Next: FBR integration · v0.8</span></section>
+    <section className="foundation-note"><strong>v0.8 FBR integration</strong><span>Next: Transfers and stock counts · v0.9</span></section>
   </div>;
 }
 

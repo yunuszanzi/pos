@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import { Hono, type Context } from "hono";
 import { fbrInvoiceProblems, fbrReferenceKinds, isTaxNumber, sandboxScenarios, type FbrReferenceKind } from "../../../shared/fbr";
 import { fbrBuyerCheckSchema, fbrConfigSchema, fbrPaymentMethodSchema, fbrTaxCategorySchema, fbrTerminalSchema, fbrTokenSchema } from "../../../shared/schemas/fbr";
+import { toDigitalInvoicingPayload } from "../../fbr/mapper";
 import { adapterKind, clientFor, loadFbrSettings } from "../../fbr/config";
 import { EncryptionKeyError, encryptSecret, tokenHint } from "../../fbr/crypto";
 import { auditPrincipal } from "../../lib/audit";
@@ -138,6 +139,34 @@ async function withClient(context: Context) {
     throw error;
   }
 }
+
+/** Runs one of PRAL's sandbox test scenarios (FR-FBR-06): a made-up invoice of that kind is checked by FBR's sandbox. Nothing is posted, so no real invoice number is used up. */
+fbrSettingsRoutes.post("/fbr/scenarios/:scenarioId/run", manage, async (context) => {
+  const scenario = sandboxScenarios.find((entry) => entry.id === context.req.param("scenarioId"));
+  if (!scenario) return apiError(context, 404, "NOT_FOUND", "Unknown scenario");
+  const ready = await withClient(context);
+  if ("response" in ready) return ready.response;
+  if (ready.settings.environment !== "sandbox") return apiError(context, 409, "NOT_SANDBOX", "Scenarios run against the FBR sandbox. Switch the environment to Sandbox first");
+  const exempt = /exempt/i.test(scenario.saleType);
+  const value = 100_000;
+  const tax = exempt || scenario.rateBps === 0 ? 0 : Math.round((value * scenario.rateBps) / 10_000);
+  const retail = !scenario.registered && scenario.id >= "SN026";
+  const payload = toDigitalInvoicingPayload({
+    kind: "sale", number: `TEST-${scenario.id}`, date: new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Karachi" }),
+    seller: { name: ready.settings.seller.name, ntnCnic: ready.settings.seller.ntnCnic, strn: ready.settings.seller.strn, province: ready.settings.seller.province, address: ready.settings.seller.address },
+    buyer: { name: scenario.registered ? "Test Buyer (Registered)" : "Walk-in customer", ntnCnic: scenario.registered ? "1234567" : "", province: ready.settings.seller.province, address: ready.settings.seller.address, registered: scenario.registered },
+    lines: [{ hsCode: "9503.0090", description: "Scenario test item", uom: "Numbers, pieces, units", quantity: "1", valueExclTaxPaisa: value, taxPaisa: tax, totalPaisa: value + tax, discountPaisa: 0, rateBps: scenario.rateBps, saleType: scenario.saleType, sroScheduleNo: "", sroItemSerialNo: "" }],
+    refIrn: null, totalPaisa: value + tax,
+  }, "sandbox", { retail });
+  const result = await ready.client.validate(payload);
+  const passed = result.outcome === "valid";
+  const message = passed ? "FBR's sandbox accepted the test invoice" : result.outcome === "rejected" ? `${result.code}: ${result.message}` : result.message;
+  await db.execute(sql`
+    insert into fbr_scenario_runs (business_id, scenario_id, passed, message, environment, ran_by) values (${ready.businessId}, ${scenario.id}, ${passed}, ${message}, 'sandbox', ${getActorId(getPrincipal(context))})
+    on conflict (business_id, scenario_id) do update set passed = excluded.passed, message = excluded.message, environment = 'sandbox', ran_at = now(), ran_by = excluded.ran_by`);
+  await auditPrincipal(context, getPrincipal(context), "fbr_config", ready.businessId, "scenario_run", null, { scenario: scenario.id, passed });
+  return context.json({ id: scenario.id, passed, message });
+});
 
 fbrSettingsRoutes.post("/fbr/test", manage, async (context) => {
   const ready = await withClient(context);
