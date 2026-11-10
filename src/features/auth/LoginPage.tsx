@@ -1,17 +1,14 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { signInWithPassword, signUpOwner, requestPasswordReset, recordUserLogin } from "../../api/authApi";
 import { requestApi } from "../../api/client";
-import { useAuth } from "../../app/useAuth";
 import { ErrorMessage, Field, SuccessMessage, TextInput } from "../../app/FormElements";
 import { authCredentialsSchema } from "../../../shared/schemas/auth";
 import type { z } from "zod";
 
 export function LoginPage() {
-  const navigate = useNavigate();
-  const { refreshCurrentUser } = useAuth();
   const [mode, setMode] = useState<"signin" | "signup" | "reset">("signin");
   const form = useForm<z.input<typeof authCredentialsSchema>>({
     resolver: zodResolver(authCredentialsSchema),
@@ -44,14 +41,11 @@ export function LoginPage() {
         setSuccess("Check your email to confirm the account, then sign in to continue.");
         return;
       }
+      // Only record the login here. The app shell already sends the person to the right page (setup for a new owner)
+      // as soon as the session exists; navigating again after these requests could pull them back from wherever they
+      // had gone in the meantime.
       const user = await requestApi<{ userId: string | null }>("/me");
-      if (user.userId) {
-        await recordUserLogin();
-        await refreshCurrentUser();
-        navigate("/");
-      } else {
-        navigate("/setup");
-      }
+      if (user.userId) await recordUserLogin();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Authentication failed. Try again.");
     } finally {

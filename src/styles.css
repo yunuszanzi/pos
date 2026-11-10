@@ -34,7 +34,7 @@ h2 { margin-bottom: 16px; font-size: 1.05rem; }
 .brand { display: flex; align-items: center; gap: 11px; margin: 0 8px 40px; font-weight: 760; text-decoration: none; }
 .brand small { display: block; margin-top: 2px; color: #8190a6; font-size: .72rem; font-weight: 550; }
 .brand-mark { display: grid; width: 36px; height: 36px; place-items: center; border-radius: 11px; background: #1d3b77; color: white; font-size: 1.2rem; }
-.sidebar nav { display: grid; gap: 5px; }
+.sidebar nav { display: grid; gap: 5px;overflow-x: auto;  }
 .nav-link { padding: 11px 12px; border-radius: 9px; color: #606d81; font-size: .9rem; font-weight: 620; text-decoration: none; }
 .nav-link:hover, .nav-link.selected { background: #edf3ff; color: #244b97; }
 .sidebar-bottom { display: flex; align-items: center; gap: 10px; margin-top: auto; padding: 14px 4px 4px; border-top: 1px solid #edf0f4; }
@@ -124,7 +124,7 @@ details pre { max-width: 380px; overflow: auto; font-size: .7rem; }
   .app-shell { display: block; }
   .sidebar { position: static; width: 100%; padding: 12px 14px; border-right: 0; border-bottom: 1px solid #e7ebf2; }
   .brand { margin: 0 4px 13px; }
-  .sidebar nav { display: flex; gap: 4px; overflow-x: auto; }
+  .sidebar nav { display: flex; gap: 4px; }
   .nav-link { flex: 0 0 auto; padding: 9px 10px; font-size: .8rem; }
   .sidebar-bottom { display: none; }
   .main-area { width: 100%; margin-left: 0; }
@@ -142,3 +142,128 @@ details pre { max-width: 380px; overflow: auto; font-size: .7rem; }
   .topbar { gap: 10px; }
   .terminal-choice { align-items: flex-end; flex-direction: column; gap: 4px; }
 }
+
+/* Barcode labels. Page size and grid come from labelPageCss in shared/labels.ts. */
+.label-preview { overflow: auto; padding: 14px; border-radius: 10px; background: #eef1f6; }
+.label-preview .label-page { margin: 0 auto 16px; background: #fff; box-shadow: 0 2px 10px #0003; }
+.label-cell { display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box; overflow: hidden; padding: 1.5mm 2mm; color: #000; font: 8pt/1.15 Arial, sans-serif; }
+.label-name { max-height: 2.4em; overflow: hidden; font-weight: 700; }
+.label-variant, .label-sku { font-size: 6.5pt; }
+.label-price { font-size: 11pt; font-weight: 800; }
+.label-barcode { align-self: center; max-width: 100%; max-height: 12mm; object-fit: contain; }
+.label-print-root { display: none; }
+@media print {
+  #root { display: none !important; }
+  .label-print-root { display: block !important; }
+  html, body { background: #fff !important; }
+}
+
+/* ---- Point of sale ---- */
+.pos { display: flex; height: 100vh; flex-direction: column; background: #eef1f6; }
+.pos-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 8px 16px; border-bottom: 1px solid #e0e6ef; background: #fff; font-size: .85rem; }
+.pos-bar .button { min-height: 36px; padding: 6px 12px; }
+.pos-bar .grow { flex: 1; }
+.pos-main { display: grid; min-height: 0; flex: 1; grid-template-columns: minmax(0, 1fr) minmax(360px, 440px); gap: 12px; padding: 12px; }
+.pos-left, .pos-right { display: flex; min-height: 0; flex-direction: column; gap: 10px; }
+.pos-right { padding: 14px; border: 1px solid #e0e6ef; border-radius: 12px; background: #fff; }
+.pos-search { min-height: 52px; font-size: 1.05rem; }
+.pos-grid { display: grid; flex: 1; align-content: start; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; overflow: auto; }
+.tile { display: grid; min-height: 92px; align-content: space-between; gap: 4px; padding: 10px; border: 1px solid #dfe5ee; border-radius: 10px; background: #fff; color: #1d2b41; text-align: left; }
+.tile:hover { border-color: #5c83ce; }
+.tile-name { font-size: .88rem; font-weight: 650; }
+.tile-meta { color: #6d778a; font-size: .72rem; }
+.cart-scroll { min-height: 0; flex: 1; overflow: auto; }
+.cart-table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+.cart-table th { padding: 6px 4px; border-bottom: 1px solid #e5e9f0; color: #64748b; font-size: .72rem; text-align: left; text-transform: uppercase; }
+.cart-table td { padding: 8px 4px; border-bottom: 1px solid #f0f2f6; vertical-align: top; }
+.cart-table td small { display: block; color: #6d778a; }
+.cart-row { cursor: pointer; }
+.cart-row:hover { background: #f5f8ff; }
+.cart-row.missing td { color: #a3312c; }
+.num { text-align: right !important; font-variant-numeric: tabular-nums; }
+.totals { display: grid; gap: 4px; margin: 0; }
+.totals > div { display: flex; justify-content: space-between; }
+.totals dt { color: #5b687c; }
+.totals dd { margin: 0; font-variant-numeric: tabular-nums; }
+.totals .grand { padding-top: 8px; border-top: 1px solid #e5e9f0; font-size: 1.5rem; font-weight: 800; }
+.totals .grand dt { color: inherit; }
+.pay-button { min-height: 54px; font-size: 1.05rem; }
+.dialog-backdrop { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 16px; background: #0d1a3366; }
+.dialog { width: min(100%, 460px); max-height: calc(100vh - 32px); overflow: auto; padding: 20px; border-radius: 14px; background: #fff; box-shadow: 0 24px 70px #0d1a3340; }
+.dialog.wide { width: min(100%, 720px); }
+.dialog > header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.dialog > header h2 { margin: 0; }
+.pay-total { display: flex; align-items: baseline; justify-content: space-between; }
+.pay-total strong { font-size: 1.8rem; }
+.pay-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.pay-row .input:nth-child(3) { grid-column: 1 / -1; }
+.pay-summary { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; padding: 10px; border-radius: 8px; background: #f5f7fb; }
+.held-row { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid #eef0f4; }
+.held-row small { display: block; color: #6d778a; }
+.report-table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+.report-table td { padding: 5px 0; border-bottom: 1px solid #f0f2f6; }
+/* The return dialog's item table: room between columns, numbers lined up under their headings, and fixed widths for the two boxes. */
+.return-table th, .return-table td { padding: 8px 10px; vertical-align: middle; }
+.return-table th:first-child, .return-table td:first-child { padding-left: 0; }
+.return-table th:last-child, .return-table td:last-child { padding-right: 0; }
+.return-table td:nth-child(4) { width: 6.5rem; }
+.return-table td:nth-child(4) input { text-align: right; font-variant-numeric: tabular-nums; }
+.return-table td:nth-child(5) { width: 10.5rem; }
+.return-table .short { display: block; margin-top: 4px; text-align: right; }
+.report-table tr.variance td { color: #a3312c; font-weight: 700; }
+fieldset { border: 1px solid #e0e6ef; border-radius: 8px; }
+@media (max-width: 900px) { .pos { height: auto; min-height: 100vh; } .pos-main { grid-template-columns: 1fr; } }
+
+/* ---- Printed receipts and invoices. The model comes from shared/receipt.ts; @page size is injected per format. ---- */
+.receipt-print-root { display: none; }
+@media print {
+  #root { display: none !important; }
+  .receipt-print-root { display: block !important; }
+}
+.block { display: block; }
+.receipt { color: #000; font: 9pt/1.3 "Courier New", ui-monospace, monospace; }
+.receipt h1 { margin: 0 0 2px; font-size: 12pt; letter-spacing: 0; text-align: center; }
+.receipt h2 { margin: 6px 0; padding: 2px 0; border-block: 1px dashed #000; font-size: 9pt; text-align: center; }
+.receipt p { margin: 0; text-align: center; }
+.receipt .receipt-duplicate { margin-bottom: 6px; padding: 3px; border: 2px solid #000; font-weight: 800; text-transform: uppercase; }
+.receipt-pos80 { width: 74mm; }
+.receipt-pos58 { width: 54mm; font-size: 7.5pt; }
+.receipt-meta, .receipt-rows { display: grid; gap: 1px; margin: 6px 0; }
+.receipt-meta > div, .receipt-rows > div { display: flex; justify-content: space-between; gap: 8px; }
+.receipt dt, .receipt dd { margin: 0; }
+.receipt-rows { padding-top: 4px; border-top: 1px dashed #000; }
+.receipt-rows .strong { font-size: 1.15em; font-weight: 800; }
+.receipt-lines { margin: 6px 0; padding: 0; list-style: none; }
+.receipt-lines li { display: grid; padding: 3px 0; border-bottom: 1px dotted #999; }
+.receipt-lines .item-figures { display: flex; justify-content: space-between; }
+.receipt-lines small, .receipt-lines td small { display: block; color: #333; font-size: .85em; }
+.receipt-tax { width: 100%; margin-top: 6px; border-collapse: collapse; font-size: .9em; }
+.receipt-tax th { text-align: left; }
+.receipt .num { text-align: right; }
+.receipt-foot { margin-top: 8px; padding-top: 4px; border-top: 1px dashed #000; }
+.receipt-a4, .receipt-a5 { width: 100%; font: 10pt/1.4 Arial, Helvetica, sans-serif; }
+.receipt-a4 h1, .receipt-a5 h1 { font-size: 18pt; text-align: left; }
+.receipt-a4 .receipt-head p, .receipt-a5 .receipt-head p { text-align: left; }
+.receipt-a4 h2, .receipt-a5 h2 { border: 0; text-align: right; font-size: 14pt; }
+.receipt-a4 .receipt-meta, .receipt-a5 .receipt-meta { grid-template-columns: repeat(2, 1fr); gap: 2px 24px; }
+.receipt-a4 table.receipt-lines, .receipt-a5 table.receipt-lines { width: 100%; border-collapse: collapse; }
+.receipt-a4 table.receipt-lines th, .receipt-a5 table.receipt-lines th { padding: 4px; border-bottom: 2px solid #000; text-align: left; }
+.receipt-a4 table.receipt-lines td, .receipt-a5 table.receipt-lines td { padding: 4px; border-bottom: 1px solid #ccc; vertical-align: top; }
+.receipt-a4 .receipt-rows, .receipt-a5 .receipt-rows { width: 55%; margin-left: auto; }
+.receipt-a4 .receipt-foot p, .receipt-a5 .receipt-foot p { text-align: left; }
+.cart-table td small .short { color: #a3312c; font-weight: 700; }
+
+/* ---- Menu entries for modules that are not built yet ---- */
+.sidebar { overflow-y: auto; }
+.planned-nav { display: grid; gap: 2px; margin-top: 18px; }
+.nav-link.disabled { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px; color: #9aa5b6; cursor: not-allowed; user-select: none; }
+.nav-link.disabled:hover { background: transparent; }
+.badge { padding: 2px 7px; border-radius: 99px; background: #f1f3f6; color: #7b8799; font-size: .64rem; font-weight: 700; white-space: nowrap; }
+
+/* ---- Customer on the till ---- */
+.customer-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-bottom: 10px; border-bottom: 1px solid #eef0f4; }
+.customer-bar small { display: block; color: #6d778a; }
+.customer-results { display: grid; max-height: 280px; gap: 4px; overflow: auto; }
+.customer-row { display: grid; padding: 8px 10px; border: 1px solid #e3e8f0; border-radius: 8px; background: #fff; text-align: left; }
+.customer-row:hover { border-color: #5c83ce; background: #f5f8ff; }
+.customer-row small { color: #6d778a; }

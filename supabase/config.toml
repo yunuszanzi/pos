@@ -18,3 +18,7 @@ additional_redirect_urls = ["http://localhost:5173"]
 enable_signup = true
 double_confirm_changes = true
 enable_confirmations = false
+
+# Local only: staff invites send email to mailpit, and the default limit (2/hour) breaks the test suite.
+[auth.rate_limit]
+email_sent = 1000

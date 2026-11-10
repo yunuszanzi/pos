@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "dev:api": "tsx watch server/dev.ts",
+    "dev:all": "node scripts/dev-all.mjs",
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b --pretty",
     "lint": "eslint .",
@@ -13,7 +14,8 @@
     "test:watch": "vitest",
     "e2e": "playwright test",
     "db:migrate": "tsx db/migrate.ts",
-    "db:seed": "tsx db/seed.ts"
+    "db:seed": "tsx db/seed.ts",
+    "db:seed-demo": "tsx db/seed-demo.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.6",
@@ -21,6 +23,7 @@
     "@hookform/resolvers": "^5.2.2",
     "@supabase/supabase-js": "^2.57.4",
     "@tanstack/react-query": "^5.87.4",
+    "bwip-js": "^4.11.4",
     "dotenv": "^16.6.1",
     "drizzle-orm": "^0.45.4",
     "hono": "^4.13.16",
@@ -46,6 +49,7 @@
     "eslint": "^10.14.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.7",
+    "fake-indexeddb": "^6.2.7",
     "globals": "^17.14.0",
     "jsdom": "^26.1.0",
     "postcss": "^8.5.6",

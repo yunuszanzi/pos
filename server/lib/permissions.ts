@@ -26,6 +26,14 @@ export function getPrincipal(context: Context): Principal {
   return principal;
 }
 
+/** The person acting: the PIN-switched user on a terminal, otherwise the signed-in account. */
+export function getActorId(principal: Principal): string {
+  return principal.activeUserId ?? principal.authUserId;
+}
+
+export const createdByActor = (principal: Principal) => ({ createdBy: getActorId(principal), updatedBy: getActorId(principal) });
+export const updatedByActor = (principal: Principal) => ({ updatedBy: getActorId(principal), updatedAt: new Date() });
+
 export async function getRolePermissions(roleId: string): Promise<Set<string>> {
   const rows = await db.select({ key: rolePermissions.permissionKey })
     .from(rolePermissions)
@@ -43,6 +51,19 @@ export async function requireBusinessUser(authUserId: string) {
 
 export function hasPermission(principal: Principal, permission: string): boolean {
   return principal.permissions.has("*") || principal.permissions.has(permission);
+}
+
+/** Nobody may grant, or manage a user holding, a permission they do not hold themselves. */
+export function holdsAllPermissions(principal: Principal, keys: Iterable<string>): boolean {
+  if (principal.permissions.has("*")) return true;
+  for (const key of keys) {
+    if (!principal.permissions.has(key)) return false;
+  }
+  return true;
+}
+
+export async function canManageRole(principal: Principal, roleId: string): Promise<boolean> {
+  return holdsAllPermissions(principal, await getRolePermissions(roleId));
 }
 
 export function requirePermission(permission: string) {

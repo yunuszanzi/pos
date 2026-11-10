@@ -123,6 +123,7 @@ export const authenticate: MiddlewareHandler = async (context, next) => {
           .where(and(eq(userBranches.userId, user.id), eq(userBranches.branchId, terminal.branchId))).limit(1);
         if (!branchGrant) return context.json({ error: { code: "BRANCH_ACCESS_DENIED", message: "You are not assigned to this terminal branch" } }, 403);
       }
+      principal.terminalId = terminal.id;
     }
     const [settings] = await db.select().from(businessSettings)
       .where(eq(businessSettings.businessId, user.businessId)).limit(1);

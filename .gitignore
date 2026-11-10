@@ -8,3 +8,6 @@ playwright-report
 test-results
 coverage
 drizzle/meta
+
+# Local test output
+e2e-run.log

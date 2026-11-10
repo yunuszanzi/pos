@@ -1,12 +1,12 @@
-import { zValidator } from "@hono/zod-validator";
+import { validateJson } from "../../lib/validate";
 import { and, count, desc, eq, ilike, inArray, or } from "drizzle-orm";
 import { Hono } from "hono";
 import { appUsers, branches, permissions, rolePermissions, roles, userBranches } from "../../../db/schema";
 import { roleSchema, userCreateSchema, userUpdateSchema } from "./schema";
 import { auditPrincipal } from "../../lib/audit";
 import { db } from "../../lib/db";
-import { apiError } from "../../lib/http";
-import { getPrincipal, requirePermission } from "../../lib/permissions";
+import { apiError, paramId, roleAboveActor } from "../../lib/http";
+import { canManageRole, createdByActor, getPrincipal, holdsAllPermissions, requirePermission, updatedByActor } from "../../lib/permissions";
 import { hashPin } from "../auth/pin";
 import { supabaseAdmin } from "../../lib/supabaseAdmin";
 
@@ -38,11 +38,12 @@ usersRoutes.get("/users", requirePermission("users.view"), async (context) => {
   return context.json({ data: rows, page, pageSize, total });
 });
 
-usersRoutes.post("/users", requirePermission("users.manage"), zValidator("json", userCreateSchema), async (context) => {
+usersRoutes.post("/users", requirePermission("users.manage"), validateJson(userCreateSchema), async (context) => {
   const principal = getPrincipal(context);
   const input = context.req.valid("json");
   const [role] = await db.select().from(roles).where(and(eq(roles.id, input.roleId), eq(roles.businessId, principal.businessId!))).limit(1);
   if (!role || role.name === "Owner") return apiError(context, 400, "INVALID_ROLE", "Choose an assignable role in this business");
+  if (!await canManageRole(principal, role.id)) return roleAboveActor(context);
   const assignedBranches = await db.select({ id: branches.id }).from(branches)
     .where(and(eq(branches.businessId, principal.businessId!), inArray(branches.id, input.branchIds)));
   if (assignedBranches.length !== new Set(input.branchIds).size) {
@@ -62,6 +63,7 @@ usersRoutes.post("/users", requirePermission("users.manage"), zValidator("json",
         email: input.email,
         displayName: input.displayName,
         pinHash: input.pin ? await hashPin(input.pin) : null,
+        ...createdByActor(principal),
       }).returning();
       await tx.insert(userBranches).values(input.branchIds.map((branchId) => ({ userId: created.id, branchId })));
       return [created];
@@ -86,9 +88,9 @@ usersRoutes.post("/users", requirePermission("users.manage"), zValidator("json",
   }
 });
 
-usersRoutes.put("/users/:id", requirePermission("users.manage"), zValidator("json", userUpdateSchema), async (context) => {
+usersRoutes.put("/users/:id", requirePermission("users.manage"), validateJson(userUpdateSchema), async (context) => {
   const principal = getPrincipal(context);
-  const id = context.req.param("id");
+  const id = paramId(context);
   if (!id) return apiError(context, 400, "INVALID_USER_ID", "User ID is required");
   if (id === principal.activeUserId && context.req.valid("json").active === false) {
     return apiError(context, 400, "CANNOT_DEACTIVATE_SELF", "You cannot deactivate your own account");
@@ -99,15 +101,14 @@ usersRoutes.put("/users/:id", requirePermission("users.manage"), zValidator("jso
   if (before.id === principal.activeUserId && context.req.valid("json").roleId && context.req.valid("json").roleId !== before.roleId) {
     return apiError(context, 400, "CANNOT_CHANGE_OWN_ROLE", "You cannot change your own role");
   }
-  if (before.roleId === principal.roleId && context.req.valid("json").active === false) {
-    return apiError(context, 400, "OWNER_PROTECTED", "The active owner's account cannot be deactivated");
-  }
+  if (!await canManageRole(principal, before.roleId)) return roleAboveActor(context);
 
   const input = context.req.valid("json");
   if (input.roleId) {
     const [role] = await db.select().from(roles)
       .where(and(eq(roles.id, input.roleId), eq(roles.businessId, principal.businessId!))).limit(1);
     if (!role || role.name === "Owner") return apiError(context, 400, "INVALID_ROLE", "Choose an assignable role in this business");
+    if (!await canManageRole(principal, role.id)) return roleAboveActor(context);
   }
   if (input.branchIds) {
     const validBranches = await db.select({ id: branches.id }).from(branches)
@@ -121,7 +122,7 @@ usersRoutes.put("/users/:id", requirePermission("users.manage"), zValidator("jso
     const [updated] = await tx.update(appUsers).set({
       ...profileChanges,
       ...(pin ? { pinHash: await hashPin(pin) } : {}),
-      updatedAt: new Date(),
+      ...updatedByActor(principal),
     }).where(eq(appUsers.id, id)).returning();
     if (branchIds) {
       await tx.delete(userBranches).where(eq(userBranches.userId, id));
@@ -145,11 +146,12 @@ usersRoutes.put("/users/:id", requirePermission("users.manage"), zValidator("jso
 
 usersRoutes.post("/users/:id/password-reset", requirePermission("users.manage"), async (context) => {
   const principal = getPrincipal(context);
-  const id = context.req.param("id");
+  const id = paramId(context);
   if (!id) return apiError(context, 400, "INVALID_USER_ID", "User ID is required");
   const [user] = await db.select().from(appUsers)
     .where(and(eq(appUsers.id, id), eq(appUsers.businessId, principal.businessId!))).limit(1);
   if (!user || !user.active) return apiError(context, 404, "NOT_FOUND", "Active user not found");
+  if (!await canManageRole(principal, user.roleId)) return roleAboveActor(context);
   const { data, error } = await supabaseAdmin.auth.admin.generateLink({ type: "recovery", email: user.email });
   if (error || !data.properties?.action_link) {
     console.error("Failed to create user recovery link", error?.message);
@@ -177,15 +179,16 @@ usersRoutes.get("/roles", requirePermission("roles.view"), async (context) => {
   return context.json(rows.map((role) => ({ ...role, permissionKeys: byRole.get(role.id) ?? [] })));
 });
 
-usersRoutes.post("/roles", requirePermission("roles.manage"), zValidator("json", roleSchema), async (context) => {
+usersRoutes.post("/roles", requirePermission("roles.manage"), validateJson(roleSchema), async (context) => {
   const principal = getPrincipal(context);
   const input = context.req.valid("json");
   if (input.permissionKeys.includes("*")) return apiError(context, 400, "INVALID_PERMISSION", "The wildcard permission is reserved for the Owner role");
+  if (!holdsAllPermissions(principal, input.permissionKeys)) return roleAboveActor(context);
   const valid = await db.select({ key: permissions.key }).from(permissions)
     .where(inArray(permissions.key, input.permissionKeys));
   if (valid.length !== new Set(input.permissionKeys).size) return apiError(context, 400, "INVALID_PERMISSION", "One or more permission keys are invalid");
   const [role] = await db.transaction(async (tx) => {
-    const [created] = await tx.insert(roles).values({ businessId: principal.businessId!, name: input.name }).returning();
+    const [created] = await tx.insert(roles).values({ businessId: principal.businessId!, name: input.name, ...createdByActor(principal) }).returning();
     if (input.permissionKeys.length) {
       await tx.insert(rolePermissions).values(input.permissionKeys.map((permissionKey) => ({ roleId: created.id, permissionKey })));
     }
@@ -195,19 +198,20 @@ usersRoutes.post("/roles", requirePermission("roles.manage"), zValidator("json",
   return context.json({ ...role, permissionKeys: input.permissionKeys }, 201);
 });
 
-usersRoutes.put("/roles/:id", requirePermission("roles.manage"), zValidator("json", roleSchema), async (context) => {
+usersRoutes.put("/roles/:id", requirePermission("roles.manage"), validateJson(roleSchema), async (context) => {
   const principal = getPrincipal(context);
   const input = context.req.valid("json");
-  const id = context.req.param("id");
+  const id = paramId(context);
   if (input.permissionKeys.includes("*")) return apiError(context, 400, "INVALID_PERMISSION", "The wildcard permission is reserved for the Owner role");
   const [before] = await db.select().from(roles)
     .where(and(eq(roles.id, id), eq(roles.businessId, principal.businessId!))).limit(1);
   if (!before || before.isSystem) return apiError(context, 404, "NOT_FOUND", "Editable role not found");
+  if (!holdsAllPermissions(principal, input.permissionKeys) || !await canManageRole(principal, id)) return roleAboveActor(context);
   const valid = await db.select({ key: permissions.key }).from(permissions)
     .where(inArray(permissions.key, input.permissionKeys));
   if (valid.length !== new Set(input.permissionKeys).size) return apiError(context, 400, "INVALID_PERMISSION", "One or more permission keys are invalid");
   await db.transaction(async (tx) => {
-    await tx.update(roles).set({ name: input.name, updatedAt: new Date() }).where(eq(roles.id, id));
+    await tx.update(roles).set({ name: input.name, ...updatedByActor(principal) }).where(eq(roles.id, id));
     await tx.delete(rolePermissions).where(eq(rolePermissions.roleId, id));
     if (input.permissionKeys.length) {
       await tx.insert(rolePermissions).values(input.permissionKeys.map((permissionKey) => ({ roleId: id, permissionKey })));

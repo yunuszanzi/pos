@@ -1,0 +1,302 @@
+import { describe, expect, it } from "vitest";
+import { buildCreditNoteReceipt, buildGoodsReceiptReceipt, buildPaymentReceipt, buildPurchaseBillReceipt, buildPurchaseOrderReceipt, buildPurchaseReturnReceipt, buildSupplierPaymentReceipt, buildReceipt, buildStatementReceipt, formatDay, formatDocumentDate, receiptPageCss, type ReceiptBusiness, type ReceiptCreditNote, type ReceiptInvoice, type ReceiptPayment } from "../../shared/receipt";
+
+const business: ReceiptBusiness = {
+  tradeName: "SGA Balloons", legalName: "SGA Balloons (Pvt) Ltd", address: "Shop 4, Saddar, Karachi", phone: "021-111", ntn: "1234567-8", strn: null, receiptFooter: "",
+};
+const options = { business, dateFormat: "dd/MM/yyyy", timezone: "Asia/Karachi" };
+
+const invoice: ReceiptInvoice = {
+  number: "INV-KHI-000042",
+  postedAt: "2026-11-08T09:35:00.000Z", // 14:35 in Karachi (UTC+5)
+  cashierName: "Ayesha", terminalName: "Register 1", branchName: "Main Branch", taxMode: "inclusive",
+  grossPaisa: 5000, lineDiscountPaisa: 0, invoiceDiscountPaisa: 250, taxPaisa: 724, roundingPaisa: -5, totalPaisa: 4745, paidPaisa: 4745, changePaisa: 255, balancePaisa: 0,
+  lines: [
+    { productName: "Red Balloon", variantName: "", sku: "BAL-RED", unitName: "Pack", quantity: "2.000", unitPricePaisa: 1500, lineDiscountPaisa: 0, invoiceDiscountSharePaisa: 100, taxRateBps: 1800, taxPaisa: 442, totalPaisa: 2900 },
+    { productName: "Ribbon", variantName: "Gold", sku: "RIB-G", unitName: "Piece", quantity: "4", unitPricePaisa: 500, lineDiscountPaisa: 0, invoiceDiscountSharePaisa: 150, taxRateBps: 0, taxPaisa: 0, totalPaisa: 1850 },
+  ],
+  payments: [
+    { methodName: "Cash", amountPaisa: 2745, tenderedPaisa: 3000, changePaisa: 255, reference: "" },
+    { methodName: "JazzCash", amountPaisa: 2000, tenderedPaisa: 2000, changePaisa: 0, reference: "JC-9" },
+  ],
+};
+
+describe("receipt page css", () => {
+  it("sets the paper for each format", () => {
+    expect(receiptPageCss("pos80")).toContain("80mm auto");
+    expect(receiptPageCss("pos58")).toContain("58mm auto");
+    expect(receiptPageCss("a4")).toContain("size: A4");
+    expect(receiptPageCss("a5")).toContain("size: A5");
+  });
+});
+
+describe("document dates", () => {
+  it("shows the business's local time, not the browser's", () => {
+    expect(formatDocumentDate(invoice.postedAt, "dd/MM/yyyy", "Asia/Karachi")).toBe("08/11/2026 14:35");
+    expect(formatDocumentDate(invoice.postedAt, "MM/dd/yyyy", "Asia/Karachi")).toBe("11/08/2026 14:35");
+    expect(formatDocumentDate(invoice.postedAt, "yyyy-MM-dd", "Asia/Karachi")).toBe("2026-11-08 14:35");
+    expect(formatDocumentDate("2026-11-08T20:30:00.000Z", "dd/MM/yyyy", "Asia/Karachi")).toBe("09/11/2026 01:30");
+  });
+});
+
+describe("receipt model", () => {
+  const model = buildReceipt(invoice, "pos80", options);
+
+  it("carries the identity, number and who rang it up", () => {
+    expect(model).toMatchObject({ title: "SALES RECEIPT", number: "INV-KHI-000042", dateText: "08/11/2026 14:35", cashier: "Ayesha", terminal: "Register 1", duplicateBanner: null });
+    expect(model.headerLines).toEqual(["Main Branch", "Shop 4, Saddar, Karachi", "Tel 021-111", "NTN 1234567-8"]);
+  });
+
+  it("lists lines with exact quantities, shares of the bill discount and money to 2 decimals", () => {
+    expect(model.lines[0]).toEqual({ name: "Red Balloon", detail: "BAL-RED · Pack · tax 18%", quantity: "2", unitPrice: "Rs 15.00", discount: "-Rs 1.00", total: "Rs 29.00" });
+    expect(model.lines[1]).toMatchObject({ name: "Ribbon — Gold", quantity: "4", discount: "-Rs 1.50", detail: "RIB-G · Piece" });
+  });
+
+  it("shows the totals in order, with discounts, tax, rounding and the total last", () => {
+    expect(model.totals).toEqual([
+      { label: "Subtotal", value: "Rs 50.00" },
+      { label: "Bill discount", value: "-Rs 2.50" },
+      { label: "Tax (included)", value: "Rs 7.24" },
+      { label: "Rounding", value: "-Rs 0.05" },
+      { label: "TOTAL", value: "Rs 47.45", strong: true },
+    ]);
+  });
+
+  it("shows what was handed over for each method, references, and the change", () => {
+    expect(model.payments).toEqual([
+      { label: "Cash", value: "Rs 30.00" },
+      { label: "JazzCash (JC-9)", value: "Rs 20.00" },
+      { label: "Change", value: "Rs 2.55", strong: true },
+    ]);
+  });
+
+  it("summarises tax by rate", () => {
+    expect(model.taxRows).toEqual([
+      { rate: "0%", taxable: "Rs 18.50", tax: "Rs 0.00" },
+      { rate: "18%", taxable: "Rs 24.58", tax: "Rs 4.42" },
+    ]);
+  });
+
+  it("marks a reprint as a duplicate, and sheets as invoices", () => {
+    const copy = buildReceipt(invoice, "a4", { ...options, duplicate: { copyNumber: 2 } });
+    expect(copy.duplicateBanner).toBe("DUPLICATE — copy 2, not the original");
+    expect(copy.title).toBe("SALES INVOICE");
+    expect(copy.number).toBe(model.number);
+    expect(copy.totals).toEqual(model.totals);
+  });
+
+  it("uses the shop's footer when it has one, and says what is still owed", () => {
+    const owed = buildReceipt({ ...invoice, balancePaisa: 500, changePaisa: 0 }, "pos58", { business: { ...business, receiptFooter: "No returns without receipt\nWelcome again" }, dateFormat: "dd/MM/yyyy", timezone: "Asia/Karachi" });
+    expect(owed.footer).toEqual(["No returns without receipt", "Welcome again"]);
+    expect(owed.payments.at(-1)).toEqual({ label: "Balance due", value: "Rs 5.00", strong: true });
+    expect(model.footer).toEqual(["Thank you for shopping with us."]);
+  });
+});
+
+describe("khata on a sales receipt", () => {
+  it("names the customer and shows what they owe after the sale, or the credit they hold", () => {
+    const owing = buildReceipt({ ...invoice, customerName: "Ali Traders", customerBalancePaisa: 30_000, balancePaisa: 5000, paidPaisa: 4245 }, "pos80", options);
+    expect(owing.customer).toBe("Ali Traders");
+    expect(owing.meta.at(-1)).toEqual({ label: "Customer", value: "Ali Traders" });
+    expect(owing.payments.slice(-2)).toEqual([
+      { label: "Balance due", value: "Rs 50.00", strong: true },
+      { label: "Account balance (khata)", value: "Rs 300.00" },
+    ]);
+    const credit = buildReceipt({ ...invoice, customerName: "Ali Traders", customerBalancePaisa: -1250 }, "pos80", options);
+    expect(credit.payments.at(-1)).toEqual({ label: "Credit on account", value: "Rs 12.50" });
+    // A walk-in's receipt has no customer rows at all.
+    const walkIn = buildReceipt(invoice, "pos80", options);
+    expect(walkIn.customer).toBeNull();
+    expect(walkIn.meta.map((row) => row.label)).toEqual(["No.", "Date", "Cashier", "Till"]);
+  });
+});
+
+describe("payment receipt", () => {
+  const payment: ReceiptPayment = {
+    number: "RCT-KHI-000007", postedAt: "2026-11-08T09:35:00.000Z", receivedBy: "Ayesha", branchName: "Main Branch", customerName: "Ali Traders",
+    methodName: "JazzCash", amountPaisa: 15_000, reference: "JC-77", note: "", customerBalancePaisa: 45_000,
+    allocations: [{ number: "INV-KHI-000001", amountPaisa: 10_000 }, { number: "INV-KHI-000002", amountPaisa: 4_000 }],
+  };
+
+  it("shows what was received, which invoices it settled, any left on account, and what is still owed", () => {
+    const model = buildPaymentReceipt(payment, options);
+    expect(model).toMatchObject({ title: "PAYMENT RECEIPT", number: "RCT-KHI-000007", customer: "Ali Traders", lines: [], taxRows: [], footer: ["Thank you."] });
+    expect(model.meta).toEqual([
+      { label: "No.", value: "RCT-KHI-000007" }, { label: "Date", value: "08/11/2026 14:35" }, { label: "Customer", value: "Ali Traders" }, { label: "Received by", value: "Ayesha" },
+    ]);
+    expect(model.totals).toEqual([{ label: "JazzCash (JC-77)", value: "Rs 150.00" }, { label: "RECEIVED", value: "Rs 150.00", strong: true }]);
+    expect(model.payments).toEqual([
+      { label: "Against INV-KHI-000001", value: "Rs 100.00" },
+      { label: "Against INV-KHI-000002", value: "Rs 40.00" },
+      { label: "On account", value: "Rs 10.00" },
+      { label: "Balance still owed", value: "Rs 450.00", strong: true },
+    ]);
+  });
+
+  it("shows credit when the customer has paid ahead, and marks a copy as a duplicate", () => {
+    const model = buildPaymentReceipt({ ...payment, allocations: [], customerBalancePaisa: -15_000 }, { ...options, duplicate: { copyNumber: 2 } });
+    expect(model.duplicateBanner).toBe("DUPLICATE — copy 2, not the original");
+    expect(model.payments).toEqual([{ label: "On account", value: "Rs 150.00" }, { label: "Credit on account", value: "Rs 150.00", strong: true }]);
+  });
+});
+
+describe("credit note", () => {
+  const note: ReceiptCreditNote = {
+    number: "INV-KHI-R-000003", postedAt: "2026-11-08T09:35:00.000Z", cashierName: "Ayesha", terminalName: "Register 1", branchName: "Main Branch", taxMode: "inclusive",
+    invoiceNumber: "INV-KHI-000042", customerName: "Ali Traders", customerBalancePaisa: 1_000, reason: "Wrong colour",
+    grossPaisa: 3_000, lineDiscountPaisa: 0, invoiceDiscountPaisa: 100, taxPaisa: 442, roundingPaisa: 0, totalPaisa: 2_900,
+    refundMethodName: "Cash", refundPaisa: 900, refundReference: "", accountCreditPaisa: 2_000,
+    lines: [{ productName: "Red Balloon", variantName: "", sku: "BAL-RED", unitName: "Pack", quantity: "2", unitPricePaisa: 1500, lineDiscountPaisa: 0, invoiceDiscountSharePaisa: 100, taxRateBps: 1800, taxPaisa: 442, totalPaisa: 2900, restockTo: "damaged" }],
+  };
+
+  it("names the bill it came from, what was given back, and where the money went", () => {
+    const model = buildCreditNoteReceipt(note, options);
+    expect(model).toMatchObject({ title: "CREDIT NOTE", number: "INV-KHI-R-000003", customer: "Ali Traders", footer: ["Thank you."] });
+    expect(model.meta).toEqual([
+      { label: "No.", value: "INV-KHI-R-000003" }, { label: "Date", value: "08/11/2026 14:35" }, { label: "Invoice", value: "INV-KHI-000042" },
+      { label: "Cashier", value: "Ayesha" }, { label: "Till", value: "Register 1" }, { label: "Customer", value: "Ali Traders" }, { label: "Reason", value: "Wrong colour" },
+    ]);
+    expect(model.lines).toEqual([{ name: "Red Balloon", detail: "BAL-RED · Pack · tax 18% · damaged", quantity: "2", unitPrice: "Rs 15.00", discount: "-Rs 1.00", total: "Rs 29.00" }]);
+    expect(model.totals.at(-1)).toEqual({ label: "CREDIT TOTAL", value: "Rs 29.00", strong: true });
+    expect(model.payments).toEqual([
+      { label: "Refunded — Cash", value: "Rs 9.00", strong: true }, { label: "Credited to account", value: "Rs 20.00", strong: true },
+      { label: "Account balance (khata)", value: "Rs 10.00" },
+    ]);
+    expect(model.taxRows).toEqual([{ rate: "18%", taxable: "Rs 24.58", tax: "Rs 4.42" }]);
+  });
+
+  it("says so when there was no bill, and shows store credit and a duplicate marker", () => {
+    const model = buildCreditNoteReceipt({ ...note, invoiceNumber: null, customerBalancePaisa: -2_000, refundPaisa: 0, accountCreditPaisa: 2_900, reason: "" }, { ...options, duplicate: { copyNumber: 3 } });
+    expect(model.duplicateBanner).toBe("DUPLICATE — copy 3, not the original");
+    expect(model.meta).toContainEqual({ label: "Invoice", value: "none (no receipt)" });
+    expect(model.meta.some((row) => row.label === "Reason")).toBe(false);
+    expect(model.payments).toEqual([{ label: "Credited to account", value: "Rs 29.00", strong: true }, { label: "Credit on account", value: "Rs 20.00" }]);
+  });
+});
+
+describe("customer statement", () => {
+  const summary = { openingPaisa: 10_000, invoicesPaisa: 50_000, paymentsPaisa: 30_000, returnsPaisa: 10_000, refundsPaisa: 0, otherPaisa: 0, closingPaisa: 20_000 };
+  const statement = {
+    customerName: "Ali Traders", customerPhone: "0300-5551234", customerAddress: "", from: "2026-11-01", to: "2026-11-30", summary,
+    entries: [
+      { at: "2026-11-02T08:00:00Z", docNumber: "INV-KHI-000001", memo: "Invoice", debitPaisa: 50_000, creditPaisa: 0, balanceAfterPaisa: 60_000 },
+      { at: "2026-11-09T08:00:00Z", docNumber: "RCT-KHI-000001", memo: "Cash", debitPaisa: 0, creditPaisa: 30_000, balanceAfterPaisa: 30_000 },
+    ],
+  };
+
+  it("lists the entries and ends on the balance due", () => {
+    const model = buildStatementReceipt(statement, options);
+    expect(model.title).toBe("STATEMENT OF ACCOUNT");
+    expect(model.meta).toContainEqual({ label: "Period", value: "2026-11-01 to 2026-11-30" });
+    expect(model.statementRows).toEqual([
+      { date: "02/11/2026", document: "INV-KHI-000001", memo: "Invoice", debit: "Rs 500.00", credit: "", balance: "Rs 600.00" },
+      { date: "09/11/2026", document: "RCT-KHI-000001", memo: "Cash", debit: "", credit: "Rs 300.00", balance: "Rs 300.00" },
+    ]);
+    expect(model.totals).toEqual([
+      { label: "Opening balance", value: "Rs 100.00" }, { label: "Invoices", value: "Rs 500.00" }, { label: "Payments received", value: "-Rs 300.00" },
+      { label: "Returns", value: "-Rs 100.00" }, { label: "BALANCE DUE", value: "Rs 200.00", strong: true },
+    ]);
+  });
+
+  it("shows credit the customer holds as Cr, and refunds and adjustments only when there are some", () => {
+    const model = buildStatementReceipt({ ...statement, entries: [], summary: { ...summary, openingPaisa: -500, refundsPaisa: 400, otherPaisa: -100, closingPaisa: -9_000 } }, options);
+    expect(model.totals[0]).toEqual({ label: "Opening balance", value: "Rs 5.00 Cr" });
+    expect(model.totals.map((row) => row.label)).toEqual(["Opening balance", "Invoices", "Payments received", "Returns", "Refunds paid out", "Opening balance / adjustments", "CREDIT WITH US"]);
+    expect(model.totals.at(-1)).toEqual({ label: "CREDIT WITH US", value: "Rs 90.00", strong: true });
+  });
+});
+
+describe("purchase documents", () => {
+  const lines = [
+    { productName: "Latex Balloon", variantName: "Red", sku: "BAL-RED", unitName: "Carton", quantity: "2", unitCostPaisa: 320_000, lineTotalPaisa: 640_000 },
+    { productName: "Ribbon", variantName: "", sku: "RIB-1", unitName: "Piece", quantity: "12.500", unitCostPaisa: 2_500, lineTotalPaisa: 31_250 },
+  ];
+  const order = { number: "PO-KHI-000007", orderDate: "2026-11-09", expectedDate: "2026-11-20", supplierName: "Karachi Balloon Mills", branchName: "Karachi", locationName: "Main store", note: "Deliver before Eid", totalPaisa: 671_250, lines };
+
+  it("formats a day in the business's date style", () => {
+    expect(formatDay("2026-11-09", "dd/MM/yyyy")).toBe("09/11/2026");
+    expect(formatDay("2026-11-09", "MM/dd/yyyy")).toBe("11/09/2026");
+    expect(formatDay("2026-11-09", "yyyy-MM-dd")).toBe("2026-11-09");
+  });
+
+  it("prints a purchase order with its items, prices and total", () => {
+    const model = buildPurchaseOrderReceipt(order, options);
+    expect(model.title).toBe("PURCHASE ORDER");
+    expect(model.meta).toEqual([
+      { label: "No.", value: "PO-KHI-000007" }, { label: "Date", value: "09/11/2026" }, { label: "To", value: "Karachi Balloon Mills" },
+      { label: "Expected", value: "20/11/2026" }, { label: "Deliver to", value: "Main store" },
+    ]);
+    expect(model.lines).toEqual([
+      { name: "Latex Balloon — Red", detail: "BAL-RED · Carton", quantity: "2", unitPrice: "Rs 3,200.00", discount: null, total: "Rs 6,400.00" },
+      { name: "Ribbon", detail: "RIB-1 · Piece", quantity: "12.5", unitPrice: "Rs 25.00", discount: null, total: "Rs 312.50" },
+    ]);
+    expect(model.totals).toEqual([{ label: "ORDER TOTAL", value: "Rs 6,712.50", strong: true }]);
+    expect(model.footer).toEqual(["Deliver before Eid"]);
+  });
+
+  it("leaves prices and totals off when the reader may not see costs", () => {
+    const { totalPaisa, ...rest } = order;
+    void totalPaisa;
+    const model = buildPurchaseOrderReceipt({ ...rest, lines: lines.map(({ unitCostPaisa, lineTotalPaisa, ...line }) => { void unitCostPaisa; void lineTotalPaisa; return line; }) }, options);
+    expect(model.lines.every((line) => line.unitPrice === "" && line.total === "")).toBe(true);
+    expect(model.totals).toEqual([]);
+  });
+
+  it("prints a goods receipt with the order, the supplier's reference and who received it", () => {
+    const model = buildGoodsReceiptReceipt({
+      number: "GRN-KHI-000003", receivedAt: "2026-11-09T09:30:00Z", supplierName: "Karachi Balloon Mills", branchName: "Karachi", locationName: "Main store",
+      orderNumber: "PO-KHI-000007", supplierRef: "DC-4411", receivedBy: "Store Keeper", note: "", totalPaisa: 640_000, lines: [lines[0]],
+    }, { ...options, duplicate: { copyNumber: 2 } });
+    expect(model.title).toBe("GOODS RECEIVED");
+    expect(model.duplicateBanner).toBe("DUPLICATE — copy 2, not the original");
+    expect(model.meta).toEqual(expect.arrayContaining([{ label: "Order", value: "PO-KHI-000007" }, { label: "Supplier ref", value: "DC-4411" }, { label: "Received by", value: "Store Keeper" }]));
+    expect(model.totals).toEqual([{ label: "VALUE RECEIVED", value: "Rs 6,400.00", strong: true }]);
+  });
+
+  it("prints a supplier bill with freight, input tax, the supplier's invoice number and the due date", () => {
+    const model = buildPurchaseBillReceipt({
+      number: "BILL-KHI-000002", supplierInvoiceNo: "KBM-1001", supplierName: "Karachi Balloon Mills", branchName: "Karachi", billDate: "2026-11-09", dueDate: "2026-12-09", note: "",
+      subtotalPaisa: 640_000, chargesPaisa: 40_000, taxPaisa: 115_200, totalPaisa: 795_200,
+      lines: [{ productName: "Latex Balloon", variantName: "Red", sku: "BAL-RED", unitName: "Carton", quantity: "2", unitCostPaisa: 320_000, lineValuePaisa: 640_000 }],
+      charges: [{ description: "Freight", amountPaisa: 40_000 }],
+    }, options);
+    expect(model.title).toBe("SUPPLIER BILL");
+    expect(model.meta).toEqual(expect.arrayContaining([{ label: "Their invoice", value: "KBM-1001" }, { label: "Due", value: "09/12/2026" }]));
+    expect(model.lines[0]).toMatchObject({ quantity: "2", unitPrice: "Rs 3,200.00", total: "Rs 6,400.00" });
+    expect(model.totals).toEqual([
+      { label: "Items", value: "Rs 6,400.00" }, { label: "Freight", value: "Rs 400.00" }, { label: "Input tax", value: "Rs 1,152.00" }, { label: "BILL TOTAL", value: "Rs 7,952.00", strong: true },
+    ]);
+  });
+
+it("prints a payment voucher with the bills it settled and what is still owed, or the advance held", () => {
+    const payment = {
+      number: "SPY-KHI-000004", postedAt: "2026-11-09T09:30:00Z", paidBy: "Owner", branchName: "Karachi", supplierName: "Karachi Balloon Mills", methodName: "Bank transfer",
+      amountPaisa: 60_000, reference: "TRF-9001", note: "", supplierBalancePaisa: 20_000,
+      allocations: [{ number: "BILL-KHI-000001", supplierInvoiceNo: "KBM-1001", amountPaisa: 50_000 }, { number: "BILL-KHI-000002", supplierInvoiceNo: "KBM-1002", amountPaisa: 10_000 }],
+    };
+    const owing = buildSupplierPaymentReceipt(payment, options);
+    expect(owing.title).toBe("PAYMENT VOUCHER");
+    expect(owing.totals).toEqual([{ label: "Bank transfer (TRF-9001)", value: "Rs 600.00" }, { label: "PAID", value: "Rs 600.00", strong: true }]);
+    expect(owing.payments).toEqual([
+      { label: "Against KBM-1001 (BILL-KHI-000001)", value: "Rs 500.00" }, { label: "Against KBM-1002 (BILL-KHI-000002)", value: "Rs 100.00" },
+      { label: "Still owed to supplier", value: "Rs 200.00", strong: true },
+    ]);
+    const advance = buildSupplierPaymentReceipt({ ...payment, allocations: [{ number: "BILL-KHI-000001", supplierInvoiceNo: "KBM-1001", amountPaisa: 50_000 }], supplierBalancePaisa: -10_000 }, options);
+    expect(advance.payments).toEqual([
+      { label: "Against KBM-1001 (BILL-KHI-000001)", value: "Rs 500.00" }, { label: "Advance (not against a bill)", value: "Rs 100.00" },
+      { label: "Advance held with supplier", value: "Rs 100.00", strong: true },
+    ]);
+  });
+
+  it("prints a debit note with the tax reversed and where the credit went", () => {
+    const model = buildPurchaseReturnReceipt({
+      number: "PRT-KHI-000001", postedAt: "2026-11-09T09:30:00Z", supplierName: "Karachi Balloon Mills", branchName: "Karachi", receiptNumber: "GRN-KHI-000003", reason: "Damaged in transit",
+      subtotalPaisa: 36_000, taxPaisa: 6_480, totalPaisa: 42_480, settledBillsPaisa: 30_000, onAccountPaisa: 12_480,
+      lines: [{ productName: "Latex Balloon", variantName: "Red", sku: "BAL-RED", unitName: "Piece", quantity: "30", unitCostPaisa: 1_200, lineValuePaisa: 36_000 }],
+    }, options);
+    expect(model.title).toBe("DEBIT NOTE");
+    expect(model.meta).toEqual(expect.arrayContaining([{ label: "Goods receipt", value: "GRN-KHI-000003" }, { label: "Reason", value: "Damaged in transit" }]));
+    expect(model.totals).toEqual([{ label: "Goods returned", value: "Rs 360.00" }, { label: "Input tax reversed", value: "Rs 64.80" }, { label: "DEBIT TOTAL", value: "Rs 424.80", strong: true }]);
+    expect(model.payments).toEqual([{ label: "Taken off bills", value: "Rs 300.00" }, { label: "Credit on account", value: "Rs 124.80" }]);
+  });
+});
