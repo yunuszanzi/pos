@@ -5,6 +5,7 @@ import { apiError } from "./lib/http";
 import { HTTPException } from "hono/http-exception";
 import { auditRoutes } from "./modules/audit/routes";
 import { dashboardRoutes } from "./modules/reports/dashboard";
+import { fbrSettingsRoutes } from "./modules/fbr/settings";
 import { dayClosingRoutes } from "./modules/shifts/dayClosing";
 import { authRoutes } from "./modules/auth/routes";
 import { catalogueRoutes } from "./modules/catalogue/routes";
@@ -69,6 +70,7 @@ app.route("/api/v1", accountRoutes);
 app.route("/api/v1", expenseRoutes);
 app.route("/api/v1", dashboardRoutes);
 app.route("/api/v1", dayClosingRoutes);
+app.route("/api/v1", fbrSettingsRoutes);
 app.route("/api/v1", returnRoutes);
 
 app.notFound((context) => apiError(context, 404, "NOT_FOUND", "API route not found"));
