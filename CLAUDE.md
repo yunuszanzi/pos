@@ -3,6 +3,7 @@
 Generic POS + inventory for Pakistani traders (first client: SGA Balloons, Karachi).
 Specs: docs/srs.md (what) and docs/technical-plan.md (how, versions). Read the relevant
 sections before any task. Work only on the version named in the task.
+Operations: docs/runbook.md, docs/go-live.md (checklist and known gaps), docs/security-review.md, docs/requirements-trace.md, docs/user-guide.md.
 
 ## Stack
 React 18 + Vite + TypeScript, Tailwind + shadcn/ui, TanStack Query, Zustand,
