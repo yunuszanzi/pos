@@ -59,6 +59,7 @@ export function SuppliersPage() {
       </div>
       {canManage && <div className="button-row">
         <Link className="button primary" to="/suppliers/new">New supplier</Link>
+        <Link className="button secondary" to="/suppliers/import">Import suppliers</Link>
         {canLedger && <Link className="button secondary" to="/suppliers/opening-payables">Opening payables</Link>}
       </div>}
       {suppliers.isError && <ErrorMessage>{suppliers.error.message}</ErrorMessage>}

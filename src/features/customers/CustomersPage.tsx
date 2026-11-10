@@ -73,6 +73,7 @@ export function CustomersPage() {
       {canManage && <div className="button-row">
         <Link className="button primary" to="/customers/new">New customer</Link>
         <Link className="button secondary" to="/customers/setup">Groups &amp; areas</Link>
+        <Link className="button secondary" to="/customers/import">Import customers</Link>
         {canLedger && <Link className="button secondary" to="/customers/opening-balances">Opening balances</Link>}
       </div>}
       {customers.isError && <ErrorMessage>{customers.error.message}</ErrorMessage>}

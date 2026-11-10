@@ -87,6 +87,7 @@ const TransferPage = lazy(() => import("../features/transfers/TransferPage").the
 const StockCountsPage = lazy(() => import("../features/stock-counts/StockCountsPage").then(({ StockCountsPage: Page }) => ({ default: Page })));
 const StockCountPage = lazy(() => import("../features/stock-counts/StockCountPage").then(({ StockCountPage: Page }) => ({ default: Page })));
 const OfflineSalesPage = lazy(() => import("../features/offline-sales/OfflineSalesPage").then(({ OfflineSalesPage: Page }) => ({ default: Page })));
+const PartyImportPage = lazy(() => import("../features/customers/PartyImportPage").then(({ PartyImportPage: Page }) => ({ default: Page })));
 const PosPage = lazy(() => import("../pos/PosPage").then(({ PosPage: Page }) => ({ default: Page })));
 const ValuationPage = lazy(() => import("../features/stock/ValuationPage").then(({ ValuationPage: Page }) => ({ default: Page })));
 
@@ -122,6 +123,8 @@ const appRoutes: AppRoute[] = [
   { path: "/customers/:id/statement", label: "Customer statement", permission: "customers.ledger", element: <CustomerStatementPage />, nav: false },
   { path: "/suppliers", label: "Suppliers", permission: "suppliers.view", element: <SuppliersPage /> },
   { path: "/suppliers/new", label: "New supplier", permission: "suppliers.manage", element: <SupplierFormPage />, nav: false },
+  { path: "/customers/import", label: "Import customers", permission: "customers.manage", element: <PartyImportPage kind="customer" />, nav: false },
+  { path: "/suppliers/import", label: "Import suppliers", permission: "suppliers.manage", element: <PartyImportPage kind="supplier" />, nav: false },
   { path: "/suppliers/opening-payables", label: "Opening payables", permission: "suppliers.manage", element: <OpeningPayablesPage />, nav: false },
   { path: "/suppliers/:id/ledger", label: "Supplier ledger", permission: "suppliers.ledger", element: <SupplierLedgerPage />, nav: false },
   { path: "/suppliers/:id", label: "Edit supplier", permission: "suppliers.manage", element: <SupplierFormPage />, nav: false },
