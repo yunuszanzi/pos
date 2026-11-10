@@ -27,7 +27,7 @@ const enter = (context: Setup, id: string, entries: Array<{ variantId: string; u
 const act = (context: Setup, id: string, action: string, body: Record<string, unknown> = {}) =>
   callApi(context.business.ownerToken, "POST", `/stock-counts/${id}/${action}`, { body, idempotencyKey: key() });
 const onHand = async (context: Setup, sku: string) => (await callApi(context.business.ownerToken, "GET", "/stock?pageSize=100")).body.data.find((row: { sku: string }) => row.sku === sku).onHand as string;
-const line = (count: { lines: { data: Array<{ sku: string }> } }, sku: string) => count.lines.data.find((row) => row.sku === sku) as any;
+const line = (count: { lines: { data: Array<{ sku: string }> } }, sku: string) => count.lines.data.find((row) => row.sku === sku) as Record<string, unknown>;
 
 integration("stock counts", { timeout: 300_000 }, () => {
   it("freezes the books' figures, takes counts, and shows the variance before anything changes", async () => {

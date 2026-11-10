@@ -133,7 +133,6 @@ const product = (id: string, name: string, pricePaisa: number, taxCategoryId: st
 } as unknown as Product);
 const reference = { units: [{ id: "u-pc", name: "Piece" }], taxCategories: [{ id: "gst", rateBps: 1800 }] };
 const catalogue = new CatalogueIndex([product("a", "Red", 500, "gst"), product("b", "Blue", 250, null)], reference as never);
-const entryOf = (id: string) => catalogue.get(`${id}-v`, "u-pc")!;
 const cart = (lines: Cart["lines"], extra: Partial<Cart> = {}): Cart => ({ lines, invoiceDiscount: null, customerId: null, ...extra });
 const line = (id: string, quantityMilli: number, extra: Partial<Cart["lines"][number]> = {}): Cart["lines"][number] => ({ key: `${id}-k`, variantId: `${id}-v`, unitId: "u-pc", quantityMilli, priceOverridePaisa: null, discount: null, ...extra });
 
