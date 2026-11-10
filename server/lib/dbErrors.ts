@@ -29,6 +29,8 @@ const duplicateMessages: Record<string, (value: string) => [code: string, messag
   suppliers_name_uidx: () => ["NAME_EXISTS", "A supplier with this name already exists"],
   purchase_bills_supplier_invoice_idx: () => ["BILL_EXISTS", "This supplier invoice number has already been entered for this supplier"],
   cheques_identity_idx: () => ["CHEQUE_EXISTS", "This cheque has already been entered"],
+  accounts_name_uidx: () => ["NAME_EXISTS", "An account with this name already exists"],
+  expense_categories_name_uidx: () => ["NAME_EXISTS", "An expense category with this name already exists"],
   price_lists_name_uidx: () => ["NAME_EXISTS", "A price list with this name already exists"],
 };
 

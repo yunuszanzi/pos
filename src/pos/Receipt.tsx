@@ -94,6 +94,7 @@ export function Receipt({ model, format }: { model: ReceiptModel; format: PrintF
 export function ReceiptPrinter({ job, onDone }: { job: PrintJob | null; onDone: () => void }) {
   useEffect(() => {
     if (!job) return;
+    document.body.classList.add("printing-receipt");
     // Two frames, so the receipt is laid out before the browser takes its picture of the page.
     let second = 0;
     const first = requestAnimationFrame(() => {
@@ -103,6 +104,7 @@ export function ReceiptPrinter({ job, onDone }: { job: PrintJob | null; onDone: 
       });
     });
     return () => {
+      document.body.classList.remove("printing-receipt");
       cancelAnimationFrame(first);
       cancelAnimationFrame(second);
     };

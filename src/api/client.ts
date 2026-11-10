@@ -16,7 +16,8 @@ export async function requestApi<T>(path: string, init: RequestInit = {}): Promi
   if (!session) throw new Error("Please sign in again");
   const headers = new Headers(init.headers);
   headers.set("Authorization", `Bearer ${session.access_token}`);
-  headers.set("Content-Type", "application/json");
+  // A file upload sets its own boundary; every other request is JSON.
+  if (!(init.body instanceof FormData)) headers.set("Content-Type", "application/json");
   const terminalId = localStorage.getItem("pos.terminalId");
   const pinSession = sessionStorage.getItem("pos.pinSession");
   if (terminalId) headers.set("X-Terminal-Id", terminalId);

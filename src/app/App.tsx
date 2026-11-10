@@ -44,6 +44,16 @@ const DeliveryChallanPage = lazy(() => import("../features/delivery/DeliveryChal
 const InvoicesPage = lazy(() => import("../features/invoices/InvoicesPage").then(({ InvoicesPage: Page }) => ({ default: Page })));
 const InvoicePage = lazy(() => import("../features/invoices/InvoicePage").then(({ InvoicePage: Page }) => ({ default: Page })));
 const PublicDocumentPage = lazy(() => import("../features/public/PublicDocumentPage").then(({ PublicDocumentPage: Page }) => ({ default: Page })));
+const AccountsPage = lazy(() => import("../features/accounts/AccountsPage").then(({ AccountsPage: Page }) => ({ default: Page })));
+const AccountPage = lazy(() => import("../features/accounts/AccountPage").then(({ AccountPage: Page }) => ({ default: Page })));
+const ExpensesPage = lazy(() => import("../features/expenses/ExpensesPage").then(({ ExpensesPage: Page }) => ({ default: Page })));
+const ExpenseFormPage = lazy(() => import("../features/expenses/ExpenseFormPage").then(({ ExpenseFormPage: Page }) => ({ default: Page })));
+const ExpensePage = lazy(() => import("../features/expenses/ExpensePage").then(({ ExpensePage: Page }) => ({ default: Page })));
+const ReportsPage = lazy(() => import("../features/reports/ReportsPage").then(({ ReportsPage: Page }) => ({ default: Page })));
+const ReportPage = lazy(() => import("../features/reports/ReportPage").then(({ ReportPage: Page }) => ({ default: Page })));
+const DashboardPanel = lazy(() => import("../features/dashboard/DashboardPanel").then(({ DashboardPanel: Panel }) => ({ default: Panel })));
+const DayClosingPage = lazy(() => import("../features/cash/DayClosingPage").then(({ DayClosingPage: Page }) => ({ default: Page })));
+const DayClosingDetailPage = lazy(() => import("../features/cash/DayClosingDetailPage").then(({ DayClosingDetailPage: Page }) => ({ default: Page })));
 const SalesOrderPage = lazy(() => import("../features/sales-orders/SalesOrderPage").then(({ SalesOrderPage: Page }) => ({ default: Page })));
 const ReceiveGoodsPage = lazy(() => import("../features/purchasing/ReceiveGoodsPage").then(({ ReceiveGoodsPage: Page }) => ({ default: Page })));
 const GoodsReceiptsPage = lazy(() => import("../features/purchasing/GoodsReceiptsPage").then(({ GoodsReceiptsPage: Page }) => ({ default: Page })));
@@ -113,6 +123,13 @@ const appRoutes: AppRoute[] = [
   { path: "/invoices", label: "Invoices", permission: "invoices.view", element: <InvoicesPage /> },
   { path: "/invoices/new", label: "New invoice", permission: "invoices.create", element: <SalesOrderFormPage mode="invoice" />, nav: false },
   { path: "/invoices/:id", label: "Invoice", permission: "invoices.view", element: <InvoicePage />, nav: false },
+  { path: "/expenses", label: "Expenses", permission: "expenses.view", element: <ExpensesPage /> },
+  { path: "/expenses/new", label: "Record an expense", permission: "expenses.create", element: <ExpenseFormPage />, nav: false },
+  { path: "/expenses/:id", label: "Expense", permission: "expenses.view", element: <ExpensePage />, nav: false },
+  { path: "/day-closings", label: "Day-end closing", permission: "shifts.view_all", element: <DayClosingPage /> },
+  { path: "/day-closings/:id", label: "Day closing", permission: "shifts.view_all", element: <DayClosingDetailPage />, nav: false },
+  { path: "/accounts", label: "Accounts", permission: "accounts.view", element: <AccountsPage /> },
+  { path: "/accounts/:id", label: "Account", permission: "accounts.view", element: <AccountPage />, nav: false },
   { path: "/sales-orders", label: "Sales orders", permission: "sales_orders.view", element: <SalesOrdersPage /> },
   { path: "/sales-orders/new", label: "New sales order", permission: "sales_orders.manage", element: <SalesOrderFormPage />, nav: false },
   { path: "/sales-orders/:id", label: "Sales order", permission: "sales_orders.view", element: <SalesOrderPage />, nav: false },
@@ -139,7 +156,9 @@ const appRoutes: AppRoute[] = [
   { path: "/customers/opening-balances", label: "Customer opening balances", permission: "customers.manage", element: <OpeningBalancesPage />, nav: false },
   { path: "/customers/:id", label: "Edit customer", permission: "customers.manage", element: <CustomerFormPage />, nav: false },
   { path: "/returns", label: "Returns", permission: "sales.return", element: <ReturnsPage /> },
-  { path: "/reports/daily-sales", label: "Daily sales", permission: "reports.sales.view", element: <DailySalesPage /> },
+  { path: "/reports", label: "Reports", element: <ReportsPage /> },
+  { path: "/reports/daily-sales", label: "Daily sales", permission: "reports.sales.view", element: <DailySalesPage />, nav: false },
+  { path: "/reports/:key", label: "Report", element: <ReportPage />, nav: false },
   { path: "/users", label: "Users", permission: "users.view", element: <UsersPage /> },
   { path: "/roles", label: "Roles & permissions", permission: "roles.view", element: <RolesPage /> },
   { path: "/settings", label: "Settings", permission: "settings.view", element: <SettingsPage /> },
@@ -291,14 +310,15 @@ function Dashboard() {
   const cards = appRoutes.filter((route) => route.path !== "/" && route.nav !== false && (!route.permission || hasPermission(currentUser?.permissions ?? [], route.permission)));
   return <div className="content">
     <div className="welcome-panel">
-      <p className="eyebrow">Release v0.3 · Point of sale</p>
+      <p className="eyebrow">Release v0.7 · Reports, accounts and expenses</p>
       <h1>Welcome{currentUser?.activeUserName ? `, ${currentUser.activeUserName}` : ""}</h1>
-      <p>Products, stock and selling at the till are ready. Modules marked “Under development” in the menu arrive in later releases.</p>
+      <p>Selling, stock, customers, suppliers, quotations, orders, reports and expenses are ready. Modules marked “Under development” in the menu arrive in later releases.</p>
     </div>
+    <DashboardPanel />
     <div className="dashboard-grid">{cards.map((route) => <Link className="dashboard-card" key={route.path} to={route.path}>
       <span className="card-arrow">↗</span><strong>{route.label}</strong><small>Open workspace</small>
     </Link>)}</div>
-    <section className="foundation-note"><strong>v0.5 Suppliers and purchasing</strong><span>Next: quotations, orders and delivery · v0.6</span></section>
+    <section className="foundation-note"><strong>v0.7 Reports, dashboard and expenses</strong><span>Next: FBR integration · v0.8</span></section>
   </div>;
 }
 

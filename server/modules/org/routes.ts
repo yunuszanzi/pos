@@ -93,6 +93,7 @@ orgRoutes.post("/org/setup", validateJson(setupBusinessSchema), async (context) 
     await tx.insert(businessSettings).values({ businessId: business.id, ...authorship });
     await tx.execute(sql`SELECT seed_catalogue_defaults(${business.id}, ${authorship.createdBy})`);
     await tx.execute(sql`SELECT seed_sales_defaults(${business.id}, ${authorship.createdBy})`);
+    await tx.execute(sql`SELECT seed_expense_defaults(${business.id}, ${authorship.createdBy})`);
     await tx.insert(documentSeries).values({
       businessId: business.id,
       branchId: branch.id,
