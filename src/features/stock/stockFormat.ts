@@ -19,6 +19,8 @@ export const adjustmentReasonLabels: Record<string, string> = {
 
 export const documentLabels: Record<string, string> = {
   stock_adjustment: "Stock adjustment",
+  stock_transfer_out: "Transfer out",
+  stock_transfer_in: "Transfer in",
   goods_receipt: "Goods receipt",
   cost_adjustment: "Cost adjustment (supplier bill)",
   purchase_return: "Purchase return",

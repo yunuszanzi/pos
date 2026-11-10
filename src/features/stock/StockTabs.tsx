@@ -5,9 +5,11 @@ import { useCan } from "../../app/permissions";
 export function StockTabs() {
   const canValue = useCan("products.cost.view");
   const canOpen = useCan("inventory.opening_stock");
+  const canTransfer = useCan("transfers.view");
   const tabs = [
     { to: "/stock", label: "Stock levels", show: true },
     { to: "/stock/adjustments", label: "Adjustments", show: true },
+    { to: "/transfers", label: "Transfers", show: canTransfer },
     { to: "/stock/valuation", label: "Valuation", show: canValue },
     { to: "/stock/opening", label: "Opening stock", show: canOpen },
   ];

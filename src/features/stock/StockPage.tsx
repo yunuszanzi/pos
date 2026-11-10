@@ -7,7 +7,7 @@ import { getStockLevels } from "../../api/inventoryApi";
 import { getAllLocations } from "../../api/orgApi";
 import { ErrorMessage, PageTitle, SelectInput, TextInput } from "../../app/FormElements";
 import { useCan } from "../../app/permissions";
-import { describeStock } from "./stockFormat";
+import { describeStock, groupDigits } from "./stockFormat";
 import { StockTabs } from "./StockTabs";
 
 const pageSize = 25;
@@ -68,7 +68,7 @@ export function StockPage() {
             <td><strong>{row.productName}</strong>{row.variantName && <small className="muted"> · {row.variantName}</small>}</td>
             <td className="mono">{row.sku}</td>
             <td>{stock.main}{stock.detail && <small className="muted"> ({stock.detail})</small>}{row.low && <> <span className="status">Low</span></>}</td>
-            <td>{row.available}</td>
+            <td>{row.available}{row.inTransit !== "0" && <small className="muted block" data-testid={`in-transit-${row.sku}`}>{groupDigits(row.inTransit)} in transit</small>}</td>
             <td>{row.reorderLevel === "0" ? "—" : row.reorderLevel}</td>
             {showsValue && <td>{row.valuePaisa === undefined ? "" : formatPkr(row.valuePaisa)}</td>}
             <td className="action-cell"><Link className="text-button" to={`/stock/ledger?variantId=${row.variantId}`}>Movements</Link></td>

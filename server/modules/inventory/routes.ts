@@ -52,6 +52,8 @@ inventoryRoutes.get("/stock", view, async (context) => {
   const search = context.req.query("q")?.trim();
   const pattern = search ? `%${escapeLike(search)}%` : null;
   const locationFilter = locationId ? sql`and b.location_id = ${locationId}` : sql``;
+  // Goods sent and not yet received are on no shelf. For one location: those on their way to it.
+  const transitFilter = locationId ? sql`and t.to_location_id = ${locationId}` : sql``;
   const searchFilter = pattern
     ? sql`and (p.name ilike ${pattern} or v.sku ilike ${pattern}
         or exists (select 1 from product_units pu where pu.variant_id = v.id and pu.barcode ilike ${pattern}))`
@@ -62,6 +64,8 @@ inventoryRoutes.get("/stock", view, async (context) => {
     with levels as (
       select v.id as variant_id, v.sku, v.variant_name, p.id as product_id, p.name as product_name, p.base_unit_id,
              v.reorder_level, v.cost_paisa,
+             coalesce((select sum(tl.qty_base) from stock_transfer_lines tl join stock_transfers t on t.id = tl.transfer_id
+                       where tl.variant_id = v.id and t.status = 'dispatched' ${transitFilter}), 0) as in_transit,
              coalesce(sum(b.on_hand), 0) as on_hand,
              coalesce(sum(b.reserved), 0) as reserved,
              case when coalesce(sum(b.on_hand), 0) > 0
@@ -96,6 +100,7 @@ inventoryRoutes.get("/stock", view, async (context) => {
       baseUnitId: String(row.base_unit_id),
       onHand: quantityText(onHand),
       reserved: quantityText(reserved),
+      inTransit: quantityText(String(row.in_transit)),
       available: formatQuantity(parseSignedQuantity(onHand) - parseSignedQuantity(reserved)),
       reorderLevel: quantityText(reorderLevel),
       low: parseSignedQuantity(reorderLevel) > 0 && parseSignedQuantity(onHand) <= parseSignedQuantity(reorderLevel),
