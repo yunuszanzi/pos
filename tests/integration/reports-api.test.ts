@@ -266,4 +266,53 @@ integration("the report catalogue", { timeout: 600_000 }, () => {
     expect(book.rows.map((row) => [row.kind, row.money_in, row.money_out])).toEqual(expect.arrayContaining([["opening", 100_000, 0], ["expense", 0, 500], ["expense reversal", 500, 0]]));
     expect((await run(context, "shifts")).body.rows[0]).toMatchObject({ terminal: "Register 1", closed: "Still open" });
   });
+
+  it("acceptance 1: the dashboard's totals for the seeded day match the sales register and the daily summary", async () => {
+    const context = await seeded();
+    const board = (await callApi(context.business.ownerToken, "GET", "/dashboard")).body;
+    const register = (await run(context, "invoice-register", "pageSize=200")).body;
+    const summary = (await run(context, "sales-summary")).body;
+    const registerTotal = register.rows.reduce((sum, row) => sum + Number(row.total), 0);
+    expect(board.date).toBe(today());
+    expect(board.sales.totalPaisa).toBe(registerTotal);
+    expect(board.sales.totalPaisa).toBe(Number(summary.rows[0].total));
+    expect(board.sales.totalPaisa).toBe(8_000);
+    expect(board.sales.bills).toBe(register.total);
+    expect(board.sales).toMatchObject({ bills: 3, averageBillPaisa: 2_667, creditPaisa: 2_000, returnsPaisa: 1_000, returns: 1 });
+    // Today's profit is the profit-and-loss report's gross profit for the same day.
+    const lines = (await run(context, "profit-and-loss")).body.rows;
+    expect(board.profit).toEqual({ netSalesPaisa: lines.find((row) => row.line === "Net sales")!.amount, costPaisa: lines.find((row) => row.line === "Cost of goods sold")!.amount, grossProfitPaisa: lines.find((row) => row.line === "Gross profit")!.amount });
+    expect(board.profit.grossProfitPaisa).toBe(5_447);
+    expect(board.topProducts.map((row: { sku: string; totalPaisa: number }) => [row.sku, row.totalPaisa])).toEqual([["A", 7_000], ["T", 1_000]]);
+    expect(board.trend).toHaveLength(14);
+    expect(board.trend.at(-1)).toEqual({ day: today(), totalPaisa: 8_000, bills: 3 });
+    expect(board.trend.slice(0, 13).every((point: { totalPaisa: number }) => point.totalPaisa === 0)).toBe(true);
+    // Money in the drawer: 60.00 of cash sales less the 10.00 refunded; the bank account after the expense was reversed.
+    expect(board.cash).toEqual({ drawersPaisa: 5_000, openShifts: 1, accountsPaisa: 100_000 });
+    expect(board.receivables).toEqual({ totalPaisa: 2_000, customers: 1 });
+    expect(board.payables).toEqual({ totalPaisa: 2_360, suppliers: 1 });
+    expect(board.lowStock).toEqual({ items: 0 });
+    // Another branch's numbers are not this one's.
+    const elsewhere = (await callApi(context.business.ownerToken, "GET", `/dashboard?branchId=${crypto.randomUUID()}`)).body;
+    expect(elsewhere.sales.totalPaisa).toBe(0);
+    expect((await callApi(context.business.ownerToken, "GET", "/dashboard?branchId=nope")).status).toBe(400);
+  });
+
+  it("the dashboard sends each person only the figures they may see", async () => {
+    const context = await seeded();
+    const salesOnly = await inviteStaffWithPermissions(context.business, "Dashboard sales", ["reports.sales.view"]);
+    const board = (await callApi(salesOnly.token, "GET", "/dashboard")).body;
+    expect(Object.keys(board).sort()).toEqual(["date", "sales", "topProducts", "trend"]);
+    const cashier = await inviteTestStaff(context.business, "Cashier");
+    const till = (await callApi(cashier.token, "GET", "/dashboard")).body;
+    expect(till.sales).toBeUndefined();
+    expect(till.profit).toBeUndefined();
+    expect(till.cash).toBeUndefined();
+    expect(till.payables).toBeUndefined();
+    expect(till.receivables).toEqual({ totalPaisa: 2_000, customers: 1 });
+    expect(till.lowStock).toEqual({ items: 0 });
+    // Profit needs the profit permission even for someone who sees sales.
+    const costOnly = await inviteStaffWithPermissions(context.business, "Dashboard cost", ["reports.sales.view", "products.cost.view"]);
+    expect((await callApi(costOnly.token, "GET", "/dashboard")).body.profit).toBeUndefined();
+  });
 });

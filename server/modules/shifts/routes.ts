@@ -30,7 +30,7 @@ const shiftView = (row: typeof shifts.$inferSelect, showExpected: boolean) => ({
 type Executor = Pick<typeof db, "execute" | "select">;
 
 /** What a shift has taken, worked out from the posted documents. The same numbers feed the X and Z reports. */
-async function summarise(executor: Executor, businessId: string, shiftId: string, openingFloatPaisa: number) {
+export async function summarise(executor: Executor, businessId: string, shiftId: string, openingFloatPaisa: number) {
   const [sales] = await executor.execute(sql`
     select count(*)::int as invoices, coalesce(sum(total_paisa), 0)::bigint as total, coalesce(sum(balance_paisa), 0)::bigint as credit,
            coalesce(sum(tax_paisa), 0)::bigint as tax,
