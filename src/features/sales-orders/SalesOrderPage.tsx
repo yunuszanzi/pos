@@ -11,6 +11,7 @@ import { ReceiptPrinter, type PrintJob } from "../../pos/Receipt";
 import { challanStatusLabels } from "../../../shared/schemas/deliveryChallans";
 import { dayText } from "../purchasing/dayText";
 import { usePrintSetup } from "../purchasing/usePrintSetup";
+import { MakeInvoicePanel } from "../invoices/MakeInvoicePanel";
 import { WriteChallanPanel } from "./WriteChallanPanel";
 
 type Move = "cancel" | "close";
@@ -25,6 +26,7 @@ export function SalesOrderPage() {
   const queryClient = useQueryClient();
   const mayManage = useCan("sales_orders.manage");
   const mayDeliver = useCan("delivery.manage");
+  const mayInvoice = useCan("invoices.create");
   const setup = usePrintSetup();
   const [format, setFormat] = useState<PrintFormat | "">("");
   const [job, setJob] = useState<PrintJob | null>(null);
@@ -122,6 +124,19 @@ export function SalesOrderPage() {
       <p className="muted">"Delivered" and "Billed" count in pieces (the base unit). {data.status === "open" || data.status === "partly_delivered" ? "The stock still to be delivered is held for this order." : ""}</p>
     </section>
     {mayDeliver && (data.status === "open" || data.status === "partly_delivered") && <WriteChallanPanel order={data} />}
+
+    {mayInvoice && data.status !== "cancelled" && <MakeInvoicePanel source={{ kind: "order", order: data }} />}
+
+    {data.invoices.length > 0 && <section className="panel stack">
+      <h2>Invoices</h2>
+      <div className="table-scroll"><table aria-label="Invoices for this order">
+        <thead><tr><th>Invoice</th><th>Due</th><th className="num">Total</th></tr></thead>
+        <tbody>{data.invoices.map((invoice) => <tr key={invoice.id}>
+          <td><Link className="text-button" to={`/invoices/${invoice.id}`}>{invoice.number}</Link></td>
+          <td>{dayText(invoice.dueDate)}</td><td className="num">{formatPkr(invoice.totalPaisa)}</td>
+        </tr>)}</tbody>
+      </table></div>
+    </section>}
 
     {data.challans.length > 0 && <section className="panel stack">
       <h2>Delivery challans</h2>

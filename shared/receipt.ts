@@ -43,6 +43,19 @@ export type ReceiptInvoice = {
   /** Set when the sale was to a named customer. The balance is what they owed straight after this invoice. */
   customerName?: string | null;
   customerBalancePaisa?: number | null;
+  /** A back-office invoice (written at a desk, on credit, with terms) rather than a till sale. */
+  channel?: "pos" | "back_office";
+  termsDays?: number | null;
+  /** yyyy-mm-dd */
+  dueDate?: string | null;
+  customerPo?: string;
+  orderNumber?: string | null;
+  note?: string;
+  /** The buyer as they were on the day; a tax invoice shows their NTN and STRN. */
+  buyerName?: string;
+  buyerNtn?: string | null;
+  buyerStrn?: string | null;
+  buyerAddress?: string;
   lines: Array<{
     productName: string; variantName: string; sku: string; unitName: string; quantity: string; unitPricePaisa: number;
     lineDiscountPaisa: number; invoiceDiscountSharePaisa: number; taxRateBps: number; taxPaisa: number; totalPaisa: number;
@@ -137,9 +150,23 @@ function lineRowsOf<T extends DocumentLine>(lines: T[], detailExtra: (line: T) =
   });
 }
 
+/** What a back-office invoice shows besides a till receipt: the buyer's registration and address, the order, their PO, the terms and the due date. */
+function backOfficeMeta(invoice: ReceiptInvoice, options: ReceiptOptions): ReceiptRow[] {
+  const registration = [invoice.buyerNtn ? `NTN ${invoice.buyerNtn}` : "", invoice.buyerStrn ? `STRN ${invoice.buyerStrn}` : ""].filter(Boolean).join("  ");
+  const terms = invoice.termsDays === null || invoice.termsDays === undefined ? "" : invoice.termsDays === 0 ? "Due on receipt" : `${invoice.termsDays} days`;
+  return [
+    ...(registration ? [{ label: "Buyer", value: registration }] : []),
+    ...(invoice.buyerAddress ? [{ label: "Address", value: invoice.buyerAddress }] : []),
+    ...(invoice.customerPo ? [{ label: "Customer PO", value: invoice.customerPo }] : []),
+    ...(invoice.orderNumber ? [{ label: "Order", value: invoice.orderNumber }] : []),
+    ...(terms ? [{ label: "Terms", value: terms }] : []),
+    ...(invoice.dueDate ? [{ label: "Due date", value: formatDay(invoice.dueDate, options.dateFormat) }] : []),
+  ];
+}
+
 export function buildReceipt(invoice: ReceiptInvoice, format: PrintFormat, options: ReceiptOptions): ReceiptModel {
   const { business } = options;
-  const sheet = format === "a4" || format === "a5";
+  const sheet = format === "a4" || format === "a5"; const back = invoice.channel === "back_office";
   const lineDiscount = invoice.lineDiscountPaisa;
   const billDiscount = invoice.invoiceDiscountPaisa;
 
@@ -165,7 +192,7 @@ export function buildReceipt(invoice: ReceiptInvoice, format: PrintFormat, optio
 
   const dateText = formatDocumentDate(invoice.postedAt, options.dateFormat, options.timezone);
   return {
-    title: sheet ? "SALES INVOICE" : "SALES RECEIPT",
+    title: back ? (invoice.buyerNtn || invoice.buyerStrn ? "TAX INVOICE" : "SALES INVOICE") : sheet ? "SALES INVOICE" : "SALES RECEIPT",
     duplicateBanner: duplicateBanner(options),
     businessName: business.tradeName,
     headerLines: headerLinesOf(business, invoice.branchName),
@@ -175,8 +202,8 @@ export function buildReceipt(invoice: ReceiptInvoice, format: PrintFormat, optio
     terminal: invoice.terminalName,
     customer: invoice.customerName || null,
     meta: [
-      { label: "No.", value: invoice.number }, { label: "Date", value: dateText }, { label: "Cashier", value: invoice.cashierName ?? "" },
-      { label: "Till", value: invoice.terminalName }, ...(invoice.customerName ? [{ label: "Customer", value: invoice.customerName }] : []),
+      { label: "No.", value: invoice.number }, { label: "Date", value: dateText }, ...(back ? [] : [{ label: "Cashier", value: invoice.cashierName ?? "" }]),
+      ...(back ? [] : [{ label: "Till", value: invoice.terminalName }]), ...(invoice.customerName ? [{ label: "Customer", value: (back && invoice.buyerName) || invoice.customerName }] : []), ...(back ? backOfficeMeta(invoice, options) : []),
     ],
     lines: lineRowsOf(invoice.lines),
     totals,

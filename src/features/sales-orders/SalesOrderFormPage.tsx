@@ -3,10 +3,12 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
 import { formatPkr, parsePercentToBps, toPlainRupees } from "../../../shared/money";
 import { priceCart } from "../../../shared/pricing";
+import { salesInvoiceSchema, paymentTermChoices } from "../../../shared/schemas/salesInvoices";
 import { salesOrderSchema } from "../../../shared/schemas/salesOrders";
 import { parseQuantity } from "../../../shared/units";
 import { getAllUnits } from "../../api/catalogueApi";
 import type { Product, ProductVariant } from "../../api/productsApi";
+import { postSalesInvoice } from "../../api/salesInvoicesApi";
 import { postSalesOrder } from "../../api/salesOrdersApi";
 import { ErrorMessage, Field, PageTitle, SelectInput, TextInput } from "../../app/FormElements";
 import { MoneyInput } from "../../app/MoneyInput";
@@ -19,7 +21,8 @@ type UnitChoice = { unitId: string; name: string; salePricePaisa: number };
 type Line = { variantId: string; sku: string; productName: string; variantName: string; unitId: string; units: UnitChoice[]; quantity: string; price: string; discount: string };
 
 /** Takes a sales order for a customer: the items, the prices (the customer's tier unless changed) and where and when it goes. */
-export function SalesOrderFormPage() {
+export function SalesOrderFormPage({ mode = "order" }: { mode?: "order" | "invoice" }) {
+  const invoicing = mode === "invoice";
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const units = useQuery({ queryKey: ["units"], queryFn: getAllUnits, staleTime: 5 * 60_000 });
@@ -27,6 +30,7 @@ export function SalesOrderFormPage() {
   const [customerPo, setCustomerPo] = useState("");
   const [deliveryDate, setDeliveryDate] = useState("");
   const [deliveryAddress, setDeliveryAddress] = useState("");
+  const [terms, setTerms] = useState("");
   const [note, setNote] = useState("");
   const [lines, setLines] = useState<Line[]>([]);
   const [error, setError] = useState("");
@@ -75,7 +79,8 @@ export function SalesOrderFormPage() {
         ...(prices[index] !== undefined ? { unitPricePaisa: prices[index]! } : {}), discount: discounts[index],
       })),
     };
-    const checked = salesOrderSchema.safeParse(input);
+    const invoiceInput = { customerId: customer.id, customerPo, note, lines: input.lines, ...(terms !== "" ? { termsDays: Number(terms) } : {}) };
+    const checked = invoicing ? salesInvoiceSchema.safeParse(invoiceInput) : salesOrderSchema.safeParse(input);
     if (!checked.success) {
       const [issue] = checked.error.issues;
       const line = issue.path[0] === "lines" && typeof issue.path[1] === "number" ? lines[issue.path[1]] : undefined;
@@ -83,6 +88,12 @@ export function SalesOrderFormPage() {
     }
     setBusy(true);
     try {
+      if (invoicing) {
+        const posted = await postSalesInvoice(invoiceInput, key.current);
+        await Promise.all(["sales-invoices", "stock", "customers", "customer-ledger"].map((name) => queryClient.invalidateQueries({ queryKey: [name] })));
+        navigate(`/invoices/${posted.invoice.id}`);
+        return;
+      }
       const result = await postSalesOrder(input, key.current);
       // Stock reserved changed: the stock lists and order lists must be asked again.
       await Promise.all(["sales-orders", "stock"].map((name) => queryClient.invalidateQueries({ queryKey: [name] })));
@@ -94,15 +105,23 @@ export function SalesOrderFormPage() {
   }
 
   return <div className="content">
-    <PageTitle title="New sales order" description="Choose the customer and the items. Taking the order holds the stock for it; nothing leaves until it is dispatched." />
+    <PageTitle title={invoicing ? "New invoice" : "New sales order"} description={invoicing ? "Choose the customer and the items. The goods leave the shop with the invoice, and the amount goes on the customer's account." : "Choose the customer and the items. Taking the order holds the stock for it; nothing leaves until it is dispatched."} />
     <form className="stack" onSubmit={(event) => void submit(event)}>
       {error && <ErrorMessage>{error}</ErrorMessage>}
       <section className="panel stack">
         <div className="form-grid">
           <CustomerPicker value={customer} onChange={setCustomer} />
           <Field label="Customer's PO number"><TextInput value={customerPo} maxLength={100} onChange={(event) => setCustomerPo(event.target.value)} /></Field>
-          <Field label="Deliver by"><TextInput type="date" value={deliveryDate} onChange={(event) => setDeliveryDate(event.target.value)} /></Field>
-          <Field label="Deliver to"><TextInput value={deliveryAddress} maxLength={500} onChange={(event) => setDeliveryAddress(event.target.value)} /></Field>
+          {!invoicing && <>
+            <Field label="Deliver by"><TextInput type="date" value={deliveryDate} onChange={(event) => setDeliveryDate(event.target.value)} /></Field>
+            <Field label="Deliver to"><TextInput value={deliveryAddress} maxLength={500} onChange={(event) => setDeliveryAddress(event.target.value)} /></Field>
+          </>}
+          {invoicing && <Field label="Payment terms">
+            <SelectInput value={terms} onChange={(event) => setTerms(event.target.value)}>
+              <option value="">The customer's usual terms</option>
+              {paymentTermChoices.map((days) => <option key={days} value={days}>{days === 0 ? "Due on receipt" : `${days} days`}</option>)}
+            </SelectInput>
+          </Field>}
           <Field label="Note"><TextInput value={note} maxLength={1000} onChange={(event) => setNote(event.target.value)} /></Field>
         </div>
       </section>
@@ -121,12 +140,12 @@ export function SalesOrderFormPage() {
         {!lines.length && <p className="muted">No items added yet.</p>}
         {lines.length > 0 && <>
           <p className="pay-total"><span>Items, about</span><strong data-testid="order-estimate">{formatPkr(subtotal)}</strong></p>
-          <p className="muted">Leave a price empty to use the shelf price (or the customer's price tier). Tax and the exact total are worked out when the order is taken.</p>
+          <p className="muted">Leave a price empty to use the shelf price (or the customer's price tier). Tax and the exact total are worked out when it is saved.</p>
         </>}
       </section>
       <div className="button-row">
-        <button className="button primary" disabled={busy || !lines.length || !customer}>{busy ? "Saving…" : "Take order"}</button>
-        <Link className="button secondary" to="/sales-orders">Cancel</Link>
+        <button className="button primary" disabled={busy || !lines.length || !customer}>{busy ? "Saving…" : invoicing ? "Post invoice" : "Take order"}</button>
+        <Link className="button secondary" to={invoicing ? "/invoices" : "/sales-orders"}>Cancel</Link>
       </div>
     </form>
   </div>;

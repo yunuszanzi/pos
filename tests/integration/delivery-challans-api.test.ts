@@ -152,6 +152,17 @@ integration("delivery challans", { timeout: 300_000 }, () => {
     expect(await ledgerCount(context, "delivery_challan")).toBe(0);
   });
 
+  it("answers a request with no readable body with 400, not a server error", async () => {
+    const context = await setup(100);
+    const order = await placeOrder(context, "5");
+    const written = await challan(context, order.id);
+    const noBody = await callApi(context.business.ownerToken, "POST", `/delivery-challans/${written.body.challan.id}/dispatch`, { idempotencyKey: key() });
+    expect(noBody.status).toBe(400);
+    expect(noBody.body.error.code).toBe("BAD_REQUEST");
+    // Nothing happened; the same request with a body works.
+    expect((await act(context, written.body.challan.id, "dispatch")).status).toBe(200);
+  });
+
   it("cancelling an order takes its pending challans with it, and a cancelled challan cannot be dispatched", async () => {
     const context = await setup(100);
     const order = await placeOrder(context, "30");

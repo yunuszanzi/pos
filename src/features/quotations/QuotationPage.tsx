@@ -10,6 +10,7 @@ import { ErrorMessage, PageTitle, SelectInput, SuccessMessage } from "../../app/
 import { useCan } from "../../app/permissions";
 import { ReceiptPrinter, type PrintJob } from "../../pos/Receipt";
 import { dayText } from "../purchasing/dayText";
+import { MakeInvoicePanel } from "../invoices/MakeInvoicePanel";
 import { ConvertToOrderPanel } from "./ConvertToOrderPanel";
 import { usePrintSetup } from "../purchasing/usePrintSetup";
 
@@ -27,6 +28,7 @@ export function QuotationPage() {
   const queryClient = useQueryClient();
   const mayManage = useCan("quotations.manage");
   const mayOrder = useCan("sales_orders.manage");
+  const mayInvoice = useCan("invoices.create");
   const setup = usePrintSetup();
   const [format, setFormat] = useState<PrintFormat | "">("");
   const [job, setJob] = useState<PrintJob | null>(null);
@@ -142,6 +144,7 @@ export function QuotationPage() {
     </section>
 
     {mayOrder && (data.status === "sent" || data.status === "accepted") && <ConvertToOrderPanel quotation={data} />}
+    {mayInvoice && (data.status === "sent" || data.status === "accepted") && <MakeInvoicePanel source={{ kind: "quotation", quotation: data }} />}
 
     {data.revisions.length > 1 && <section className="panel stack">
       <h2>Revisions</h2>

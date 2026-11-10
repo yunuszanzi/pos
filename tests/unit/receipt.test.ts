@@ -355,3 +355,35 @@ describe("delivery challan print", () => {
     expect(model.footer.at(-1)).toMatch(/Received by/);
   });
 });
+
+describe("back-office tax invoice print", () => {
+  const backOffice: ReceiptInvoice = {
+    ...invoice, number: "INV-KHI-000050", cashierName: "Owner", terminalName: "", channel: "back_office", termsDays: 15, dueDate: "2026-11-25", customerPo: "PO-77", orderNumber: "SO-KHI-000003",
+    customerName: "Bilal Wholesale", customerBalancePaisa: 4745, buyerName: "Bilal Traders", buyerNtn: "7654321-1", buyerStrn: "STRN-9", buyerAddress: "Shop 9, Jodia Bazaar",
+    paidPaisa: 0, changePaisa: 0, balancePaisa: 4745, payments: [],
+  };
+
+  it("is a TAX INVOICE for a registered buyer, with their NTN and STRN, the terms and the due date, and no till or cashier", () => {
+    const model = buildReceipt(backOffice, "a4", options);
+    expect(model.title).toBe("TAX INVOICE");
+    expect(model.meta).toEqual([
+      { label: "No.", value: "INV-KHI-000050" }, { label: "Date", value: "08/11/2026 14:35" }, { label: "Customer", value: "Bilal Traders" },
+      { label: "Buyer", value: "NTN 7654321-1  STRN STRN-9" }, { label: "Address", value: "Shop 9, Jodia Bazaar" }, { label: "Customer PO", value: "PO-77" },
+      { label: "Order", value: "SO-KHI-000003" }, { label: "Terms", value: "15 days" }, { label: "Due date", value: "25/11/2026" },
+    ]);
+    expect(model.payments).toEqual(expect.arrayContaining([{ label: "Balance due", value: "Rs 47.45", strong: true }]));
+  });
+
+  it("is a plain SALES INVOICE for a buyer with no registration, and says due on receipt for zero days", () => {
+    const model = buildReceipt({ ...backOffice, buyerNtn: null, buyerStrn: null, termsDays: 0 }, "a4", options);
+    expect(model.title).toBe("SALES INVOICE");
+    expect(model.meta).toEqual(expect.arrayContaining([{ label: "Terms", value: "Due on receipt" }]));
+    expect(model.meta.some((row) => row.label === "Buyer")).toBe(false);
+  });
+
+  it("leaves a till receipt exactly as it was", () => {
+    const model = buildReceipt(invoice, "pos80", options);
+    expect(model.title).toBe("SALES RECEIPT");
+    expect(model.meta.map((row) => row.label)).toEqual(["No.", "Date", "Cashier", "Till"]);
+  });
+});
