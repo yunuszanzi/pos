@@ -3,6 +3,8 @@
 -- The product search matches text anywhere inside (ILIKE '%part%'), which an ordinary index cannot help with, so every search read the
 -- whole product, variant and unit tables (about 190 ms at 20,000 SKUs). Trigram indexes make the same query read only the rows that match.
 
+-- Supabase already has this schema; a plain Postgres (the migration tests build one) does not.
+CREATE SCHEMA IF NOT EXISTS extensions;
 CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA extensions;
 
 CREATE INDEX products_name_trgm_idx ON products USING gin (name extensions.gin_trgm_ops);
