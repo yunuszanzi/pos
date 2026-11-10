@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCreditNoteReceipt, buildGoodsReceiptReceipt, buildPaymentReceipt, buildPurchaseBillReceipt, buildPurchaseOrderReceipt, buildPurchaseReturnReceipt, buildQuotationReceipt, buildSupplierPaymentReceipt, buildReceipt, buildStatementReceipt, formatDay, formatDocumentDate, receiptPageCss, type ReceiptBusiness, type ReceiptCreditNote, type ReceiptInvoice, type ReceiptPayment } from "../../shared/receipt";
+import { buildCreditNoteReceipt, buildGoodsReceiptReceipt, buildPaymentReceipt, buildPurchaseBillReceipt, buildPurchaseOrderReceipt, buildPurchaseReturnReceipt, buildQuotationReceipt, buildSalesOrderReceipt, buildSupplierPaymentReceipt, buildReceipt, buildStatementReceipt, formatDay, formatDocumentDate, receiptPageCss, type ReceiptBusiness, type ReceiptCreditNote, type ReceiptInvoice, type ReceiptPayment } from "../../shared/receipt";
 
 const business: ReceiptBusiness = {
   tradeName: "SGA Balloons", legalName: "SGA Balloons (Pvt) Ltd", address: "Shop 4, Saddar, Karachi", phone: "021-111", ntn: "1234567-8", strn: null, receiptFooter: "",
@@ -318,5 +318,23 @@ describe("quotation print", () => {
     ]);
     expect(model.footer[0]).toBe("Terms: 50% advance");
     expect(model.lines[0].total).toBe("Rs 1,062.00");
+  });
+});
+
+describe("sales order print", () => {
+  it("prints the order with the customer's PO, the quotation it came from and where it goes", () => {
+    const model = buildSalesOrderReceipt({
+      number: "SO-KHI-000003", orderDate: "2026-11-10", deliveryDate: "2026-11-15", branchName: "Karachi", customerName: "Bilal Wholesale", customerPhone: "0301-1111111",
+      customerNtn: null, customerStrn: "STRN-9", customerPo: "PO-77", quotationNumber: "QUO-KHI-000007", deliveryAddress: "Shop 9, Jodia Bazaar", note: "Call before delivery",
+      taxMode: "inclusive", grossPaisa: 5_000, lineDiscountPaisa: 500, invoiceDiscountPaisa: 0, taxPaisa: 687, roundingPaisa: 0, totalPaisa: 4_500,
+      lines: [{ productName: "Latex Balloon", variantName: "", sku: "BAL", unitName: "Piece", quantity: "10", unitPricePaisa: 500, lineDiscountPaisa: 500, invoiceDiscountSharePaisa: 0, taxRateBps: 1800, taxPaisa: 687, totalPaisa: 4_500 }],
+    }, options);
+    expect(model.title).toBe("SALES ORDER");
+    expect(model.meta).toEqual(expect.arrayContaining([
+      { label: "Customer PO", value: "PO-77" }, { label: "Quotation", value: "QUO-KHI-000007" }, { label: "Deliver by", value: "15/11/2026" },
+      { label: "Deliver to", value: "Shop 9, Jodia Bazaar" }, { label: "Buyer", value: "STRN STRN-9" },
+    ]));
+    expect(model.totals.at(-1)).toEqual({ label: "ORDER TOTAL", value: "Rs 45.00", strong: true });
+    expect(model.footer).toEqual(["Call before delivery"]);
   });
 });

@@ -10,6 +10,7 @@ import { ErrorMessage, PageTitle, SelectInput, SuccessMessage } from "../../app/
 import { useCan } from "../../app/permissions";
 import { ReceiptPrinter, type PrintJob } from "../../pos/Receipt";
 import { dayText } from "../purchasing/dayText";
+import { ConvertToOrderPanel } from "./ConvertToOrderPanel";
 import { usePrintSetup } from "../purchasing/usePrintSetup";
 
 const moves: Record<QuotationMove, { label: string; done: string }> = {
@@ -25,6 +26,7 @@ export function QuotationPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const mayManage = useCan("quotations.manage");
+  const mayOrder = useCan("sales_orders.manage");
   const setup = usePrintSetup();
   const [format, setFormat] = useState<PrintFormat | "">("");
   const [job, setJob] = useState<PrintJob | null>(null);
@@ -138,6 +140,8 @@ export function QuotationPage() {
         </tbody>
       </table></div>
     </section>
+
+    {mayOrder && (data.status === "sent" || data.status === "accepted") && <ConvertToOrderPanel quotation={data} />}
 
     {data.revisions.length > 1 && <section className="panel stack">
       <h2>Revisions</h2>

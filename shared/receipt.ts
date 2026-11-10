@@ -689,3 +689,67 @@ export function buildQuotationReceipt(quote: ReceiptQuotation, options: ReceiptO
     footer: [...(quote.terms ? [`Terms: ${quote.terms}`] : []), ...(quote.note ? [quote.note] : []), "This is a quotation, not a bill. Prices hold until the date above."],
   };
 }
+
+// ---------------------------------------------------------------- sales orders (v0.6)
+
+export type ReceiptSalesOrder = {
+  number: string;
+  /** yyyy-mm-dd */
+  orderDate: string;
+  deliveryDate: string | null;
+  branchName: string;
+  customerName: string;
+  customerPhone: string;
+  customerNtn: string | null;
+  customerStrn: string | null;
+  customerPo: string;
+  quotationNumber: string | null;
+  deliveryAddress: string;
+  note: string;
+  taxMode: "inclusive" | "exclusive";
+  grossPaisa: number;
+  lineDiscountPaisa: number;
+  invoiceDiscountPaisa: number;
+  taxPaisa: number;
+  roundingPaisa: number;
+  totalPaisa: number;
+  lines: ReceiptInvoice["lines"];
+};
+
+/** A sales order: what the customer ordered at the agreed prices. Not a bill. */
+export function buildSalesOrderReceipt(order: ReceiptSalesOrder, options: ReceiptOptions): ReceiptModel {
+  const { business } = options;
+  const dateText = formatDay(order.orderDate, options.dateFormat);
+  const totals: ReceiptRow[] = [{ label: "Subtotal", value: formatPkr(order.grossPaisa) }];
+  if (order.lineDiscountPaisa > 0) totals.push({ label: "Item discounts", value: negative(order.lineDiscountPaisa) });
+  if (order.invoiceDiscountPaisa > 0) totals.push({ label: "Discount", value: negative(order.invoiceDiscountPaisa) });
+  totals.push({ label: order.taxMode === "inclusive" ? "Tax (included)" : "Tax", value: formatPkr(order.taxPaisa) });
+  if (order.roundingPaisa !== 0) totals.push({ label: "Rounding", value: order.roundingPaisa < 0 ? negative(-order.roundingPaisa) : formatPkr(order.roundingPaisa) });
+  totals.push({ label: "ORDER TOTAL", value: formatPkr(order.totalPaisa), strong: true });
+  const registration = [order.customerNtn ? `NTN ${order.customerNtn}` : "", order.customerStrn ? `STRN ${order.customerStrn}` : ""].filter(Boolean).join("  ");
+  return {
+    title: "SALES ORDER",
+    duplicateBanner: duplicateBanner(options),
+    businessName: business.tradeName,
+    headerLines: headerLinesOf(business, order.branchName),
+    number: order.number,
+    dateText,
+    cashier: "",
+    terminal: "",
+    customer: order.customerName,
+    meta: [
+      { label: "No.", value: order.number }, { label: "Date", value: dateText }, { label: "Customer", value: order.customerName },
+      ...(order.customerPhone ? [{ label: "Phone", value: order.customerPhone }] : []),
+      ...(registration ? [{ label: "Buyer", value: registration }] : []),
+      ...(order.customerPo ? [{ label: "Customer PO", value: order.customerPo }] : []),
+      ...(order.quotationNumber ? [{ label: "Quotation", value: order.quotationNumber }] : []),
+      ...(order.deliveryDate ? [{ label: "Deliver by", value: formatDay(order.deliveryDate, options.dateFormat) }] : []),
+      ...(order.deliveryAddress ? [{ label: "Deliver to", value: order.deliveryAddress }] : []),
+    ],
+    lines: lineRowsOf(order.lines),
+    totals,
+    taxRows: taxRowsOf(order.lines),
+    payments: [],
+    footer: order.note ? [order.note] : [],
+  };
+}
