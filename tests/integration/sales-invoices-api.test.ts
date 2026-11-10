@@ -129,6 +129,26 @@ integration("back-office invoices", { timeout: 300_000 }, () => {
     expect((await callApi(context.business.ownerToken, "GET", `/sales/${first.id}`)).body).toMatchObject({ id: first.id, channel: "back_office" });
   });
 
+  it("goods on a desk invoice can be taken back at the till: the customer owes less and the stock returns", async () => {
+    const context = await setup(100);
+    const written = (await invoice(context, { customerId: context.customerId, lines: [line(context, "10")] })).body.invoice;
+    expect(await balanceOf(context)).toBe(5_000);
+    const as = { terminalId: context.business.terminalId };
+    const shift = await callApi(context.business.ownerToken, "POST", "/shifts/open", { ...as, body: { openingFloatPaisa: 0 }, idempotencyKey: key() });
+    expect(shift.status, JSON.stringify(shift.body)).toBe(201);
+    const client = sql();
+    const [{ id: originalLineId }] = await client<{ id: string }[]>`SELECT id FROM sales_invoice_lines WHERE invoice_id = ${written.id}`;
+    await client.end();
+    const back = await callApi(context.business.ownerToken, "POST", "/returns", {
+      ...as, idempotencyKey: key(),
+      body: { shiftId: shift.body.id, invoiceId: written.id, lines: [{ originalLineId, quantity: "4", restockTo: "sellable" }], refund: {} },
+    });
+    expect(back.status, JSON.stringify(back.body)).toBe(201);
+    // The 4 pieces were Rs 20.00 on an unpaid invoice: the customer owes that much less, and nothing is handed back.
+    expect(await balanceOf(context)).toBe(3_000);
+    expect(await stockOf(context)).toMatchObject({ onHand: "94" });
+  });
+
   it("an invoice past its due date reads as overdue", async () => {
     const context = await setup(100);
     const written = await invoice(context, { customerId: context.customerId, lines: [line(context, "5")], termsDays: 0 });
