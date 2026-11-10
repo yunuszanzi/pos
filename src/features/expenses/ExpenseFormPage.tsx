@@ -1,6 +1,7 @@
 import { useRef, useState, type FormEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
+import { businessToday } from "../../../shared/dates";
 import { expenseSchema } from "../../../shared/schemas/accounts";
 import { attachExpenseBill, getAllAccounts, getAllExpenseCategories, postExpense } from "../../api/accountsApi";
 import { getCurrentShift } from "../../api/posApi";
@@ -10,7 +11,7 @@ import { useCan } from "../../app/permissions";
 import { amountOf } from "../../pos/amounts";
 
 const REGISTER = "register";
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => businessToday();
 
 /** Records an expense: what for, how much, who was paid, where the money came from, and a photo of the bill. */
 export function ExpenseFormPage() {
