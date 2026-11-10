@@ -7,9 +7,11 @@ import { salesOrderStatusLabels } from "../../../shared/schemas/salesOrders";
 import { getSalesOrderById, moveSalesOrder, type SalesOrder } from "../../api/salesOrdersApi";
 import { ErrorMessage, PageTitle, SelectInput, SuccessMessage } from "../../app/FormElements";
 import { useCan } from "../../app/permissions";
+import { salesOrderPrintDoc } from "../../pos/documentPrint";
 import { ReceiptPrinter, type PrintJob } from "../../pos/Receipt";
 import { challanStatusLabels } from "../../../shared/schemas/deliveryChallans";
 import { dayText } from "../purchasing/dayText";
+import { ShareLinkButton } from "../sharing/ShareLinkButton";
 import { usePrintSetup } from "../purchasing/usePrintSetup";
 import { MakeInvoicePanel } from "../invoices/MakeInvoicePanel";
 import { WriteChallanPanel } from "./WriteChallanPanel";
@@ -63,16 +65,7 @@ export function SalesOrderPage() {
     if (!setup) return;
     setJob({
       business: setup.business, dateFormat: setup.dateFormat, timezone: setup.timezone, format: format || setup.defaultFormat,
-      salesOrder: {
-        number: data.number, orderDate: data.orderDate, deliveryDate: data.deliveryDate, branchName: data.branchName, customerName: data.customerName, customerPhone: data.customerPhone,
-        customerNtn: data.customerNtn, customerStrn: data.customerStrn, customerPo: data.customerPo, quotationNumber: data.quotationNumber, deliveryAddress: data.deliveryAddress,
-        note: data.note, taxMode: data.taxMode, grossPaisa: data.grossPaisa, lineDiscountPaisa: data.lineDiscountPaisa, invoiceDiscountPaisa: data.invoiceDiscountPaisa,
-        taxPaisa: data.taxPaisa, roundingPaisa: data.roundingPaisa, totalPaisa: data.totalPaisa,
-        lines: data.lines.map((line) => ({
-          productName: line.productName, variantName: line.variantName, sku: line.sku, unitName: line.unitName, quantity: line.quantity, unitPricePaisa: line.unitPricePaisa,
-          lineDiscountPaisa: line.lineDiscountPaisa, invoiceDiscountSharePaisa: line.invoiceDiscountSharePaisa, taxRateBps: line.taxRateBps, taxPaisa: line.taxPaisa, totalPaisa: line.totalPaisa,
-        })),
-      },
+      salesOrder: salesOrderPrintDoc(data),
     });
   }
 
@@ -98,6 +91,7 @@ export function SalesOrderPage() {
       <div className="button-row">
         {can("close") && <button className="button secondary" disabled={busy} onClick={() => void move("close")}>{moves.close.label}</button>}
         {can("cancel") && <button className="button secondary" disabled={busy} onClick={() => void move("cancel")}>{moves.cancel.label}</button>}
+        <ShareLinkButton type="sales_order" id={data.id} phone={data.customerPhone} message={(url) => `Dear ${data.customerName}, order ${data.number} for ${formatPkr(data.totalPaisa)}. ${url}`} />
       </div>
       {setup && <div className="pay-row">
         <SelectInput aria-label="Print format" value={format || setup.defaultFormat} onChange={(event) => setFormat(event.target.value as PrintFormat)}>

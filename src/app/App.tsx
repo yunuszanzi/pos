@@ -43,6 +43,7 @@ const DeliveryChallansPage = lazy(() => import("../features/delivery/DeliveryCha
 const DeliveryChallanPage = lazy(() => import("../features/delivery/DeliveryChallanPage").then(({ DeliveryChallanPage: Page }) => ({ default: Page })));
 const InvoicesPage = lazy(() => import("../features/invoices/InvoicesPage").then(({ InvoicesPage: Page }) => ({ default: Page })));
 const InvoicePage = lazy(() => import("../features/invoices/InvoicePage").then(({ InvoicePage: Page }) => ({ default: Page })));
+const PublicDocumentPage = lazy(() => import("../features/public/PublicDocumentPage").then(({ PublicDocumentPage: Page }) => ({ default: Page })));
 const SalesOrderPage = lazy(() => import("../features/sales-orders/SalesOrderPage").then(({ SalesOrderPage: Page }) => ({ default: Page })));
 const ReceiveGoodsPage = lazy(() => import("../features/purchasing/ReceiveGoodsPage").then(({ ReceiveGoodsPage: Page }) => ({ default: Page })));
 const GoodsReceiptsPage = lazy(() => import("../features/purchasing/GoodsReceiptsPage").then(({ GoodsReceiptsPage: Page }) => ({ default: Page })));
@@ -153,6 +154,8 @@ function AppRoutes() {
   const { session, currentUser, loading, authError, refreshCurrentUser, signOut } = useAuth();
   const location = useLocation();
 
+  // A shared link opens for anyone, signed in or not, and shows nothing but the document.
+  if (location.pathname.startsWith("/d/")) return <PublicDocumentPage />;
   if (loading) return <div className="full-message">Loading your secure session…</div>;
   if (!session) {
     return <Routes>

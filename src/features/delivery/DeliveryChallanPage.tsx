@@ -6,8 +6,10 @@ import { challanStatusLabels } from "../../../shared/schemas/deliveryChallans";
 import { dispatchDeliveryChallan, getDeliveryChallanById, moveDeliveryChallan, returnDeliveryChallan, type Challan } from "../../api/deliveryApi";
 import { ErrorMessage, Field, PageTitle, SelectInput, SuccessMessage, TextInput } from "../../app/FormElements";
 import { useCan } from "../../app/permissions";
+import { challanPrintDoc } from "../../pos/documentPrint";
 import { ReceiptPrinter, type PrintJob } from "../../pos/Receipt";
 import { momentDayText } from "../purchasing/dayText";
+import { ShareLinkButton } from "../sharing/ShareLinkButton";
 import { usePrintSetup } from "../purchasing/usePrintSetup";
 
 type Action = "dispatch" | "deliver" | "cancel" | "return";
@@ -57,12 +59,7 @@ export function DeliveryChallanPage() {
     if (!setup) return;
     setJob({
       business: setup.business, dateFormat: setup.dateFormat, timezone: setup.timezone, format: format || setup.defaultFormat,
-      deliveryChallan: {
-        number: data.number, at: data.dispatchedAt ?? data.createdAt, branchName: data.branchName, customerName: data.customerName, customerPhone: data.customerPhone,
-        orderNumber: data.orderNumber, customerPo: data.customerPo, driverName: data.driverName, vehicleNo: data.vehicleNo, route: data.route,
-        deliveryAddress: data.deliveryAddress, note: data.note,
-        lines: data.lines.map((line) => ({ productName: line.productName, variantName: line.variantName, sku: line.sku, unitName: line.unitName, quantity: line.quantity })),
-      },
+      deliveryChallan: challanPrintDoc(data),
     });
   }
 
@@ -107,6 +104,10 @@ export function DeliveryChallanPage() {
           </div>
         </div>
         : <div className="button-row"><button className="button secondary" onClick={() => setReturning(true)}>Goods came back</button></div>)}
+
+      <div className="button-row">
+        <ShareLinkButton type="delivery_challan" id={data.id} phone={data.customerPhone} message={(url) => `Dear ${data.customerName}, delivery challan ${data.number} for order ${data.orderNumber}. ${url}`} />
+      </div>
 
       {setup && <div className="pay-row">
         <SelectInput aria-label="Print format" value={format || setup.defaultFormat} onChange={(event) => setFormat(event.target.value as PrintFormat)}>

@@ -23,7 +23,7 @@ type OneDocument<K extends keyof Documents> = { [P in K]: Documents[P] } & { [P 
 /** A sale, money received, a credit note, a customer statement, a purchase order or a goods receipt: exactly one of them. */
 export type PrintJob = JobBase & { [K in keyof Documents]: OneDocument<K> }[keyof Documents];
 
-const modelOf = (job: PrintJob) => {
+export const modelOf = (job: PrintJob) => {
   const options = { business: job.business, dateFormat: job.dateFormat, timezone: job.timezone, duplicate: job.duplicate };
   if (job.creditNote) return buildCreditNoteReceipt(job.creditNote, options);
   if (job.statement) return buildStatementReceipt(job.statement, options);

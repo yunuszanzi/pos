@@ -1,14 +1,15 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
-import { whatsappShareLink } from "../../../shared/khata";
 import { formatBps, formatPkr } from "../../../shared/money";
 import { formatDay, printFormatLabels, printFormats, type PrintFormat } from "../../../shared/receipt";
 import { getSalesInvoiceById, type Invoice } from "../../api/salesInvoicesApi";
 import { ErrorMessage, PageTitle, SelectInput } from "../../app/FormElements";
 import { useCan } from "../../app/permissions";
+import { invoicePrintDoc } from "../../pos/documentPrint";
 import { ReceiptPrinter, type PrintJob } from "../../pos/Receipt";
 import { dayText, momentDayText } from "../purchasing/dayText";
+import { ShareLinkButton } from "../sharing/ShareLinkButton";
 import { usePrintSetup } from "../purchasing/usePrintSetup";
 
 /** One back-office invoice: the buyer, the terms and due date, what was billed, and what is still owing. */
@@ -31,18 +32,7 @@ export function InvoicePage() {
     if (!setup) return;
     setJob({
       business: setup.business, dateFormat: setup.dateFormat, timezone: setup.timezone, format,
-      invoice: {
-        number: data.number, postedAt: data.postedAt, cashierName: data.cashierName, terminalName: data.terminalName, branchName: data.branchName, taxMode: data.taxMode,
-        grossPaisa: data.grossPaisa, lineDiscountPaisa: data.lineDiscountPaisa, invoiceDiscountPaisa: data.invoiceDiscountPaisa, taxPaisa: data.taxPaisa, roundingPaisa: data.roundingPaisa,
-        totalPaisa: data.totalPaisa, paidPaisa: data.paidPaisa, changePaisa: data.changePaisa, balancePaisa: data.balancePaisa, customerName: data.customerName, customerBalancePaisa: null,
-        channel: data.channel, termsDays: data.termsDays, dueDate: data.dueDate, customerPo: data.customerPo, orderNumber: data.orderNumber, note: data.note,
-        buyerName: data.buyerName, buyerNtn: data.buyerNtn, buyerStrn: data.buyerStrn, buyerAddress: data.buyerAddress,
-        lines: data.lines.map((line) => ({
-          productName: line.productName, variantName: line.variantName, sku: line.sku, unitName: line.unitName, quantity: line.quantity, unitPricePaisa: line.unitPricePaisa,
-          lineDiscountPaisa: line.lineDiscountPaisa, invoiceDiscountSharePaisa: line.invoiceDiscountSharePaisa, taxRateBps: line.taxRateBps, taxPaisa: line.taxPaisa, totalPaisa: line.totalPaisa,
-        })),
-        payments: [],
-      },
+      invoice: invoicePrintDoc(data),
     });
   }
 
@@ -72,7 +62,7 @@ export function InvoicePage() {
       {data.note && <p className="muted">{data.note}</p>}
       <div className="button-row">
         {data.customerId && mayLedger && owing > 0 && <Link className="button primary" to={`/customers/${data.customerId}/ledger`}>Receive a payment (khata)</Link>}
-        <a className="button secondary" href={whatsappShareLink(message)} target="_blank" rel="noreferrer">Share on WhatsApp</a>
+        <ShareLinkButton type="invoice" id={data.id} message={(url) => `${message} ${url}`} />
       </div>
       {setup && <div className="pay-row">
         <SelectInput aria-label="Print format" value={format} onChange={(event) => setFormat(event.target.value as PrintFormat)}>

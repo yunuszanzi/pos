@@ -1,16 +1,17 @@
 import { useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { whatsappLink, whatsappShareLink } from "../../../shared/khata";
 import { formatBps, formatPkr } from "../../../shared/money";
 import { quotationShareMessage, quotationStatusLabels } from "../../../shared/quotations";
 import { formatDay, printFormatLabels, printFormats, type PrintFormat } from "../../../shared/receipt";
 import { getQuotationById, moveQuotation, type Quotation, type QuotationMove } from "../../api/quotationsApi";
 import { ErrorMessage, PageTitle, SelectInput, SuccessMessage } from "../../app/FormElements";
 import { useCan } from "../../app/permissions";
+import { quotationPrintDoc } from "../../pos/documentPrint";
 import { ReceiptPrinter, type PrintJob } from "../../pos/Receipt";
 import { dayText } from "../purchasing/dayText";
 import { MakeInvoicePanel } from "../invoices/MakeInvoicePanel";
+import { ShareLinkButton } from "../sharing/ShareLinkButton";
 import { ConvertToOrderPanel } from "./ConvertToOrderPanel";
 import { usePrintSetup } from "../purchasing/usePrintSetup";
 
@@ -71,16 +72,7 @@ export function QuotationPage() {
     if (!setup) return;
     setJob({
       business: setup.business, dateFormat: setup.dateFormat, timezone: setup.timezone, format: format || setup.defaultFormat,
-      quotation: {
-        number: data.number, revisionNo: data.revisionNo, quoteDate: data.quoteDate, validUntil: data.validUntil, branchName: data.branchName,
-        customerName: data.customerName, customerPhone: data.customerPhone, customerNtn: data.customerNtn, customerStrn: data.customerStrn,
-        terms: data.terms, note: data.note, taxMode: data.taxMode, grossPaisa: data.grossPaisa, lineDiscountPaisa: data.lineDiscountPaisa,
-        invoiceDiscountPaisa: data.invoiceDiscountPaisa, taxPaisa: data.taxPaisa, roundingPaisa: data.roundingPaisa, totalPaisa: data.totalPaisa,
-        lines: data.lines.map((line) => ({
-          productName: line.productName, variantName: line.variantName, sku: line.sku, unitName: line.unitName, quantity: line.quantity, unitPricePaisa: line.unitPricePaisa,
-          lineDiscountPaisa: line.lineDiscountPaisa, invoiceDiscountSharePaisa: line.invoiceDiscountSharePaisa, taxRateBps: line.taxRateBps, taxPaisa: line.taxPaisa, totalPaisa: line.totalPaisa,
-        })),
-      },
+      quotation: quotationPrintDoc(data),
     });
   }
 
@@ -88,8 +80,6 @@ export function QuotationPage() {
     businessName: setup?.business.tradeName ?? "", number: label, customerName: data.customerName, totalText: formatPkr(data.totalPaisa),
     validUntilText: formatDay(data.validUntil, setup?.dateFormat ?? "dd/MM/yyyy"),
   });
-  // To the customer's own number when there is one, else WhatsApp lets the person choose who.
-  const shareLink = (data.customerPhone && whatsappLink(data.customerPhone, message)) || whatsappShareLink(message);
   const mayShare = data.status !== "draft" && data.status !== "revised";
 
   return <div className="content">
@@ -117,7 +107,7 @@ export function QuotationPage() {
         {can("accept") && <button className="button primary" disabled={busy} onClick={() => void move("accept")}>{moves.accept.label}</button>}
         {can("reject") && <button className="button secondary" disabled={busy} onClick={() => void move("reject")}>{moves.reject.label}</button>}
         {can("revise") && <button className="button secondary" disabled={busy} onClick={() => void move("revise")}>{moves.revise.label}</button>}
-        {mayShare && <a className="button secondary" href={shareLink} target="_blank" rel="noreferrer">Share on WhatsApp</a>}
+        {mayShare && <ShareLinkButton type="quotation" id={data.id} phone={data.customerPhone} message={(url) => `${message} ${url}`} />}
       </div>
       {setup && <div className="pay-row">
         <SelectInput aria-label="Print format" value={format || setup.defaultFormat} onChange={(event) => setFormat(event.target.value as PrintFormat)}>

@@ -27,14 +27,14 @@ export default defineConfig({
       url: `http://127.0.0.1:${apiPort}/api/health`,
       env: { API_PORT: String(apiPort) },
       reuseExistingServer: false,
-      timeout: 60_000,
+      timeout: 180_000,
     },
     {
       command: `node node_modules/vite/bin/vite.js --host 127.0.0.1 --port ${webPort} --strictPort`,
       url: `http://127.0.0.1:${webPort}`,
       env: { API_PORT: String(apiPort) },
       reuseExistingServer: false,
-      timeout: 60_000,
+      timeout: 180_000,
     },
   ],
 });

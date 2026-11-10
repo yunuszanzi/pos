@@ -267,3 +267,15 @@ fieldset { border: 1px solid #e0e6ef; border-radius: 8px; }
 .customer-row { display: grid; padding: 8px 10px; border: 1px solid #e3e8f0; border-radius: 8px; background: #fff; text-align: left; }
 .customer-row:hover { border-color: #5c83ce; background: #f5f8ff; }
 .customer-row small { color: #6d778a; }
+
+/* ---- A document opened from a shared link (no menu, no sign-in): the printed sheet on a plain page, readable on a phone. ---- */
+.public-document { min-height: 100vh; padding: 16px; background: #f1f2f4; color: #111; }
+.public-sheet { box-sizing: border-box; max-width: 860px; margin: 0 auto; padding: 16px; overflow-x: auto; border-radius: 8px; background: #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, .15); }
+.public-sheet h1 { margin-top: 0; }
+.public-actions { max-width: 860px; margin: 16px auto 0; display: grid; gap: 8px; justify-items: start; }
+@media (max-width: 600px) {
+  .public-document { padding: 8px; }
+  .public-sheet { padding: 10px; }
+  .public-sheet .receipt-a4 .receipt-meta { grid-template-columns: 1fr; }
+  .public-sheet .receipt-a4 .receipt-rows { width: 100%; }
+}
