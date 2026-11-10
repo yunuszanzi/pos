@@ -13,6 +13,7 @@ import { reorderRoutes } from "./modules/purchasing/reorder";
 import { quotationRoutes } from "./modules/quotations/routes";
 import { challanRoutes } from "./modules/sales/challans";
 import { salesInvoiceRoutes } from "./modules/sales/invoices";
+import { publicRoutes, shareRoutes } from "./modules/shares/routes";
 import { salesOrderRoutes } from "./modules/sales/orders";
 import { purchasingRoutes } from "./modules/purchasing/routes";
 import { suppliersRoutes } from "./modules/suppliers/routes";
@@ -32,6 +33,8 @@ import { usersRoutes } from "./modules/users/routes";
 export const app = new Hono();
 
 app.get("/api/health", (context) => context.json({ status: "ok" }));
+// The one place without sign-in: reading a document through a share link (the unguessable token is the key).
+app.route("/api/public", publicRoutes);
 app.use("/api/v1/*", authenticate);
 app.route("/api/v1", authRoutes);
 app.route("/api/v1", orgRoutes);
@@ -57,6 +60,7 @@ app.route("/api/v1", quotationRoutes);
 app.route("/api/v1", salesOrderRoutes);
 app.route("/api/v1", challanRoutes);
 app.route("/api/v1", salesInvoiceRoutes);
+app.route("/api/v1", shareRoutes);
 app.route("/api/v1", returnRoutes);
 
 app.notFound((context) => apiError(context, 404, "NOT_FOUND", "API route not found"));
