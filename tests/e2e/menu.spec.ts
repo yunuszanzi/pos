@@ -7,14 +7,14 @@ test("modules that are not built yet are listed as under development and cannot 
   await signInThroughUi(page, business.ownerEmail);
 
   const soon = page.getByRole("navigation", { name: "Coming soon" });
-  await expect(soon).toContainText("Delivery challans");
+  await expect(soon).toContainText("Expenses & accounts");
   await expect(soon).toContainText("Reports & dashboard");
   await expect(soon.getByText("Under development").first()).toBeVisible();
   await expect(soon.getByRole("link")).toHaveCount(0);
 
   // Clicking one does nothing: the page does not change.
   const before = page.url();
-  await soon.getByText("Delivery challans").click();
+  await soon.getByText("Expenses & accounts").click();
   expect(page.url()).toBe(before);
   await expect(page.getByRole("heading", { name: /Welcome/ })).toBeVisible();
 

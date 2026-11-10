@@ -1,8 +1,8 @@
 import { createPortal } from "react-dom";
 import { useEffect } from "react";
 import {
-  buildCreditNoteReceipt, buildGoodsReceiptReceipt, buildPaymentReceipt, buildPurchaseBillReceipt, buildPurchaseOrderReceipt, buildPurchaseReturnReceipt, buildQuotationReceipt, buildReceipt, buildSalesOrderReceipt, buildStatementReceipt, buildSupplierPaymentReceipt, receiptPageCss, type PrintFormat, type ReceiptBusiness,
-  type ReceiptCreditNote, type ReceiptGoodsReceipt, type ReceiptInvoice, type ReceiptModel, type ReceiptPayment, type ReceiptPurchaseBill, type ReceiptPurchaseOrder, type ReceiptPurchaseReturn, type ReceiptQuotation, type ReceiptSalesOrder, type ReceiptStatement, type ReceiptSupplierPayment,
+  buildCreditNoteReceipt, buildGoodsReceiptReceipt, buildPaymentReceipt, buildPurchaseBillReceipt, buildPurchaseOrderReceipt, buildPurchaseReturnReceipt, buildQuotationReceipt, buildDeliveryChallanReceipt, buildReceipt, buildSalesOrderReceipt, buildStatementReceipt, buildSupplierPaymentReceipt, receiptPageCss, type PrintFormat, type ReceiptBusiness,
+  type ReceiptCreditNote, type ReceiptGoodsReceipt, type ReceiptInvoice, type ReceiptModel, type ReceiptPayment, type ReceiptPurchaseBill, type ReceiptPurchaseOrder, type ReceiptPurchaseReturn, type ReceiptDeliveryChallan, type ReceiptQuotation, type ReceiptSalesOrder, type ReceiptStatement, type ReceiptSupplierPayment,
 } from "../../shared/receipt";
 
 type JobBase = {
@@ -17,7 +17,7 @@ type JobBase = {
 type Documents = {
   invoice: ReceiptInvoice; payment: ReceiptPayment; creditNote: ReceiptCreditNote; statement: ReceiptStatement;
   purchaseOrder: ReceiptPurchaseOrder; goodsReceipt: ReceiptGoodsReceipt; purchaseBill: ReceiptPurchaseBill;
-  supplierPayment: ReceiptSupplierPayment; purchaseReturn: ReceiptPurchaseReturn; quotation: ReceiptQuotation; salesOrder: ReceiptSalesOrder;
+  supplierPayment: ReceiptSupplierPayment; purchaseReturn: ReceiptPurchaseReturn; quotation: ReceiptQuotation; salesOrder: ReceiptSalesOrder; deliveryChallan: ReceiptDeliveryChallan;
 };
 type OneDocument<K extends keyof Documents> = { [P in K]: Documents[P] } & { [P in Exclude<keyof Documents, K>]?: undefined };
 /** A sale, money received, a credit note, a customer statement, a purchase order or a goods receipt: exactly one of them. */
@@ -34,6 +34,7 @@ const modelOf = (job: PrintJob) => {
   if (job.purchaseReturn) return buildPurchaseReturnReceipt(job.purchaseReturn, options);
   if (job.quotation) return buildQuotationReceipt(job.quotation, options);
   if (job.salesOrder) return buildSalesOrderReceipt(job.salesOrder, options);
+  if (job.deliveryChallan) return buildDeliveryChallanReceipt(job.deliveryChallan, options);
   return job.payment ? buildPaymentReceipt(job.payment, options) : buildReceipt(job.invoice, job.format, options);
 };
 

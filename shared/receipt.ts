@@ -753,3 +753,61 @@ export function buildSalesOrderReceipt(order: ReceiptSalesOrder, options: Receip
     footer: order.note ? [order.note] : [],
   };
 }
+
+// ---------------------------------------------------------------- delivery challans (v0.6)
+
+export type ReceiptDeliveryChallan = {
+  number: string;
+  /** When it left, or was written if it has not left yet. */
+  at: string;
+  branchName: string;
+  customerName: string;
+  customerPhone: string;
+  orderNumber: string;
+  customerPo: string;
+  driverName: string;
+  vehicleNo: string;
+  route: string;
+  deliveryAddress: string;
+  note: string;
+  lines: Array<{ productName: string; variantName: string; sku: string; unitName: string; quantity: string }>;
+};
+
+/** A dispatch note: what is on the truck and who is taking it where. It carries no prices; the customer signs for the goods. */
+export function buildDeliveryChallanReceipt(challan: ReceiptDeliveryChallan, options: ReceiptOptions): ReceiptModel {
+  const { business } = options;
+  const dateText = formatDocumentDate(challan.at, options.dateFormat, options.timezone);
+  return {
+    title: "DELIVERY CHALLAN",
+    duplicateBanner: duplicateBanner(options),
+    businessName: business.tradeName,
+    headerLines: headerLinesOf(business, challan.branchName),
+    number: challan.number,
+    dateText,
+    cashier: "",
+    terminal: "",
+    customer: challan.customerName,
+    meta: [
+      { label: "No.", value: challan.number }, { label: "Date", value: dateText }, { label: "Customer", value: challan.customerName },
+      ...(challan.customerPhone ? [{ label: "Phone", value: challan.customerPhone }] : []),
+      { label: "Order", value: challan.orderNumber },
+      ...(challan.customerPo ? [{ label: "Customer PO", value: challan.customerPo }] : []),
+      ...(challan.deliveryAddress ? [{ label: "Deliver to", value: challan.deliveryAddress }] : []),
+      ...(challan.driverName ? [{ label: "Driver", value: challan.driverName }] : []),
+      ...(challan.vehicleNo ? [{ label: "Vehicle", value: challan.vehicleNo }] : []),
+      ...(challan.route ? [{ label: "Route", value: challan.route }] : []),
+    ],
+    lines: challan.lines.map((line) => ({
+      name: line.variantName ? `${line.productName} — ${line.variantName}` : line.productName,
+      detail: `${line.sku} · ${line.unitName}`,
+      quantity: formatQuantity(parseQuantity(line.quantity)),
+      unitPrice: "",
+      discount: null,
+      total: "",
+    })),
+    totals: [],
+    taxRows: [],
+    payments: [],
+    footer: [...(challan.note ? [challan.note] : []), "Goods received in good condition.", "Received by (name and signature): ____________________"],
+  };
+}

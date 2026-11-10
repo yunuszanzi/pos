@@ -8,8 +8,10 @@ import { getSalesOrderById, moveSalesOrder, type SalesOrder } from "../../api/sa
 import { ErrorMessage, PageTitle, SelectInput, SuccessMessage } from "../../app/FormElements";
 import { useCan } from "../../app/permissions";
 import { ReceiptPrinter, type PrintJob } from "../../pos/Receipt";
+import { challanStatusLabels } from "../../../shared/schemas/deliveryChallans";
 import { dayText } from "../purchasing/dayText";
 import { usePrintSetup } from "../purchasing/usePrintSetup";
+import { WriteChallanPanel } from "./WriteChallanPanel";
 
 type Move = "cancel" | "close";
 const moves: Record<Move, { label: string; done: string }> = {
@@ -22,6 +24,7 @@ export function SalesOrderPage() {
   const { id = "" } = useParams();
   const queryClient = useQueryClient();
   const mayManage = useCan("sales_orders.manage");
+  const mayDeliver = useCan("delivery.manage");
   const setup = usePrintSetup();
   const [format, setFormat] = useState<PrintFormat | "">("");
   const [job, setJob] = useState<PrintJob | null>(null);
@@ -118,6 +121,18 @@ export function SalesOrderPage() {
       </table></div>
       <p className="muted">"Delivered" and "Billed" count in pieces (the base unit). {data.status === "open" || data.status === "partly_delivered" ? "The stock still to be delivered is held for this order." : ""}</p>
     </section>
+    {mayDeliver && (data.status === "open" || data.status === "partly_delivered") && <WriteChallanPanel order={data} />}
+
+    {data.challans.length > 0 && <section className="panel stack">
+      <h2>Delivery challans</h2>
+      <div className="table-scroll"><table aria-label="Challans for this order">
+        <thead><tr><th>Challan</th><th>Driver</th><th>Vehicle</th><th>Status</th></tr></thead>
+        <tbody>{data.challans.map((challan) => <tr key={challan.id}>
+          <td><Link className="text-button" to={`/delivery-challans/${challan.id}`}>{challan.number}</Link></td>
+          <td>{challan.driverName}</td><td>{challan.vehicleNo}</td><td>{challanStatusLabels[challan.status]}</td>
+        </tr>)}</tbody>
+      </table></div>
+    </section>}
     <ReceiptPrinter job={job} onDone={() => setJob(null)} />
   </div>;
 }

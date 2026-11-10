@@ -39,6 +39,8 @@ const QuotationFormPage = lazy(() => import("../features/quotations/QuotationFor
 const QuotationPage = lazy(() => import("../features/quotations/QuotationPage").then(({ QuotationPage: Page }) => ({ default: Page })));
 const SalesOrdersPage = lazy(() => import("../features/sales-orders/SalesOrdersPage").then(({ SalesOrdersPage: Page }) => ({ default: Page })));
 const SalesOrderFormPage = lazy(() => import("../features/sales-orders/SalesOrderFormPage").then(({ SalesOrderFormPage: Page }) => ({ default: Page })));
+const DeliveryChallansPage = lazy(() => import("../features/delivery/DeliveryChallansPage").then(({ DeliveryChallansPage: Page }) => ({ default: Page })));
+const DeliveryChallanPage = lazy(() => import("../features/delivery/DeliveryChallanPage").then(({ DeliveryChallanPage: Page }) => ({ default: Page })));
 const SalesOrderPage = lazy(() => import("../features/sales-orders/SalesOrderPage").then(({ SalesOrderPage: Page }) => ({ default: Page })));
 const ReceiveGoodsPage = lazy(() => import("../features/purchasing/ReceiveGoodsPage").then(({ ReceiveGoodsPage: Page }) => ({ default: Page })));
 const GoodsReceiptsPage = lazy(() => import("../features/purchasing/GoodsReceiptsPage").then(({ GoodsReceiptsPage: Page }) => ({ default: Page })));
@@ -108,6 +110,8 @@ const appRoutes: AppRoute[] = [
   { path: "/sales-orders", label: "Sales orders", permission: "sales_orders.view", element: <SalesOrdersPage /> },
   { path: "/sales-orders/new", label: "New sales order", permission: "sales_orders.manage", element: <SalesOrderFormPage />, nav: false },
   { path: "/sales-orders/:id", label: "Sales order", permission: "sales_orders.view", element: <SalesOrderPage />, nav: false },
+  { path: "/delivery-challans", label: "Delivery challans", permission: "delivery.view", element: <DeliveryChallansPage /> },
+  { path: "/delivery-challans/:id", label: "Delivery challan", permission: "delivery.view", element: <DeliveryChallanPage />, nav: false },
   { path: "/purchase-orders", label: "Purchase orders", permission: "purchasing.view", element: <PurchaseOrdersPage /> },
   { path: "/purchase-orders/new", label: "New purchase order", permission: "purchasing.order", element: <PurchaseOrderFormPage />, nav: false },
   { path: "/purchase-orders/:id/edit", label: "Change purchase order", permission: "purchasing.order", element: <PurchaseOrderFormPage />, nav: false },

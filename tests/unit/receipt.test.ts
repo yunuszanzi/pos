@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCreditNoteReceipt, buildGoodsReceiptReceipt, buildPaymentReceipt, buildPurchaseBillReceipt, buildPurchaseOrderReceipt, buildPurchaseReturnReceipt, buildQuotationReceipt, buildSalesOrderReceipt, buildSupplierPaymentReceipt, buildReceipt, buildStatementReceipt, formatDay, formatDocumentDate, receiptPageCss, type ReceiptBusiness, type ReceiptCreditNote, type ReceiptInvoice, type ReceiptPayment } from "../../shared/receipt";
+import { buildCreditNoteReceipt, buildGoodsReceiptReceipt, buildPaymentReceipt, buildPurchaseBillReceipt, buildPurchaseOrderReceipt, buildPurchaseReturnReceipt, buildDeliveryChallanReceipt, buildQuotationReceipt, buildSalesOrderReceipt, buildSupplierPaymentReceipt, buildReceipt, buildStatementReceipt, formatDay, formatDocumentDate, receiptPageCss, type ReceiptBusiness, type ReceiptCreditNote, type ReceiptInvoice, type ReceiptPayment } from "../../shared/receipt";
 
 const business: ReceiptBusiness = {
   tradeName: "SGA Balloons", legalName: "SGA Balloons (Pvt) Ltd", address: "Shop 4, Saddar, Karachi", phone: "021-111", ntn: "1234567-8", strn: null, receiptFooter: "",
@@ -336,5 +336,22 @@ describe("sales order print", () => {
     ]));
     expect(model.totals.at(-1)).toEqual({ label: "ORDER TOTAL", value: "Rs 45.00", strong: true });
     expect(model.footer).toEqual(["Call before delivery"]);
+  });
+});
+
+describe("delivery challan print", () => {
+  it("prints what is on the truck, who takes it where, no prices, and a line to sign", () => {
+    const model = buildDeliveryChallanReceipt({
+      number: "DC-KHI-000002", at: "2026-11-10T09:30:00Z", branchName: "Karachi", customerName: "Bilal Wholesale", customerPhone: "0301-1111111", orderNumber: "SO-KHI-000003",
+      customerPo: "PO-77", driverName: "Rafiq", vehicleNo: "KHI-1234", route: "Saddar", deliveryAddress: "Shop 9, Jodia Bazaar", note: "",
+      lines: [{ productName: "Latex Balloon", variantName: "Red", sku: "BAL-RED", unitName: "Carton", quantity: "2" }],
+    }, options);
+    expect(model.title).toBe("DELIVERY CHALLAN");
+    expect(model.meta).toEqual(expect.arrayContaining([
+      { label: "Date", value: "10/11/2026 14:30" }, { label: "Order", value: "SO-KHI-000003" }, { label: "Driver", value: "Rafiq" }, { label: "Vehicle", value: "KHI-1234" }, { label: "Route", value: "Saddar" },
+    ]));
+    expect(model.lines).toEqual([{ name: "Latex Balloon — Red", detail: "BAL-RED · Carton", quantity: "2", unitPrice: "", discount: null, total: "" }]);
+    expect(model.totals).toEqual([]);
+    expect(model.footer.at(-1)).toMatch(/Received by/);
   });
 });
