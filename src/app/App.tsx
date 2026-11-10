@@ -34,6 +34,9 @@ const CustomerLedgerPage = lazy(() => import("../features/customers/CustomerLedg
 const PurchaseOrdersPage = lazy(() => import("../features/purchasing/PurchaseOrdersPage").then(({ PurchaseOrdersPage: Page }) => ({ default: Page })));
 const PurchaseOrderFormPage = lazy(() => import("../features/purchasing/PurchaseOrderFormPage").then(({ PurchaseOrderFormPage: Page }) => ({ default: Page })));
 const PurchaseOrderPage = lazy(() => import("../features/purchasing/PurchaseOrderPage").then(({ PurchaseOrderPage: Page }) => ({ default: Page })));
+const QuotationsPage = lazy(() => import("../features/quotations/QuotationsPage").then(({ QuotationsPage: Page }) => ({ default: Page })));
+const QuotationFormPage = lazy(() => import("../features/quotations/QuotationFormPage").then(({ QuotationFormPage: Page }) => ({ default: Page })));
+const QuotationPage = lazy(() => import("../features/quotations/QuotationPage").then(({ QuotationPage: Page }) => ({ default: Page })));
 const ReceiveGoodsPage = lazy(() => import("../features/purchasing/ReceiveGoodsPage").then(({ ReceiveGoodsPage: Page }) => ({ default: Page })));
 const GoodsReceiptsPage = lazy(() => import("../features/purchasing/GoodsReceiptsPage").then(({ GoodsReceiptsPage: Page }) => ({ default: Page })));
 const GoodsReceiptPage = lazy(() => import("../features/purchasing/GoodsReceiptPage").then(({ GoodsReceiptPage: Page }) => ({ default: Page })));
@@ -95,6 +98,10 @@ const appRoutes: AppRoute[] = [
   { path: "/suppliers/opening-payables", label: "Opening payables", permission: "suppliers.manage", element: <OpeningPayablesPage />, nav: false },
   { path: "/suppliers/:id/ledger", label: "Supplier ledger", permission: "suppliers.ledger", element: <SupplierLedgerPage />, nav: false },
   { path: "/suppliers/:id", label: "Edit supplier", permission: "suppliers.manage", element: <SupplierFormPage />, nav: false },
+  { path: "/quotations", label: "Quotations", permission: "quotations.view", element: <QuotationsPage /> },
+  { path: "/quotations/new", label: "New quotation", permission: "quotations.manage", element: <QuotationFormPage />, nav: false },
+  { path: "/quotations/:id/edit", label: "Change quotation", permission: "quotations.manage", element: <QuotationFormPage />, nav: false },
+  { path: "/quotations/:id", label: "Quotation", permission: "quotations.view", element: <QuotationPage />, nav: false },
   { path: "/purchase-orders", label: "Purchase orders", permission: "purchasing.view", element: <PurchaseOrdersPage /> },
   { path: "/purchase-orders/new", label: "New purchase order", permission: "purchasing.order", element: <PurchaseOrderFormPage />, nav: false },
   { path: "/purchase-orders/:id/edit", label: "Change purchase order", permission: "purchasing.order", element: <PurchaseOrderFormPage />, nav: false },

@@ -626,3 +626,66 @@ export function buildPurchaseReturnReceipt(note: ReceiptPurchaseReturn, options:
     footer: [],
   };
 }
+
+// ---------------------------------------------------------------- quotations (v0.6)
+
+export type ReceiptQuotation = {
+  number: string;
+  /** Shown as "Rev 2" once there is more than one. */
+  revisionNo: number;
+  /** yyyy-mm-dd */
+  quoteDate: string;
+  validUntil: string;
+  branchName: string;
+  customerName: string;
+  customerPhone: string;
+  customerNtn: string | null;
+  customerStrn: string | null;
+  terms: string;
+  note: string;
+  taxMode: "inclusive" | "exclusive";
+  grossPaisa: number;
+  lineDiscountPaisa: number;
+  invoiceDiscountPaisa: number;
+  taxPaisa: number;
+  roundingPaisa: number;
+  totalPaisa: number;
+  lines: ReceiptInvoice["lines"];
+};
+
+/** A quotation: the same lines, discounts and tax as the invoice it may become, with how long the offer stands. It is not a bill. */
+export function buildQuotationReceipt(quote: ReceiptQuotation, options: ReceiptOptions): ReceiptModel {
+  const { business } = options;
+  const dateText = formatDay(quote.quoteDate, options.dateFormat);
+  const totals: ReceiptRow[] = [{ label: "Subtotal", value: formatPkr(quote.grossPaisa) }];
+  if (quote.lineDiscountPaisa > 0) totals.push({ label: "Item discounts", value: negative(quote.lineDiscountPaisa) });
+  if (quote.invoiceDiscountPaisa > 0) totals.push({ label: "Discount", value: negative(quote.invoiceDiscountPaisa) });
+  totals.push({ label: quote.taxMode === "inclusive" ? "Tax (included)" : "Tax", value: formatPkr(quote.taxPaisa) });
+  if (quote.roundingPaisa !== 0) totals.push({ label: "Rounding", value: quote.roundingPaisa < 0 ? negative(-quote.roundingPaisa) : formatPkr(quote.roundingPaisa) });
+  totals.push({ label: "QUOTED TOTAL", value: formatPkr(quote.totalPaisa), strong: true });
+  const registration = [quote.customerNtn ? `NTN ${quote.customerNtn}` : "", quote.customerStrn ? `STRN ${quote.customerStrn}` : ""].filter(Boolean).join("  ");
+  return {
+    title: "QUOTATION",
+    duplicateBanner: duplicateBanner(options),
+    businessName: business.tradeName,
+    headerLines: headerLinesOf(business, quote.branchName),
+    number: quote.number,
+    dateText,
+    cashier: "",
+    terminal: "",
+    customer: quote.customerName,
+    meta: [
+      { label: "No.", value: quote.revisionNo > 1 ? `${quote.number} Rev ${quote.revisionNo}` : quote.number },
+      { label: "Date", value: dateText },
+      { label: "Valid until", value: formatDay(quote.validUntil, options.dateFormat) },
+      { label: "For", value: quote.customerName },
+      ...(quote.customerPhone ? [{ label: "Phone", value: quote.customerPhone }] : []),
+      ...(registration ? [{ label: "Buyer", value: registration }] : []),
+    ],
+    lines: lineRowsOf(quote.lines),
+    totals,
+    taxRows: taxRowsOf(quote.lines),
+    payments: [],
+    footer: [...(quote.terms ? [`Terms: ${quote.terms}`] : []), ...(quote.note ? [quote.note] : []), "This is a quotation, not a bill. Prices hold until the date above."],
+  };
+}

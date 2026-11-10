@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCreditNoteReceipt, buildGoodsReceiptReceipt, buildPaymentReceipt, buildPurchaseBillReceipt, buildPurchaseOrderReceipt, buildPurchaseReturnReceipt, buildSupplierPaymentReceipt, buildReceipt, buildStatementReceipt, formatDay, formatDocumentDate, receiptPageCss, type ReceiptBusiness, type ReceiptCreditNote, type ReceiptInvoice, type ReceiptPayment } from "../../shared/receipt";
+import { buildCreditNoteReceipt, buildGoodsReceiptReceipt, buildPaymentReceipt, buildPurchaseBillReceipt, buildPurchaseOrderReceipt, buildPurchaseReturnReceipt, buildQuotationReceipt, buildSupplierPaymentReceipt, buildReceipt, buildStatementReceipt, formatDay, formatDocumentDate, receiptPageCss, type ReceiptBusiness, type ReceiptCreditNote, type ReceiptInvoice, type ReceiptPayment } from "../../shared/receipt";
 
 const business: ReceiptBusiness = {
   tradeName: "SGA Balloons", legalName: "SGA Balloons (Pvt) Ltd", address: "Shop 4, Saddar, Karachi", phone: "021-111", ntn: "1234567-8", strn: null, receiptFooter: "",
@@ -298,5 +298,25 @@ it("prints a payment voucher with the bills it settled and what is still owed, o
     expect(model.meta).toEqual(expect.arrayContaining([{ label: "Goods receipt", value: "GRN-KHI-000003" }, { label: "Reason", value: "Damaged in transit" }]));
     expect(model.totals).toEqual([{ label: "Goods returned", value: "Rs 360.00" }, { label: "Input tax reversed", value: "Rs 64.80" }, { label: "DEBIT TOTAL", value: "Rs 424.80", strong: true }]);
     expect(model.payments).toEqual([{ label: "Taken off bills", value: "Rs 300.00" }, { label: "Credit on account", value: "Rs 124.80" }]);
+  });
+});
+describe("quotation print", () => {
+  it("prints the offer with its validity, the revision, the buyer's registration and the terms", () => {
+    const options = { business: { tradeName: "SGA Balloons", legalName: "SGA", address: "Karachi", phone: "021-1", ntn: "123", strn: null, receiptFooter: "" }, dateFormat: "dd/MM/yyyy", timezone: "Asia/Karachi" };
+    const model = buildQuotationReceipt({
+      number: "QUO-KHI-000007", revisionNo: 2, quoteDate: "2026-11-10", validUntil: "2026-11-24", branchName: "Karachi", customerName: "Ali Traders", customerPhone: "0300-1234567",
+      customerNtn: "7654321-1", customerStrn: null, terms: "50% advance", note: "", taxMode: "exclusive", grossPaisa: 100_000, lineDiscountPaisa: 10_000, invoiceDiscountPaisa: 0, taxPaisa: 16_200,
+      roundingPaisa: 0, totalPaisa: 106_200,
+      lines: [{ productName: "Latex Balloon", variantName: "Red", sku: "BAL-RED", unitName: "Carton", quantity: "2", unitPricePaisa: 50_000, lineDiscountPaisa: 10_000, invoiceDiscountSharePaisa: 0, taxRateBps: 1800, taxPaisa: 16_200, totalPaisa: 106_200 }],
+    }, options);
+    expect(model.title).toBe("QUOTATION");
+    expect(model.meta).toEqual(expect.arrayContaining([
+      { label: "No.", value: "QUO-KHI-000007 Rev 2" }, { label: "Valid until", value: "24/11/2026" }, { label: "Buyer", value: "NTN 7654321-1" },
+    ]));
+    expect(model.totals).toEqual([
+      { label: "Subtotal", value: "Rs 1,000.00" }, { label: "Item discounts", value: "-Rs 100.00" }, { label: "Tax", value: "Rs 162.00" }, { label: "QUOTED TOTAL", value: "Rs 1,062.00", strong: true },
+    ]);
+    expect(model.footer[0]).toBe("Terms: 50% advance");
+    expect(model.lines[0].total).toBe("Rs 1,062.00");
   });
 });
