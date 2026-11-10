@@ -16,6 +16,7 @@ import { idempotent } from "../../lib/idempotency";
 import { getActorId, getPrincipal, hasPermission, requirePermission } from "../../lib/permissions";
 import { validateJson } from "../../lib/validate";
 import { approveByManager } from "./approval";
+import { describeShortage as describeOrderShortage } from "./orders";
 import { resolveSalesLocationId } from "./location";
 import { canSeeCost, escapeLike, quantityText } from "../products/service";
 
@@ -46,6 +47,8 @@ export function describeCredit(code: string, message: string, customerName: stri
 
 /** The database says which SKU ran short by id; the cashier needs its name and the numbers. */
 async function describeShortage(businessId: string, message: string): Promise<string> {
+  // Stock held for open sales orders has its own wording (it names what is reserved).
+  if (/ available \(/.test(message)) return describeOrderShortage(businessId, message);
   const found = /variant ([0-9a-f-]{36}) has (-?[\d.]+) on hand, needs ([\d.]+)/i.exec(message);
   if (!found) return "Not enough stock to complete this sale";
   const [row] = await db.execute<{ name: string; sku: string }>(sql`

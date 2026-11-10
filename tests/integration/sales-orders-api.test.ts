@@ -181,6 +181,30 @@ integration("sales orders and converting quotations", { timeout: 300_000 }, () =
     expect((await act(context, `/quotations/${draft.id}/convert-to-order`)).status).toBe(409);
   });
 
+  it("the till cannot sell stock that open orders hold, and sells it again once the order is cancelled", async () => {
+    const context = await setup(100);
+    const placed = (await placeOrder(context, [line(context, "90")])).body.order; // 10 are free
+    expect(await stockOf(context)).toMatchObject({ onHand: "100", reserved: "90", available: "10" });
+    const shift = await callApi(context.business.ownerToken, "POST", "/shifts/open", { terminalId: context.business.terminalId, body: { openingFloatPaisa: 0 }, idempotencyKey: key() });
+    const client = sql();
+    const [{ id: cashId }] = await client<{ id: string }[]>`SELECT id FROM payment_methods WHERE business_id = ${context.business.businessId} AND code = 'cash'`;
+    await client.end();
+    const sell = (quantity: string) => callApi(context.business.ownerToken, "POST", "/sales", {
+      terminalId: context.business.terminalId, idempotencyKey: key(),
+      body: { shiftId: shift.body.id, lines: [line(context, quantity)], payments: [{ methodId: cashId, amountPaisa: Number(quantity) * 500 }] },
+    });
+    const refused = await sell("11");
+    expect(refused.status, JSON.stringify(refused.body)).toBe(409);
+    expect(refused.body.error.code).toBe("STOCK_INSUFFICIENT");
+    expect(refused.body.error.message).toMatch(/10 available \(100 on hand, 90 already promised/);
+    expect((await sell("10")).status).toBe(201);
+    expect(await stockOf(context)).toMatchObject({ onHand: "90", reserved: "90", available: "0" });
+    // Cancel the order and the held stock can be sold.
+    expect((await act(context, `/sales-orders/${placed.id}/cancel`)).status).toBe(200);
+    expect((await sell("50")).status).toBe(201);
+    expect(await stockOf(context)).toMatchObject({ onHand: "40", reserved: "0" });
+  });
+
   it("lists orders by status and customer, and keeps cashiers out", async () => {
     const context = await setup(100);
     const a = (await placeOrder(context, [line(context, "5")])).body.order;
