@@ -233,7 +233,11 @@ test("the till shows what is in stock, warns when a row asks for more, and the d
   await expect(page.getByRole("alert")).toContainText("Not enough stock of Product A (A): 100 on hand, 150 needed");
   await page.keyboard.press("Escape");
 
-  await page.getByRole("button", { name: /^Clear/ }).click();
+  await page.getByRole("button", { name: "Cancel sale" }).click();
+  const cancelDialog = page.getByRole("dialog", { name: "Cancel this sale" });
+  await cancelDialog.getByLabel("Why?").selectOption({ index: 1 });
+  await cancelDialog.getByRole("button", { name: "Cancel the sale" }).click();
+  await expect(page.getByText("Sale cancelled and logged")).toBeVisible();
   await scan(page, "4*A-PC");
   await page.getByRole("button", { name: /^Pay/ }).click();
   await page.getByRole("button", { name: /^Pay Rs 20.00/ }).click();
