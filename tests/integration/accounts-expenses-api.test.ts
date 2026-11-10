@@ -218,6 +218,48 @@ integration("accounts and expenses", { timeout: 300_000 }, () => {
     expect((await callApi(context.business.ownerToken, "GET", "/expenses?reversed=hide")).body.total).toBe(0);
   });
 
+  it("keeps the photo or PDF of a bill in private storage and hands out a short-lived link", async () => {
+    const context = await setup(false);
+    const bank = await newAccount(context, "HBL Current", "bank", 100_000);
+    const expense = (await spend(context, { amountPaisa: 4_000, paidFrom: "account", accountId: bank.id })).body;
+    const { app } = await import("../../server/app");
+    const upload = async (token: string, id: string, file: File | null) => {
+      const form = new FormData();
+      if (file) form.set("file", file);
+      const response = await app.fetch(new Request(`http://localhost/api/v1/expenses/${id}/attachment`, { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: form }));
+      return { status: response.status, body: await response.json() as Record<string, any> };
+    };
+    // A 1x1 PNG.
+    const png = Uint8Array.from(atob("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="), (char) => char.charCodeAt(0));
+
+    expect((await callApi(context.business.ownerToken, "GET", `/expenses/${expense.id}/attachment`)).status).toBe(404);
+    const stored = await upload(context.business.ownerToken, expense.id, new File([png], "bill.png", { type: "image/png" }));
+    expect(stored.status, JSON.stringify(stored.body)).toBe(201);
+    expect(stored.body).toMatchObject({ hasAttachment: true, attachmentName: "bill.png" });
+    const link = await callApi(context.business.ownerToken, "GET", `/expenses/${expense.id}/attachment`);
+    expect(link.status, JSON.stringify(link.body)).toBe(200);
+    const fetched = await fetch(link.body.url);
+    expect(fetched.status).toBe(200);
+    expect(new Uint8Array(await fetched.arrayBuffer())).toEqual(png);
+    // The file is not public: the bucket path without the signed token gives nothing.
+    expect((await fetch(link.body.url.split("?")[0])).status).toBeGreaterThanOrEqual(400);
+
+    // Only photos and PDFs, and not too big.
+    expect((await upload(context.business.ownerToken, expense.id, new File(["hello"], "bill.txt", { type: "text/plain" }))).status).toBe(400);
+    expect((await upload(context.business.ownerToken, expense.id, null)).status).toBe(400);
+    expect((await upload(context.business.ownerToken, expense.id, new File([new Uint8Array(5 * 1024 * 1024 + 1)], "huge.pdf", { type: "application/pdf" }))).status).toBe(413);
+    // A new file replaces the old one.
+    const replaced = await upload(context.business.ownerToken, expense.id, new File(["%PDF-1.4"], "bill.pdf", { type: "application/pdf" }));
+    expect(replaced.body.attachmentName).toBe("bill.pdf");
+
+    // Another business cannot see or attach to it; a reversed expense takes no new file.
+    const other = await createTestBusiness();
+    expect((await callApi(other.ownerToken, "GET", `/expenses/${expense.id}/attachment`)).status).toBe(404);
+    expect((await upload(other.ownerToken, expense.id, new File([png], "x.png", { type: "image/png" }))).status).toBe(404);
+    await callApi(context.business.ownerToken, "POST", `/expenses/${expense.id}/reverse`, { body: { reason: "Duplicate" }, idempotencyKey: key() });
+    expect((await upload(context.business.ownerToken, expense.id, new File([png], "again.png", { type: "image/png" }))).status).toBe(409);
+  });
+
   it("keeps cashiers out and lets a viewer look but not touch", async () => {
     const context = await setup(false);
     const cashier = await inviteTestStaff(context.business, "Cashier");

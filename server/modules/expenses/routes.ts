@@ -1,9 +1,11 @@
 import { sql } from "drizzle-orm";
+import { randomUUID } from "node:crypto";
 import { Hono } from "hono";
 import { expenseCategorySchema, expenseSchema, reverseExpenseSchema } from "../../../shared/schemas/accounts";
 import { auditPrincipal } from "../../lib/audit";
 import { db } from "../../lib/db";
 import { conflictOrThrow } from "../../lib/dbErrors";
+import { supabaseAdmin } from "../../lib/supabaseAdmin";
 import { apiError, paramId } from "../../lib/http";
 import { idempotent } from "../../lib/idempotency";
 import { getActorId, getPrincipal, requirePermission } from "../../lib/permissions";
@@ -165,4 +167,47 @@ expenseRoutes.post("/expenses/:id/reverse", create, idempotent(), validateJson(r
   }
   await auditPrincipal(context, principal, "expense", id, "reverse", null, { reason: input.reason });
   return context.json(await loadExpense(businessId, id));
+});
+
+// ---------------------------------------------------------------- the bill's photo or PDF
+
+const bucket = "expense-attachments";
+const maxBytes = 5 * 1024 * 1024;
+const types: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "application/pdf": "pdf" };
+
+/** Attaches (or replaces) the photo or PDF of the bill. The file goes to private storage; the expense records only where. */
+expenseRoutes.post("/expenses/:id/attachment", create, async (context) => {
+  const principal = getPrincipal(context);
+  const businessId = principal.businessId!;
+  const id = paramId(context);
+  const [expense] = await db.execute<{ attachment_path: string | null; reversed_at: string | null }>(sql`select attachment_path, reversed_at from expenses where id = ${id} and business_id = ${businessId}`);
+  if (!expense) return apiError(context, 404, "NOT_FOUND", "Expense not found");
+  if (expense.reversed_at) return apiError(context, 409, "ALREADY_REVERSED", "A reversed expense cannot take a new attachment");
+  const form = await context.req.parseBody().catch(() => null);
+  const file = form?.file;
+  if (!(file instanceof File)) return apiError(context, 400, "VALIDATION_FAILED", "Choose a photo or a PDF of the bill");
+  const extension = types[file.type];
+  if (!extension) return apiError(context, 400, "VALIDATION_FAILED", "The bill must be a photo (JPEG, PNG, WebP) or a PDF");
+  if (file.size === 0 || file.size > maxBytes) return apiError(context, 413, "FILE_TOO_LARGE", "The bill must be less than 5 MB");
+  const path = `${businessId}/${id}/${randomUUID()}.${extension}`;
+  const uploaded = await supabaseAdmin.storage.from(bucket).upload(path, await file.arrayBuffer(), { contentType: file.type, upsert: false });
+  if (uploaded.error) {
+    console.error("Expense attachment upload failed", uploaded.error);
+    return apiError(context, 502, "STORAGE_UNAVAILABLE", "The file could not be stored. Try again in a moment.");
+  }
+  await db.execute(sql`update expenses set attachment_path = ${path}, attachment_name = ${file.name.slice(0, 200)} where id = ${id} and business_id = ${businessId}`);
+  // The old file, if there was one, is no use any more.
+  if (expense.attachment_path) await supabaseAdmin.storage.from(bucket).remove([expense.attachment_path]).catch(() => undefined);
+  await auditPrincipal(context, principal, "expense", id, "attach", null, { name: file.name, bytes: file.size });
+  return context.json(await loadExpense(businessId, id), 201);
+});
+
+/** A link to the bill that works for five minutes. The file itself is never public. */
+expenseRoutes.get("/expenses/:id/attachment", view, async (context) => {
+  const businessId = getPrincipal(context).businessId!;
+  const [expense] = await db.execute<{ attachment_path: string | null; attachment_name: string | null }>(sql`select attachment_path, attachment_name from expenses where id = ${paramId(context)} and business_id = ${businessId}`);
+  if (!expense?.attachment_path) return apiError(context, 404, "NOT_FOUND", "This expense has no attachment");
+  const signed = await supabaseAdmin.storage.from(bucket).createSignedUrl(expense.attachment_path, 300);
+  if (signed.error || !signed.data) return apiError(context, 502, "STORAGE_UNAVAILABLE", "The file could not be opened. Try again in a moment.");
+  return context.json({ url: signed.data.signedUrl, name: expense.attachment_name, expiresInSeconds: 300 });
 });
