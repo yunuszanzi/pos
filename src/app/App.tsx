@@ -51,6 +51,7 @@ const ExpenseFormPage = lazy(() => import("../features/expenses/ExpenseFormPage"
 const ExpensePage = lazy(() => import("../features/expenses/ExpensePage").then(({ ExpensePage: Page }) => ({ default: Page })));
 const ReportsPage = lazy(() => import("../features/reports/ReportsPage").then(({ ReportsPage: Page }) => ({ default: Page })));
 const ReportPage = lazy(() => import("../features/reports/ReportPage").then(({ ReportPage: Page }) => ({ default: Page })));
+const DashboardPanel = lazy(() => import("../features/dashboard/DashboardPanel").then(({ DashboardPanel: Panel }) => ({ default: Panel })));
 const SalesOrderPage = lazy(() => import("../features/sales-orders/SalesOrderPage").then(({ SalesOrderPage: Page }) => ({ default: Page })));
 const ReceiveGoodsPage = lazy(() => import("../features/purchasing/ReceiveGoodsPage").then(({ ReceiveGoodsPage: Page }) => ({ default: Page })));
 const GoodsReceiptsPage = lazy(() => import("../features/purchasing/GoodsReceiptsPage").then(({ GoodsReceiptsPage: Page }) => ({ default: Page })));
@@ -305,14 +306,15 @@ function Dashboard() {
   const cards = appRoutes.filter((route) => route.path !== "/" && route.nav !== false && (!route.permission || hasPermission(currentUser?.permissions ?? [], route.permission)));
   return <div className="content">
     <div className="welcome-panel">
-      <p className="eyebrow">Release v0.3 · Point of sale</p>
+      <p className="eyebrow">Release v0.7 · Reports, accounts and expenses</p>
       <h1>Welcome{currentUser?.activeUserName ? `, ${currentUser.activeUserName}` : ""}</h1>
-      <p>Products, stock and selling at the till are ready. Modules marked “Under development” in the menu arrive in later releases.</p>
+      <p>Selling, stock, customers, suppliers, quotations, orders, reports and expenses are ready. Modules marked “Under development” in the menu arrive in later releases.</p>
     </div>
+    <DashboardPanel />
     <div className="dashboard-grid">{cards.map((route) => <Link className="dashboard-card" key={route.path} to={route.path}>
       <span className="card-arrow">↗</span><strong>{route.label}</strong><small>Open workspace</small>
     </Link>)}</div>
-    <section className="foundation-note"><strong>v0.5 Suppliers and purchasing</strong><span>Next: quotations, orders and delivery · v0.6</span></section>
+    <section className="foundation-note"><strong>v0.7 Reports, dashboard and expenses</strong><span>Next: FBR integration · v0.8</span></section>
   </div>;
 }
 

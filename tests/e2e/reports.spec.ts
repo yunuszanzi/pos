@@ -26,6 +26,11 @@ test("6. a report is run and narrowed, exported to a spreadsheet, and a sales-on
   }
 
   await signInThroughUi(page, business.ownerEmail);
+  // The home page shows today at a glance: the same figures the reports give.
+  await expect(page.getByTestId("dash-sales")).toHaveText("Rs 70.00");
+  await expect(page.getByTestId("dash-profit")).toHaveText("Rs 56.00"); // 70.00 less 14.00 of cost
+  await expect(page.getByRole("table", { name: "Best sellers today" })).toContainText("Product A");
+  await expect(page.getByRole("img", { name: /Sales for the last 14 days/ })).toBeVisible();
   await page.getByRole("navigation", { name: "Main navigation" }).getByRole("link", { name: "Reports", exact: true }).click();
   await expect(page.getByRole("region", { name: "Sales" })).toContainText("Sales by product");
   await expect(page.getByRole("region", { name: "Profit" })).toContainText("Profit and loss");
@@ -65,6 +70,9 @@ test("6. a report is run and narrowed, exported to a spreadsheet, and a sales-on
   const staffPage = await context.newPage();
   await staffPage.goto("/login");
   await signInThroughUi(staffPage, staff.email);
+  await expect(staffPage.getByTestId("dash-sales")).toHaveText("Rs 70.00");
+  await expect(staffPage.getByTestId("dash-profit")).toHaveCount(0);
+  await expect(staffPage.getByTestId("dash-cash")).toHaveCount(0);
   await staffPage.getByRole("navigation", { name: "Main navigation" }).getByRole("link", { name: "Reports", exact: true }).click();
   await expect(staffPage.getByRole("region", { name: "Sales" })).toBeVisible();
   await expect(staffPage.getByRole("region", { name: "Profit" })).toHaveCount(0);
