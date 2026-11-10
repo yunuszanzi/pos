@@ -33,6 +33,7 @@ import { returnRoutes } from "./modules/returns/routes";
 import { customersRoutes } from "./modules/customers/routes";
 import { inventoryRoutes } from "./modules/inventory/routes";
 import { orgRoutes } from "./modules/org/routes";
+import { secureHeaders } from "hono/secure-headers";
 import { posRoutes } from "./modules/pos/routes";
 import { productsRoutes } from "./modules/products/routes";
 import { settingsRoutes } from "./modules/settings/routes";
@@ -42,6 +43,14 @@ import { shiftsRoutes } from "./modules/shifts/routes";
 import { usersRoutes } from "./modules/users/routes";
 
 export const app = new Hono();
+
+// Headers for every answer: no guessing at content types, no framing, no referrer. What the API says about money, stock and people is
+// never kept by a browser or a shared proxy (it is private, and it changes).
+app.use("*", secureHeaders({ xFrameOptions: "DENY", referrerPolicy: "no-referrer" }));
+app.use("/api/*", async (context, next) => {
+  await next();
+  if (!context.req.path.startsWith("/api/health")) context.header("Cache-Control", "no-store");
+});
 
 app.get("/api/health", (context) => context.json({ status: "ok" }));
 // The one place without sign-in: reading a document through a share link (the unguessable token is the key).

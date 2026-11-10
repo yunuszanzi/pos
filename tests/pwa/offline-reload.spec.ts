@@ -56,3 +56,36 @@ test("a till that was open before the network went can be reloaded offline and s
     await client.end();
   }
 });
+
+test("the app runs under the production security headers: nothing is blocked by the content security policy", async ({ page, context }) => {
+  // The preview server sends the headers from vercel.json (vite.config.ts), so this runs the real policy.
+  await page.addInitScript(() => {
+    (window as unknown as { __violations: string[] }).__violations = [];
+    document.addEventListener("securitypolicyviolation", (event) => (window as unknown as { __violations: string[] }).__violations.push(`${event.violatedDirective} ${event.blockedURI}`));
+  });
+
+  const business = await createTestBusiness();
+  await createSimpleProduct(business, "CSP-A", 100);
+  expect((await callApi(business.ownerToken, "POST", "/stock/opening", { body: { csv: "sku,quantity,unit,cost\nCSP-A,10,Piece,1.00" }, idempotencyKey: `open-${crypto.randomUUID()}` })).status).toBe(201);
+  await signInThroughUi(page, business.ownerEmail);
+  for (const path of ["/products", "/stock", "/reports", "/settings/fbr"]) {
+    await page.goto(path);
+    await expect(page.locator("main .content, main .full-message").first()).toBeVisible();
+  }
+  await page.goto("/pos");
+  await page.getByLabel("Opening cash (Rs)").fill("0.00");
+  await page.getByRole("button", { name: "Open shift" }).click();
+  await expect(page.getByLabel("Scan or search")).toBeVisible();
+  const box = page.getByLabel("Scan or search");
+  await box.fill("CSP-A-PC");
+  await box.press("Enter");
+  await page.getByRole("button", { name: /^Pay/ }).click();
+  await page.getByLabel("Amount 1").fill("5.00");
+  await page.getByRole("button", { name: /^Pay Rs 5.00/ }).click();
+  await expect(page.getByRole("dialog", { name: "Sale complete" })).toBeVisible();
+
+  // The form checker (zod) tries `new Function` once to see whether it may compile its fast path, and carries on with the plain one
+  // when the policy says no. That single probe is reported as a violation; everything else would be a real block.
+  const violations = await page.evaluate(() => (window as unknown as { __violations: string[] }).__violations);
+  expect(violations.filter((entry) => entry !== "script-src eval")).toEqual([]);
+});
