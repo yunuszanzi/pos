@@ -27,7 +27,7 @@ export function TransferFormPage() {
 
   const units = useQuery({ queryKey: ["units"], queryFn: getAllUnits, staleTime: 5 * 60_000 });
   const locations = useQuery({ queryKey: ["locations"], queryFn: getAllLocations, staleTime: 5 * 60_000 });
-  const active = (locations.data ?? []).filter((location) => location.active);
+  const active = (locations.data ?? []).filter((location) => location.active).sort((a, b) => a.name.localeCompare(b.name));
   const from = fromId || active[0]?.id || "";
   const to = toId || active.find((location) => location.id !== from)?.id || "";
   const unitName = (unitId: string) => units.data?.find((unit) => unit.id === unitId)?.name ?? "";

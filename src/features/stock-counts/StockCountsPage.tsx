@@ -27,7 +27,7 @@ export function StockCountsPage() {
   const idempotencyKey = useRef(crypto.randomUUID());
 
   const locations = useQuery({ queryKey: ["locations"], queryFn: getAllLocations, staleTime: 5 * 60_000 });
-  const active = (locations.data ?? []).filter((location) => location.active);
+  const active = (locations.data ?? []).filter((location) => location.active).sort((a, b) => a.name.localeCompare(b.name));
   const chosen = locationId || active[0]?.id || "";
   const list = useQuery({ queryKey: ["stock-counts", { status, page }], queryFn: ({ signal }) => getAllStockCounts(status, page, signal), placeholderData: keepPreviousData });
   const rows = list.data?.data ?? [];
