@@ -58,6 +58,7 @@ export function InvoicePage() {
         <div><dt>{data.taxMode === "inclusive" ? "Tax (included)" : "Tax"}</dt><dd>{formatPkr(data.taxPaisa)}</dd></div>
         <div className="grand"><dt>Invoice total</dt><dd data-testid="invoice-total">{formatPkr(data.totalPaisa)}</dd></div>
         <div><dt>Still owing</dt><dd data-testid="invoice-owing">{formatPkr(owing)}</dd></div>
+        {data.fbrStatus && data.fbrStatus !== "skipped" && <div><dt>FBR</dt><dd data-testid="invoice-fbr">{data.fbrStatus === "accepted" && data.fbrIrn ? `Accepted · ${data.fbrIrn}` : data.fbrStatus === "pending" ? "Waiting to be reported" : "Not accepted yet"}</dd></div>}
       </dl>
       {data.note && <p className="muted">{data.note}</p>}
       <div className="button-row">

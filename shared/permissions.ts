@@ -72,6 +72,9 @@ export const permissionDefinitions = [
   ["reports.profit.view", "See profit, cost of goods and stock value in reports and exports"],
   ["reports.tax.view", "See the sales tax summary (output and input tax by rate)"],
   ["cash.close_day", "Close a branch's day (day-end closing) and reopen it with a reason"],
+  ["fbr.view", "See the FBR log, each invoice's FBR status and the reconciliation"],
+  ["fbr.resubmit", "Send an invoice or return to FBR again after fixing what was wrong"],
+  ["fbr.manage", "Change the FBR settings: switch it on, the token, the environment, the mappings (Owner)"],
 ] as const;
 
 export type PermissionKey = (typeof permissionDefinitions)[number][0];
@@ -98,6 +101,7 @@ export const managerPermissionKeys: PermissionKey[] = [
   "delivery.view", "delivery.manage", "invoices.view", "invoices.create",
   "expenses.view", "expenses.create", "accounts.view", "accounts.manage",
   "reports.profit.view", "reports.tax.view", "cash.close_day",
+  "fbr.view", "fbr.resubmit",
 ];
 
 export const cashierPermissionKeys: PermissionKey[] = [

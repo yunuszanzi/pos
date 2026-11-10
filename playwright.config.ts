@@ -7,6 +7,10 @@ import { defineConfig, devices } from "@playwright/test";
 const apiPort = 3100;
 const webPort = 5180;
 process.env.TEST_API_URL = `http://127.0.0.1:${apiPort}`;
+// The API server inherits these: a fixed key (never a real one), the fake FBR service, and the scheduler secret.
+process.env.APP_ENCRYPTION_KEY ??= Buffer.alloc(32, 7).toString("base64");
+process.env.FBR_ADAPTER ??= "mock";
+process.env.CRON_SECRET ??= "test-cron-secret-0123456789abcdef";
 
 export default defineConfig({
   testDir: "./tests/e2e",

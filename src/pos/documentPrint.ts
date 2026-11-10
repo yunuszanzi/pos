@@ -47,6 +47,7 @@ export const invoicePrintDoc = (data: Invoice): ReceiptInvoice => ({
   customerName: data.customerName, customerBalancePaisa: null,
   channel: data.channel, termsDays: data.termsDays, dueDate: data.dueDate, customerPo: data.customerPo, orderNumber: data.orderNumber, note: data.note,
   buyerName: data.buyerName, buyerNtn: data.buyerNtn, buyerStrn: data.buyerStrn, buyerAddress: data.buyerAddress,
+  fbrStatus: data.fbrStatus, fbrIrn: data.fbrIrn, fbrQr: data.fbrQr,
   lines: sheetLines(data.lines),
   payments: [],
 });

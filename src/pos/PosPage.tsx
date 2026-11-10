@@ -329,6 +329,9 @@ function SaleDone({ sale, onNext, onPrintOriginal, onPrintDuplicate }: {
       </SelectInput>
       <button className="button secondary" disabled={printed && !can("sales.reprint")} onClick={() => void print()}>{printed ? "Print duplicate" : "Print"}</button>
     </div>
+    {invoice.fbrStatus === "accepted" && invoice.fbrIrn && <p className="notice" role="status" data-testid="done-fbr">FBR invoice no. {invoice.fbrIrn}</p>}
+    {invoice.fbrStatus === "pending" && <p className="notice error" role="status" data-testid="done-fbr">FBR could not be reached. The sale is saved and will be reported automatically. Print this bill again later to get the FBR invoice number.</p>}
+    {(invoice.fbrStatus === "rejected" || invoice.fbrStatus === "failed") && <p className="notice error" role="status" data-testid="done-fbr">FBR did not accept this invoice. The sale is saved; the owner can see why in the FBR log.</p>}
     {error && <p className="notice error" role="alert">{error}</p>}
     <button className="button primary" onClick={onNext} autoFocus>New sale</button>
   </div></Dialog>;

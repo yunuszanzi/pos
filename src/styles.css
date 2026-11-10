@@ -288,3 +288,13 @@ fieldset { border: 1px solid #e0e6ef; border-radius: 8px; }
 .trend-bar { fill: #244b97; }
 .trend-bar.empty { fill: #d5dbe6; }
 .trend-label { fill: #6b778c; font-size: 11px; }
+
+/* ---- FBR's invoice number and QR code on a bill (FR-PRT-04). ---- */
+.receipt-fbr { margin-top: 8px; padding-top: 6px; border-top: 1px dashed #000; text-align: center; }
+.receipt-fbr p { margin: 2px 0; font-weight: 700; }
+.receipt-qr { display: block; width: 26mm; height: 26mm; margin: 4px auto; image-rendering: pixelated; }
+.receipt-a4 .receipt-fbr, .receipt-a5 .receipt-fbr { text-align: left; }
+.receipt-a4 .receipt-qr, .receipt-a5 .receipt-qr { margin-left: 0; }
+
+/* ---- The FBR log: what was sent and what came back. ---- */
+.code-block { margin: 4px 0 12px; padding: 8px; max-height: 280px; overflow: auto; background: #f4f4f5; border-radius: 6px; font-size: 12px; white-space: pre-wrap; word-break: break-word; }

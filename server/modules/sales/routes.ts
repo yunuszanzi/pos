@@ -15,6 +15,7 @@ import { apiError, paramId } from "../../lib/http";
 import { idempotent } from "../../lib/idempotency";
 import { getActorId, getPrincipal, hasPermission, requirePermission } from "../../lib/permissions";
 import { validateJson } from "../../lib/validate";
+import { fbrPreflight, queueFbrSubmission, reportNow } from "../../fbr/service";
 import { approveByManager } from "./approval";
 import { describeShortage as describeOrderShortage } from "./orders";
 import { resolveSalesLocationId } from "./location";
@@ -226,10 +227,16 @@ salesRoutes.post("/sales", requirePermission("sales.create"), idempotent(), vali
     })),
   };
 
+  // FBR: nothing is posted if what FBR needs is missing, and the sale says what to fix (FR-FBR-10).
+  const fbrProblems = await fbrPreflight(businessId, { terminalId: terminal.id, customerId: customerId, totalPaisa: priced.totalPaisa, lines: payload.lines as Array<Record<string, unknown>> });
+  if (fbrProblems.length) return apiError(context, 422, "FBR_INCOMPLETE", `FBR needs more detail before this can be posted. ${fbrProblems.slice(0, 5).join(". ")}${fbrProblems.length > 5 ? `. And ${fbrProblems.length - 5} more` : ""}.`);
   let invoiceId: string;
+  let fbrQueued: string | null = null;
   try {
     invoiceId = await db.transaction(async (tx) => {
       const [row] = await tx.execute<{ id: string }>(sql`select post_sales_invoice(${JSON.stringify(payload)}::jsonb, ${actor}) as id`);
+      // Queued in the same transaction, so a posted sale can never miss being reported.
+      fbrQueued = await queueFbrSubmission(tx, businessId, "sales_invoice", row.id, terminal.id);
       return row.id;
     });
   } catch (error) {
@@ -243,6 +250,8 @@ salesRoutes.post("/sales", requirePermission("sales.create"), idempotent(), vali
   }
 
   await auditPrincipal(context, principal, "sales_invoice", invoiceId, "post", null, { totalPaisa: priced.totalPaisa, lines: input.lines.length, approvedBy });
+  // The first go at reporting it. If FBR is slow or down the sale stands as "FBR pending" and the retry job carries on.
+  await reportNow(fbrQueued);
   const invoice = await loadInvoice(businessId, invoiceId, canSeeCost(principal));
   // The till updates its cached stock from this instead of asking again (technical-plan 5.7).
   const stock = await db.execute<{ variant_id: string; on_hand: string }>(sql`
@@ -277,6 +286,9 @@ export async function loadInvoice(businessId: string, id: string, withCost: bool
     branchName: invoice.branch_name,
     terminalName: invoice.terminal_name ?? "",
     channel: String(invoice.channel),
+    fbrStatus: invoice.fbr_status ? String(invoice.fbr_status) : null,
+    fbrIrn: invoice.fbr_irn ? String(invoice.fbr_irn) : null,
+    fbrQr: invoice.fbr_qr ? String(invoice.fbr_qr) : null,
     orderId: invoice.order_id ? String(invoice.order_id) : null,
     orderNumber: invoice.order_number ? String(invoice.order_number) : null,
     quotationId: invoice.quotation_id ? String(invoice.quotation_id) : null,
