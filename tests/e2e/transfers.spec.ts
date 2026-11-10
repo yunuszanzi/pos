@@ -14,8 +14,8 @@ test("1. transfer 20 cartons: source drops on dispatch, destination rises on rec
 
   await signInThroughUi(page, business.ownerEmail);
   await page.goto("/transfers/new");
-  await page.getByLabel("From", { exact: true }).selectOption({ label: "Main Store" });
-  await page.getByLabel("To", { exact: true }).selectOption({ label: "Warehouse" });
+  await page.getByRole("combobox", { name: /^From/ }).selectOption({ label: "Main Store" });
+  await page.getByRole("combobox", { name: /^To/ }).selectOption({ label: "Warehouse" });
   await page.getByLabel("Find a product to add").fill("TRF-1");
   await page.getByRole("button", { name: "Add TRF-1" }).click();
   const line = page.getByRole("group", { name: "Line TRF-1" });
