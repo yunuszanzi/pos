@@ -400,5 +400,30 @@ const tax: ReportDef[] = [
   },
 ];
 
+tax.push({
+  key: "fbr-reconciliation", title: "FBR reconciliation", group: "Tax",
+  description: "For each day: the invoices and returns posted here, how many FBR has accepted, and the tax on those still waiting, refused or given up. Anything in the last three columns needs attention.",
+  needs: ["reports.tax.view", "fbr.view"], filters: ["dates", "branchId"],
+  columns: [date("day", "Day"), count("posted", "Invoices posted"), count("accepted", "Accepted by FBR"), count("pending", "Waiting"), count("rejected", "Refused"), count("failed", "Given up"), count("not_reported", "Not reported"),
+    money("tax_posted", "Tax posted"), money("tax_accepted", "Tax accepted"), money("tax_outstanding", "Tax not yet accepted"), count("returns_posted", "Returns posted"), count("returns_accepted", "Returns accepted")],
+  inner: (c) => sql`
+    with inv as (
+      select (i.posted_at at time zone 'Asia/Karachi')::date as day, count(*)::int as posted,
+        count(*) filter (where i.fbr_status = 'accepted')::int as accepted, count(*) filter (where i.fbr_status = 'pending')::int as pending,
+        count(*) filter (where i.fbr_status = 'rejected')::int as rejected, count(*) filter (where i.fbr_status = 'failed')::int as failed,
+        count(*) filter (where i.fbr_status is null or i.fbr_status = 'skipped')::int as not_reported,
+        coalesce(sum(i.tax_paisa), 0)::bigint as tax_posted, coalesce(sum(i.tax_paisa) filter (where i.fbr_status = 'accepted'), 0)::bigint as tax_accepted,
+        coalesce(sum(i.tax_paisa) filter (where i.fbr_status in ('pending', 'rejected', 'failed')), 0)::bigint as tax_outstanding
+      from sales_invoices i where i.business_id = ${c.businessId} and ${within("i.posted_at", c)} ${when(c.branchId, sql`and i.branch_id = ${c.branchId}`)} group by 1),
+    ret as (
+      select (r.posted_at at time zone 'Asia/Karachi')::date as day, count(*)::int as returns_posted, count(*) filter (where r.fbr_status = 'accepted')::int as returns_accepted
+      from sales_returns r where r.business_id = ${c.businessId} and ${within("r.posted_at", c)} ${when(c.branchId, sql`and r.branch_id = ${c.branchId}`)} group by 1)
+    select to_char(coalesce(inv.day, ret.day), 'YYYY-MM-DD') as day, coalesce(inv.posted, 0) as posted, coalesce(inv.accepted, 0) as accepted, coalesce(inv.pending, 0) as pending,
+      coalesce(inv.rejected, 0) as rejected, coalesce(inv.failed, 0) as failed, coalesce(inv.not_reported, 0) as not_reported, coalesce(inv.tax_posted, 0) as tax_posted,
+      coalesce(inv.tax_accepted, 0) as tax_accepted, coalesce(inv.tax_outstanding, 0) as tax_outstanding, coalesce(ret.returns_posted, 0) as returns_posted, coalesce(ret.returns_accepted, 0) as returns_accepted
+    from inv full join ret on ret.day = inv.day`,
+  orderBy: "day desc",
+});
+
 export const reportCatalogue: ReportDef[] = [...sellers, ...profits, ...inventory, ...purchasing, ...owed, ...cash, ...tax];
 export const reportByKey = new Map(reportCatalogue.map((report) => [report.key, report]));

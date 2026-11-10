@@ -10,6 +10,7 @@ import { auditPrincipal } from "../../lib/audit";
 import { db } from "../../lib/db";
 import { dbErrorMessage } from "../../lib/dbErrors";
 import { apiError, paramId } from "../../lib/http";
+import { queueFbrSubmission, reportNow } from "../../fbr/service";
 import { idempotent } from "../../lib/idempotency";
 import { getActorId, getPrincipal, hasPermission, requirePermission } from "../../lib/permissions";
 import { validateJson } from "../../lib/validate";
@@ -226,9 +227,12 @@ returnRoutes.post("/returns", useReturns, idempotent(), validateJson(postReturnS
   };
 
   let returnId: string;
+  let fbrQueued: string | null = null;
   try {
     returnId = await db.transaction(async (tx) => {
       const [row] = await tx.execute<{ id: string }>(sql`select post_sales_return(${JSON.stringify(payload)}::jsonb, ${actor}) as id`);
+      // A return is reported to FBR as a debit note against the invoice it takes back (FR-FBR-12).
+      fbrQueued = await queueFbrSubmission(tx, businessId, "sales_return", row.id, terminal.id);
       return row.id;
     });
   } catch (error) {
@@ -239,6 +243,7 @@ returnRoutes.post("/returns", useReturns, idempotent(), validateJson(postReturnS
   }
 
   await auditPrincipal(context, principal, "sales_return", returnId, "post", null, { totalPaisa: totals.totalPaisa, lines: lines.length, invoiceId: input.invoiceId ?? null, approvedBy });
+  await reportNow(fbrQueued);
   const note = await loadReturn(businessId, returnId);
   // The till updates its cached stock from this instead of asking again (technical-plan 5.7).
   const stock = await db.execute<{ variant_id: string; on_hand: string }>(sql`
@@ -270,6 +275,7 @@ async function loadReturn(businessId: string, id: string) {
     id: String(row.id), number: String(row.number), postedAt: row.posted_at, branchName: row.branch_name, terminalName: row.terminal_name, cashierName: row.cashier_name,
     shiftId: row.shift_id, invoiceId: row.original_invoice_id ?? null, invoiceNumber: row.invoice_number ?? null,
     customerId: row.customer_id ?? null, customerName: row.customer_name ?? null, customerBalancePaisa: row.customer_id ? paisa(row.customer_balance) : null,
+    fbrStatus: row.fbr_status ? String(row.fbr_status) : null, fbrIrn: row.fbr_irn ? String(row.fbr_irn) : null, fbrQr: row.fbr_qr ? String(row.fbr_qr) : null,
     reason: String(row.reason), taxMode: row.tax_mode, grossPaisa: paisa(row.gross_paisa), lineDiscountPaisa: paisa(row.line_discount_paisa),
     invoiceDiscountPaisa: paisa(row.invoice_discount_paisa), taxablePaisa: paisa(row.taxable_paisa), taxPaisa: paisa(row.tax_paisa),
     roundingPaisa: paisa(row.rounding_paisa), totalPaisa: paisa(row.total_paisa),

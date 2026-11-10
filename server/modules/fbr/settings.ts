@@ -65,6 +65,8 @@ fbrSettingsRoutes.put("/fbr/config", manage, validateJson(fbrConfigSchema), asyn
   const principal = getPrincipal(context);
   const businessId = principal.businessId!;
   const input = context.req.valid("json");
+  // POS fiscalisation uses a different FBR service from Digital Invoicing and is not built yet; saying so beats quietly not reporting.
+  if (input.mode !== "di") return apiError(context, 422, "FBR_MODE_UNAVAILABLE", "Only Digital Invoicing is available in this version. POS fiscalisation is not built yet.");
   const current = await loadFbrSettings(businessId);
   const effective = { sellerNtn: input.sellerNtn || current.seller.ntnCnic, sellerName: input.sellerName || current.seller.name, sellerProvince: input.sellerProvince || current.seller.province, sellerAddress: input.sellerAddress || current.seller.address };
 

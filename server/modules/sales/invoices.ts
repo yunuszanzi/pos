@@ -14,6 +14,7 @@ import { validateJson } from "../../lib/validate";
 import { canSeeCost, escapeLike, quantityText } from "../products/service";
 import { priceDocument } from "./documentPricing";
 import { resolveBranchId, resolveOrderLocationId } from "./location";
+import { fbrPreflight, queueFbrSubmission, reportNow } from "../../fbr/service";
 import { describeShortage } from "./orders";
 import { describeCredit, loadInvoice } from "./routes";
 
@@ -167,10 +168,14 @@ salesInvoiceRoutes.post("/sales-invoices", create, idempotent(), validateJson(sa
     terms_days: input.termsDays ?? customer.termsDays, due_date: input.dueDate ?? null, customer_po: input.customerPo ?? "", note: input.note ?? "", lines: prepared.lines,
   };
 
+  const fbrProblems = await fbrPreflight(businessId, { terminalId: null, customerId: prepared.customerId, totalPaisa: prepared.amounts.total_paisa, lines: prepared.lines as Array<Record<string, unknown>> });
+  if (fbrProblems.length) return apiError(context, 422, "FBR_INCOMPLETE", `FBR needs more detail before this can be posted. ${fbrProblems.slice(0, 5).join(". ")}${fbrProblems.length > 5 ? `. And ${fbrProblems.length - 5} more` : ""}.`);
   let invoiceId: string;
+  let fbrQueued: string | null = null;
   try {
     invoiceId = await db.transaction(async (tx) => {
       const [row] = await tx.execute<{ id: string }>(sql`select post_back_office_invoice(${JSON.stringify(payload)}::jsonb, ${getActorId(principal)}) as id`);
+      fbrQueued = await queueFbrSubmission(tx, businessId, "sales_invoice", row.id, null);
       return row.id;
     });
   } catch (error) {
@@ -184,6 +189,7 @@ salesInvoiceRoutes.post("/sales-invoices", create, idempotent(), validateJson(sa
   }
 
   await auditPrincipal(context, principal, "sales_invoice", invoiceId, "post", null, { totalPaisa: prepared.amounts.total_paisa, lines: prepared.lines.length, orderId: prepared.orderId, quotationId: prepared.quotationId });
+  await reportNow(fbrQueued);
   return context.json({ invoice: await loadInvoice(businessId, invoiceId, canSeeCost(principal)) }, 201);
 });
 

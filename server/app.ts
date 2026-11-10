@@ -5,7 +5,9 @@ import { apiError } from "./lib/http";
 import { HTTPException } from "hono/http-exception";
 import { auditRoutes } from "./modules/audit/routes";
 import { dashboardRoutes } from "./modules/reports/dashboard";
+import { fbrLogRoutes } from "./modules/fbr/log";
 import { fbrSettingsRoutes } from "./modules/fbr/settings";
+import { jobRoutes } from "./modules/jobs/routes";
 import { dayClosingRoutes } from "./modules/shifts/dayClosing";
 import { authRoutes } from "./modules/auth/routes";
 import { catalogueRoutes } from "./modules/catalogue/routes";
@@ -40,6 +42,8 @@ export const app = new Hono();
 app.get("/api/health", (context) => context.json({ status: "ok" }));
 // The one place without sign-in: reading a document through a share link (the unguessable token is the key).
 app.route("/api/public", publicRoutes);
+// Scheduled work (FBR retries): behind a secret of its own instead of a sign-in.
+app.route("/api/jobs", jobRoutes);
 app.use("/api/v1/*", authenticate);
 app.route("/api/v1", authRoutes);
 app.route("/api/v1", orgRoutes);
@@ -71,6 +75,7 @@ app.route("/api/v1", expenseRoutes);
 app.route("/api/v1", dashboardRoutes);
 app.route("/api/v1", dayClosingRoutes);
 app.route("/api/v1", fbrSettingsRoutes);
+app.route("/api/v1", fbrLogRoutes);
 app.route("/api/v1", returnRoutes);
 
 app.notFound((context) => apiError(context, 404, "NOT_FOUND", "API route not found"));

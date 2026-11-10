@@ -95,5 +95,12 @@ dashboardRoutes.get("/dashboard", async (context) => {
         group by v.id having coalesce(sum(b.on_hand), 0) <= v.reorder_level) low_items`);
     out.lowStock = { items: Number(row.low) };
   }
+  // FBR: invoices FBR refused or that were given up need someone to fix them (FR-FBR-16); the ones waiting will go by themselves.
+  if (may("fbr.view")) {
+    const [row] = await db.execute(sql`
+      select count(*) filter (where status = 'rejected')::int as rejected, count(*) filter (where status = 'failed')::int as failed, count(*) filter (where status = 'pending')::int as pending
+      from fbr_submissions where business_id = ${businessId}`);
+    if (Number(row.rejected) + Number(row.failed) + Number(row.pending) > 0) out.fbr = { rejected: Number(row.rejected), failed: Number(row.failed), pending: Number(row.pending) };
+  }
   return context.json(out);
 });

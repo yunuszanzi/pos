@@ -68,9 +68,9 @@ integration("FBR settings", { timeout: 300_000 }, () => {
     const noSeller = await callApi(business.ownerToken, "PUT", "/fbr/config", { body: config({ enabled: true, sellerNtn: "", sellerAddress: "", sellerProvince: "" }) });
     expect(noSeller.status).toBe(422);
     expect(noSeller.body.error.message).toMatch(/NTN.*province.*address/);
-    const on = await callApi(business.ownerToken, "PUT", "/fbr/config", { body: config({ enabled: true, mode: "both" }) });
+    const on = await callApi(business.ownerToken, "PUT", "/fbr/config", { body: config({ enabled: true }) });
     expect(on.status, JSON.stringify(on.body)).toBe(200);
-    expect(on.body).toMatchObject({ enabled: true, mode: "both", environment: "sandbox", seller: { ntn: "1234567-8", province: "SINDH" } });
+    expect(on.body).toMatchObject({ enabled: true, mode: "di", environment: "sandbox", seller: { ntn: "1234567-8", province: "SINDH" } });
     expect((await callApi(business.ownerToken, "PUT", "/fbr/config", { body: { enabled: true, mode: "xyz", environment: "sandbox" } })).status).toBe(400);
   });
 

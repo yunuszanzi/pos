@@ -40,10 +40,10 @@ export async function loadFbrSettings(businessId: string): Promise<FbrSettings> 
 }
 
 /** The client for this business's environment and token, or null if no token is stored. The token is read and decrypted only here. */
-export async function clientFor(businessId: string, settings?: FbrSettings): Promise<FbrClient | null> {
+export async function clientFor(businessId: string, settings?: FbrSettings, timeoutMs?: number): Promise<FbrClient | null> {
   const [row] = await db.execute<{ token_encrypted: string | null; environment: FbrEnvironment }>(sql`select token_encrypted, environment from fbr_config where business_id = ${businessId}`);
   if (!row?.token_encrypted) return null;
-  return createFbrClient({ environment: settings?.environment ?? row.environment, token: decryptSecret(row.token_encrypted) });
+  return createFbrClient({ environment: settings?.environment ?? row.environment, token: decryptSecret(row.token_encrypted), timeoutMs });
 }
 
 export const adapterKind = () => (process.env.FBR_ADAPTER === "mock" ? "mock" : "live");
