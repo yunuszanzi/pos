@@ -2,7 +2,10 @@ import { sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { db } from "../../lib/db";
 import { apiError } from "../../lib/http";
-import { getPrincipal, requirePermission } from "../../lib/permissions";
+import { getPrincipal, hasPermission, requirePermission, type Principal } from "../../lib/permissions";
+import { neutraliseFormula, toCsv } from "../../../shared/csv";
+import { reportCellCsv, type ReportCell, type ReportColumn, type ReportInfo, type ReportResult } from "../../../shared/reports";
+import { reportByKey, reportCatalogue, type ReportContext, type ReportDef } from "./catalogue";
 import { canSeeCost, quantityText } from "../products/service";
 
 export const reportsRoutes = new Hono();
@@ -64,4 +67,83 @@ reportsRoutes.get("/reports/daily-sales", requirePermission("reports.sales.view"
     byCashier: byCashier.map((row) => ({ name: row.name, invoiceCount: Number(row.invoices), totalPaisa: Number(row.total) })),
     topProducts: topProducts.map((row) => ({ sku: row.sku, productName: row.product_name, quantityBase: quantityText(String(row.qty_base)), totalPaisa: Number(row.total) })),
   });
+});
+
+// ---------------------------------------------------------------- the report catalogue (SRS 7.2)
+
+const uuidQuery = (value: string | undefined) => (value && /^[0-9a-f-]{36}$/i.test(value) ? value : undefined);
+const dayQuery = (value: string | undefined) => (value && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value)) ? value : undefined);
+const maxRangeDays = 3660;
+const csvRowLimit = 50_000;
+
+/** A report may be run by someone who holds everything it needs; one that shows costs or profit also needs reports.profit.view. */
+function mayRun(principal: Principal, report: ReportDef): boolean {
+  return report.needs.every((key) => hasPermission(principal, key)) && (!report.profit || hasPermission(principal, "reports.profit.view"));
+}
+
+reportsRoutes.get("/report-catalogue", (context) => {
+  const principal = getPrincipal(context);
+  if (!principal.businessId) return apiError(context, 403, "PERMISSION_DENIED", "You do not have permission to perform this action");
+  const data: ReportInfo[] = reportCatalogue.filter((report) => mayRun(principal, report))
+    .map((report) => ({ key: report.key, title: report.title, group: report.group, description: report.description, filters: report.filters, profit: Boolean(report.profit) }));
+  return context.json({ data, today: today() });
+});
+
+reportsRoutes.get("/report-data/:key", async (context) => {
+  const principal = getPrincipal(context);
+  const report = reportByKey.get(context.req.param("key"));
+  if (!principal.businessId || !report) return apiError(context, 404, "NOT_FOUND", "There is no such report");
+  if (!mayRun(principal, report)) return apiError(context, 403, "PERMISSION_DENIED", "You do not have permission to see this report");
+
+  const query = (name: string) => context.req.query(name);
+  const todayText = today();
+  const to = dayQuery(query("to")) ?? todayText;
+  const from = dayQuery(query("from")) ?? `${todayText.slice(0, 8)}01`;
+  if (from > to) return apiError(context, 400, "INVALID_DATE", "The first day must not be after the last day");
+  if ((Date.parse(to) - Date.parse(from)) / 86_400_000 > maxRangeDays) return apiError(context, 400, "INVALID_DATE", "Choose a range of less than ten years");
+  const days = Math.min(3650, Math.max(1, Math.trunc(Number(query("days") ?? 90)) || 90));
+  const search = query("q")?.trim().slice(0, 100);
+  const ctx: ReportContext = {
+    businessId: principal.businessId, from, to, days, q: search || undefined,
+    branchId: uuidQuery(query("branchId")), terminalId: uuidQuery(query("terminalId")), userId: uuidQuery(query("userId")), customerId: uuidQuery(query("customerId")),
+    supplierId: uuidQuery(query("supplierId")), categoryId: uuidQuery(query("categoryId")), variantId: uuidQuery(query("variantId")), locationId: uuidQuery(query("locationId")),
+    accountId: uuidQuery(query("accountId")),
+  };
+
+  const csv = query("format") === "csv";
+  const pageSize = csv ? csvRowLimit : Math.min(200, Math.max(1, Math.trunc(Number(query("pageSize") ?? 50)) || 50));
+  const page = csv ? 1 : Math.max(1, Math.trunc(Number(query("page") ?? 1)) || 1);
+  // Columns about cost and profit are left out for people without reports.profit.view, even in a report they may otherwise see.
+  const mayProfit = hasPermission(principal, "reports.profit.view");
+  const columns = report.columns.filter((column) => !column.profit || mayProfit).map(({ profit, ...column }) => { void profit; return column as ReportColumn; });
+
+  const inner = report.inner(ctx);
+  const rows = await db.execute(sql`select r.*, count(*) over () as __total from (${inner}) r order by ${sql.raw(report.orderBy)} limit ${pageSize} offset ${(page - 1) * pageSize}`);
+  const summed = columns.filter((column) => column.sum);
+  const [sums] = summed.length && rows.length
+    ? await db.execute(sql`select ${sql.join(summed.map((column) => sql`coalesce(sum(r.${sql.raw(`"${column.key}"`)}), 0)::bigint as ${sql.raw(`"${column.key}"`)}`), sql`, `)} from (${inner}) r`)
+    : [];
+
+  const cell = (column: ReportColumn, value: unknown): ReportCell => {
+    if (value === null || value === undefined) return column.type === "money" || column.type === "int" || column.type === "percent" ? null : "";
+    if (column.type === "money" || column.type === "int" || column.type === "percent") return Number(value);
+    if (column.type === "qty") return quantityText(String(value));
+    return String(value);
+  };
+  const shaped = rows.map((row) => Object.fromEntries(columns.map((column) => [column.key, cell(column, row[column.key])])));
+  const total = rows.length ? Number(rows[0].__total) : 0;
+
+  if (csv) {
+    const header = columns.map((column) => column.label);
+    const lines = shaped.map((row) => columns.map((column) => neutraliseFormula(reportCellCsv(column, row[column.key]))));
+    const totalsRow = sums ? [columns.map((column, index) => (index === 0 ? "Total" : column.sum ? reportCellCsv(column, Number(sums[column.key])) : ""))] : [];
+    // A spreadsheet opens the file as UTF-8 only if it starts with a byte order mark.
+    const body = `\uFEFF${toCsv([header, ...lines, ...totalsRow])}`;
+    return new Response(body, { headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename="${report.key}-${from}-to-${to}.csv"`, "Cache-Control": "no-store" } });
+  }
+  const result: ReportResult = {
+    key: report.key, title: report.title, columns, rows: shaped, from, to, page, pageSize, total,
+    totals: sums ? Object.fromEntries(summed.map((column) => [column.key, Number(sums[column.key])])) : null,
+  };
+  return context.json(result);
 });

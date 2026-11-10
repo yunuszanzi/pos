@@ -69,6 +69,8 @@ export const permissionDefinitions = [
   ["expenses.create", "Record expenses, attach bills, and reverse a mistaken one"],
   ["accounts.view", "View cash, bank and wallet accounts, their balances and entries"],
   ["accounts.manage", "Add accounts, record deposits and withdrawals, and move money between accounts"],
+  ["reports.profit.view", "See profit, cost of goods and stock value in reports and exports"],
+  ["reports.tax.view", "See the sales tax summary (output and input tax by rate)"],
 ] as const;
 
 export type PermissionKey = (typeof permissionDefinitions)[number][0];
@@ -94,6 +96,7 @@ export const managerPermissionKeys: PermissionKey[] = [
   "quotations.view", "quotations.manage", "sales_orders.view", "sales_orders.manage",
   "delivery.view", "delivery.manage", "invoices.view", "invoices.create",
   "expenses.view", "expenses.create", "accounts.view", "accounts.manage",
+  "reports.profit.view", "reports.tax.view",
 ];
 
 export const cashierPermissionKeys: PermissionKey[] = [
